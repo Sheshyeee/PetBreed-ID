@@ -1,6 +1,7 @@
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Link } from '@inertiajs/react';
 import { Camera, CircleAlert, RefreshCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -184,12 +185,11 @@ const CameraInterface: React.FC<CameraInterfaceProps> = ({
                                 className="max-h-[70vh] rounded-lg object-contain"
                             />
                             <div className="mt-6 flex gap-4">
-                                <Button
-                                    onClick={confirmPhoto}
-                                    className="w-[500px] flex-1 bg-black px-8 dark:bg-white"
-                                >
-                                    Analyze Image
-                                </Button>
+                                <Link href="/scan-results">
+                                    <Button className="w-[500px] flex-1 bg-black px-8 dark:bg-white">
+                                        Analyze Image
+                                    </Button>
+                                </Link>
                                 <Button
                                     onClick={retakePhoto}
                                     variant="outline"
@@ -279,134 +279,140 @@ const Scan: React.FC = () => {
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center bg-[#FDFDFC] p-6 text-[#1b1b18] lg:justify-center dark:bg-[#0a0a0a]">
-            <Header />
-            <div className="mx-auto mt-[-30px] w-full max-w-7xl pl-10">
-                <div>
-                    <h1 className="mt-6 text-lg font-bold dark:text-white">
-                        Scan Your Pet
-                    </h1>
-                    <h1 className="text-sm text-gray-600 dark:text-white/70">
-                        Upload a photo or use your camera to identify your pet's
-                        breed.
-                    </h1>
+        <>
+            <div>
+                <Header />
+            </div>
+            <div className="flex flex-col items-center bg-[#FDFDFC] text-[#1b1b18] dark:bg-[#0a0a0a]">
+                <div className="mx-auto w-full max-w-7xl pl-10">
+                    <div>
+                        <h1 className="mt-6 text-lg font-bold dark:text-white">
+                            Scan Your Pet
+                        </h1>
+                        <h1 className="text-sm text-gray-600 dark:text-white/70">
+                            Upload a photo or use your camera to identify your
+                            pet's breed.
+                        </h1>
+                    </div>
+
+                    <Card className="mx-auto mt-8 w-full max-w-4xl">
+                        <CardContent className="p-6">
+                            {uploadedImage ? (
+                                <div className="text-center">
+                                    <img
+                                        src={uploadedImage}
+                                        alt="Uploaded pet"
+                                        className="mx-auto max-h-96 rounded-lg object-contain"
+                                    />
+                                    <div className="flex gap-4 pr-10 pl-10">
+                                        <Button asChild className="mt-4 flex-1">
+                                            <Link href="/scan-results">
+                                                Analyze Image
+                                            </Link>
+                                        </Button>
+
+                                        <Button
+                                            onClick={() =>
+                                                setUploadedImage(null)
+                                            }
+                                            variant="outline"
+                                            className="mt-4"
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div
+                                        onClick={triggerFileInput}
+                                        className="flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                                    >
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            onChange={handleFileUpload}
+                                            className="hidden"
+                                        />
+                                        <div className="rounded-full bg-gray-200 dark:bg-gray-800">
+                                            <Camera
+                                                size={36}
+                                                className="p-2 text-black dark:text-white"
+                                            />
+                                        </div>
+                                        <p className="mt-2 text-sm text-gray-600 dark:text-white/70">
+                                            Drop your image here
+                                        </p>
+                                        <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
+                                            or click to browse
+                                        </p>
+                                        <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
+                                            Supports: JPG, PNG, WebP (Max 10 MB)
+                                        </p>
+                                    </div>
+
+                                    <div className="my-6 flex items-center">
+                                        <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                                        <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">
+                                            or use camera
+                                        </span>
+                                        <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                                    </div>
+
+                                    <Button
+                                        onClick={() => setShowCamera(true)}
+                                        className="w-full dark:bg-gray-900 dark:text-white"
+                                    >
+                                        <Camera className="mr-2" size={20} />
+                                        Use Camera
+                                    </Button>
+
+                                    <Card className="mt-6 border-blue-400 bg-blue-50 dark:bg-gray-950">
+                                        <CardContent className="p-4">
+                                            <div className="flex items-center gap-2">
+                                                <CircleAlert
+                                                    size={20}
+                                                    className="text-blue-600 dark:text-blue-400"
+                                                />
+                                                <p className="font-bold text-gray-700 dark:text-white/70">
+                                                    Tips for Best Results
+                                                </p>
+                                            </div>
+                                            <ul className="mt-2 list-disc space-y-1 pl-8">
+                                                <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    Ensure your pet is clearly
+                                                    visible in the photo
+                                                </li>
+                                                <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    Use a well-lit environment
+                                                    for better image quality
+                                                </li>
+                                                <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    Position your pet in the
+                                                    center of the frame
+                                                </li>
+                                                <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    Better angles can improve
+                                                    accuracy
+                                                </li>
+                                            </ul>
+                                        </CardContent>
+                                    </Card>
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
 
-                <Card className="mx-auto mt-8 w-full max-w-4xl">
-                    <CardContent className="p-6">
-                        {uploadedImage ? (
-                            <div className="text-center">
-                                <img
-                                    src={uploadedImage}
-                                    alt="Uploaded pet"
-                                    className="mx-auto max-h-96 rounded-lg object-contain"
-                                />
-                                <div className="flex gap-4 pr-10 pl-10">
-                                    <Button
-                                        onClick={() => setUploadedImage(null)}
-                                        className="mt-4 flex-1"
-                                    >
-                                        Analyze Image
-                                    </Button>
-                                    <Button
-                                        onClick={() => setUploadedImage(null)}
-                                        variant="outline"
-                                        className="mt-4"
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div
-                                    onClick={triggerFileInput}
-                                    className="flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-                                >
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        onChange={handleFileUpload}
-                                        className="hidden"
-                                    />
-                                    <div className="rounded-full bg-gray-200 dark:bg-gray-800">
-                                        <Camera
-                                            size={36}
-                                            className="p-2 text-black dark:text-white"
-                                        />
-                                    </div>
-                                    <p className="mt-2 text-sm text-gray-600 dark:text-white/70">
-                                        Drop your image here
-                                    </p>
-                                    <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
-                                        or click to browse
-                                    </p>
-                                    <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
-                                        Supports: JPG, PNG, WebP (Max 10 MB)
-                                    </p>
-                                </div>
-
-                                <div className="my-6 flex items-center">
-                                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                                    <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">
-                                        or use camera
-                                    </span>
-                                    <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                                </div>
-
-                                <Button
-                                    onClick={() => setShowCamera(true)}
-                                    className="w-full dark:bg-gray-900 dark:text-white"
-                                >
-                                    <Camera className="mr-2" size={20} />
-                                    Use Camera
-                                </Button>
-
-                                <Card className="mt-6 border-blue-400 bg-blue-50 dark:bg-gray-950">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center gap-2">
-                                            <CircleAlert
-                                                size={20}
-                                                className="text-blue-600 dark:text-blue-400"
-                                            />
-                                            <p className="font-bold text-gray-700 dark:text-white/70">
-                                                Tips for Best Results
-                                            </p>
-                                        </div>
-                                        <ul className="mt-2 list-disc space-y-1 pl-8">
-                                            <li className="text-sm text-gray-600 dark:text-white/70">
-                                                Ensure your pet is clearly
-                                                visible in the photo
-                                            </li>
-                                            <li className="text-sm text-gray-600 dark:text-white/70">
-                                                Use a well-lit environment for
-                                                better image quality
-                                            </li>
-                                            <li className="text-sm text-gray-600 dark:text-white/70">
-                                                Position your pet in the center
-                                                of the frame
-                                            </li>
-                                            <li className="text-sm text-gray-600 dark:text-white/70">
-                                                Better angles can improve
-                                                accuracy
-                                            </li>
-                                        </ul>
-                                    </CardContent>
-                                </Card>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                {showCamera && (
+                    <CameraInterface
+                        onCapture={handleCameraCapture}
+                        onClose={() => setShowCamera(false)}
+                    />
+                )}
             </div>
-
-            {showCamera && (
-                <CameraInterface
-                    onCapture={handleCameraCapture}
-                    onClose={() => setShowCamera(false)}
-                />
-            )}
-        </div>
+        </>
     );
 };
 

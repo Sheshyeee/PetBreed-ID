@@ -2,6 +2,7 @@ import { dashboard, login } from '@/routes';
 import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 
+import { Button } from '@/components/ui/button';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useEffect, useState } from 'react';
 import AppearanceToggleDropdown from './appearance-dropdown';
@@ -31,10 +32,11 @@ export default function Header() {
             : appearance === 'dark'
               ? 'Dark Mode'
               : 'Light Mode';
+    const page = usePage();
 
     return (
-        <header className="text-md mb-6 w-full max-w-[335px] not-has-[nav]:hidden lg:max-w-[1200px]">
-            <nav className="flex items-center justify-between gap-4">
+        <header className="text-md w-full border-2 not-has-[nav]:hidden">
+            <nav className="flex items-center justify-evenly gap-[900px] p-4">
                 <Link href="/">
                     <h1 className="text-black dark:text-white">PetBreedID</h1>
                 </Link>
@@ -51,12 +53,11 @@ export default function Header() {
                         <>
                             <AppearanceToggleDropdown className="dark:text-white" />
 
-                            <Link
-                                href={login()}
-                                className="text-md inline-block rounded-sm border border-transparent px-5 py-1.5 leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
-                            >
-                                Vet Portal
-                            </Link>
+                            {page.url === '/' && (
+                                <Button variant="outline">
+                                    <Link href={login()}>Vet Portal</Link>
+                                </Button>
+                            )}
                         </>
                     )}
                 </div>
