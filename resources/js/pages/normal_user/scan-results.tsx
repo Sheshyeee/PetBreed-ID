@@ -144,9 +144,11 @@ const ScanResults = () => {
                         <p className="text-gray-500">
                             Learn about breed specific-health considerations
                         </p>
-                        <Button variant="outline">
-                            View Risk
-                            <Sparkles color="#000000" />
+                        <Button variant="outline" asChild>
+                            <Link href="/health-risk">
+                                View Risk
+                                <Sparkles color="#000000" />
+                            </Link>
                         </Button>
                     </Card>
                     <Card className="flex w-1/3 flex-col gap-10 px-8 hover:border-blue-400 hover:shadow-md">
@@ -157,7 +159,7 @@ const ScanResults = () => {
                         <p className="text-gray-500">
                             Discover the history and origin of your pet's breed
                         </p>
-                        
+
                         <Button variant="outline" asChild>
                             <Link href="/origin">
                                 Eplore History

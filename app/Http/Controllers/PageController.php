@@ -10,8 +10,4 @@ class PageController extends Controller
     {
         return inertia('normal_user/header');
     }
-    public function simulation()
-    {
-        return inertia('normal_user/view-simulation');
-    }
 }
