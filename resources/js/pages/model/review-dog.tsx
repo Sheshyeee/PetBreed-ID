@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
@@ -36,7 +37,7 @@ export default function Dashboard() {
                     </h1>
                 </div>
                 <div className="flex gap-4">
-                    <Card className="h-[630px] flex-1 px-6">
+                    <Card className="h-[630px] flex-1 px-6 dark:bg-neutral-900">
                         <h1 className="font-medium">Image Preview</h1>
 
                         <img
@@ -56,14 +57,14 @@ export default function Dashboard() {
                         </div>
                     </Card>
                     <div className="flex-1">
-                        <Card className="px-6">
+                        <Card className="px-6 dark:bg-neutral-900">
                             <h1 className="font-medium">Model Prediction</h1>
                             <div className="space-y-2 px-5">
                                 <div className="flex justify-between">
-                                    <p className="text-gray-600">
+                                    <p className="text-gray-600 dark:text-white/70">
                                         Predicted Breed
                                     </p>
-                                    <p className="font-medium text-green-700">
+                                    <p className="font-medium text-green-700 dark:text-green-400">
                                         94% confidence
                                     </p>
                                 </div>
@@ -71,12 +72,12 @@ export default function Dashboard() {
                                 <h1 className="text-xl font-medium">
                                     Golden Retriever
                                 </h1>
-                                <h1 className="text-gray-600">
+                                <h1 className="text-gray-600 dark:text-white/70">
                                     Top 3 Predictions
                                 </h1>
                                 <div>
                                     <div className="flex justify-between">
-                                        <p className="text-gray-600">
+                                        <p className="text-gray-600 dark:text-white/70">
                                             Golden Retriever
                                         </p>
                                         <p className="font-medium">94%</p>
@@ -88,7 +89,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                     <div className="flex justify-between">
-                                        <p className="text-gray-600">
+                                        <p className="text-gray-600 dark:text-white/70">
                                             Predicted Breed
                                         </p>
                                         <p className="font-medium">94%</p>
@@ -100,7 +101,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                     <div className="flex justify-between">
-                                        <p className="text-gray-600">
+                                        <p className="text-gray-600 dark:text-white/70">
                                             Predicted Breed
                                         </p>
                                         <p className="font-medium">94%</p>
@@ -112,19 +113,20 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         </Card>
-                        <Card className="mt-4 px-6">
+                        <Card className="mt-4 px-6 dark:bg-neutral-900">
                             <h1 className="font-medium">
                                 Veterinarian Correction
                             </h1>
                             <div className="px-5">
                                 <p>Correct Breed (if different)</p>
-                                <input type="text" className="w-full outline" />
-                                <Card className="mt-4 bg-blue-50 pl-8 outline outline-blue-300">
+                                <Input className="mt-2 w-full focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-0 dark:border-white/20 dark:bg-white/10" />
+
+                                <Card className="mt-4 bg-blue-50 pl-8 outline outline-blue-300 dark:bg-slate-900 dark:outline-blue-800">
                                     <h1 className="text-sm">
-                                        <span className="font-bold text-blue-900">
+                                        <span className="font-bold text-blue-900 dark:text-blue-300">
                                             Note:{' '}
                                         </span>{' '}
-                                        <span className="text-blue-800">
+                                        <span className="text-blue-800 dark:text-blue-400">
                                             Your correction will be added to the
                                             training dataset and used to improve
                                             future model accuracy.

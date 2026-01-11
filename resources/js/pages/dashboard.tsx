@@ -34,14 +34,14 @@ export default function Dashboard() {
             <Head title="Dashboard" />
             <div className="flex h-full flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="flex gap-4">
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4">
+                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
-                            <h1 className="text-sm text-gray-600">
+                            <h1 className="text-sm text-gray-600 dark:text-white/80">
                                 Total Scans
                             </h1>
                             <div className="mt-[-5px] flex items-center justify-center space-x-1">
                                 <p className="text-lg font-bold">1000</p>
-                                <p className="font-bold text-green-600">
+                                <p className="font-bold text-green-600 dark:text-green-400">
                                     +12.3%
                                 </p>
                             </div>
@@ -50,14 +50,14 @@ export default function Dashboard() {
                             <ChartNoAxesCombined color="white" />
                         </div>
                     </Card>
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4">
+                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
-                            <h1 className="text-sm text-gray-600">
+                            <h1 className="text-sm text-gray-600 dark:text-white/80">
                                 Low Confidence
                             </h1>
                             <div className="mt-[-5px] flex items-center justify-center space-x-1">
                                 <p className="text-lg font-bold">1000</p>
-                                <p className="font-bold text-green-600">
+                                <p className="font-bold text-green-600 dark:text-green-400">
                                     +12.3%
                                 </p>
                             </div>
@@ -66,12 +66,14 @@ export default function Dashboard() {
                             <TriangleAlert color="white" />
                         </div>
                     </Card>
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4">
+                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
-                            <h1 className="text-sm text-gray-600">Corrected</h1>
+                            <h1 className="text-sm text-gray-600 dark:text-white/70">
+                                Corrected
+                            </h1>
                             <div className="mt-[-5px] flex items-center justify-center space-x-1">
                                 <p className="text-lg font-bold">1000</p>
-                                <p className="font-bold text-green-600">
+                                <p className="font-bold text-green-600 dark:text-green-400">
                                     +12.3%
                                 </p>
                             </div>
@@ -80,14 +82,14 @@ export default function Dashboard() {
                             <ShieldCheck color="white" />
                         </div>
                     </Card>
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4">
+                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
-                            <h1 className="text-sm text-gray-600">
+                            <h1 className="text-sm text-gray-600 dark:text-white/80">
                                 Model Accuracy
                             </h1>
                             <div className="mt-[-5px] flex items-center justify-center space-x-1">
                                 <p className="text-lg font-bold">87.6%</p>
-                                <p className="font-bold text-green-600">
+                                <p className="font-bold text-green-600 dark:text-green-400">
                                     +12.3%
                                 </p>
                             </div>
@@ -99,7 +101,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex space-x-4">
-                    <Card className="flex-1 px-8 py-5">
+                    <Card className="flex-1 px-8 py-5 dark:bg-neutral-900">
                         <div className="flex items-center justify-between">
                             <div className="">
                                 <h1 className="text-lg font-bold dark:text-white">
@@ -128,7 +130,7 @@ export default function Dashboard() {
                                     <TableCell>Paid</TableCell>
                                     <TableCell>Credit Card</TableCell>
                                     <TableCell>
-                                        <Badge className="bg-green-100 text-green-700">
+                                        <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
                                             High Confidence
                                         </Badge>
                                     </TableCell>
@@ -137,23 +139,23 @@ export default function Dashboard() {
                         </Table>
                     </Card>
 
-                    <Card className="w-[28%] p-8">
+                    <Card className="w-[28%] p-8 dark:bg-neutral-900">
                         <div className="space-y-7">
                             <h1 className="text-lg font-bold">Model Status</h1>
                             <div>
-                                <h1 className="text-gray-600">
+                                <h1 className="text-gray-600 dark:text-white/80">
                                     Current Version
                                 </h1>
                                 <p className="font-medium">v3.2</p>
                             </div>
                             <div>
-                                <h1 className="text-gray-600">
+                                <h1 className="text-gray-600 dark:text-white/80">
                                     Last Retrained
                                 </h1>
                                 <p className="font-medium">Jan 1, 2024</p>
                             </div>
                             <div>
-                                <h1 className="text-gray-600">
+                                <h1 className="text-gray-600 dark:text-white/80">
                                     Accuracy Trend
                                 </h1>
                                 <div className="flex">
@@ -168,8 +170,10 @@ export default function Dashboard() {
 
                             <div>
                                 <div className="flex justify-between">
-                                    <p className="text-gray-700">Health</p>
-                                    <p className="font-bold text-green-700">
+                                    <p className="text-gray-700 dark:text-white/80">
+                                        Health
+                                    </p>
+                                    <p className="font-bold text-green-700 dark:text-green-500">
                                         Optimal
                                     </p>
                                 </div>
@@ -183,12 +187,12 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-4">
-                    <Card className="flex-1 px-6">
+                    <Card className="flex-1 px-6 dark:bg-neutral-900">
                         <h1 className="text-lg font-bold">
                             Confidence Distribution
                         </h1>
                     </Card>
-                    <Card className="flex-1 px-6">
+                    <Card className="flex-1 px-6 dark:bg-neutral-900">
                         <h1 className="text-lg font-bold">
                             Confidence Distribution
                         </h1>

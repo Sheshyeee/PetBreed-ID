@@ -11,7 +11,7 @@ import {
 import { dashboard } from '@/routes';
 import { SharedData, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Logs, Scan } from 'lucide-react';
 import AppLogo from './app-logo';
 import { UserMenuContent } from './user-menu-content';
 
@@ -24,12 +24,12 @@ const mainNavItems: NavItem[] = [
     {
         title: 'Scan Results',
         href: '/model/scan-results',
-        icon: LayoutGrid,
+        icon: Scan,
     },
     {
         title: 'Training Queue',
         href: '/model/training-queue',
-        icon: LayoutGrid,
+        icon: Logs,
     },
 ];
 
