@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,7 +22,27 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+type PredictionResult = {
+    breed: string;
+    confidence: number;
+};
+
+type Result = {
+    scan_id: string; // your unique ID
+    image: string; // path to the stored image
+    breed: string; // primary predicted breed
+    confidence: number; // confidence for the primary breed
+    top_predictions: PredictionResult[]; // top 5 predictions
+    created_at?: string; // optional timestamp from DB
+    updated_at?: string; // optional timestamp from DB
+};
+
+type PageProps = {
+    result?: Result;
+};
+
 export default function Dashboard() {
+    const { result } = usePage<PageProps>().props;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -41,18 +61,22 @@ export default function Dashboard() {
                         <h1 className="font-medium">Image Preview</h1>
 
                         <img
-                            src="/dogPic.jpg"
+                            src={`/storage/${result?.image}`}
                             alt=""
                             className="mx-auto h-[72%] w-[72%] rounded-lg"
                         />
                         <div className="px-10">
                             <div className="flex justify-between">
                                 <p>Scan ID:</p>
-                                <p className="font-medium">1234</p>
+                                <p className="font-medium">{result?.scan_id}</p>
                             </div>
                             <div className="flex justify-between">
                                 <p>Upload Date:</p>
-                                <p className="font-medium">2024-01-08 14:32</p>
+                                <p className="font-medium">
+                                    {result?.created_at
+                                        ?.replace('T', ' ')
+                                        .substring(0, 16)}
+                                </p>
                             </div>
                         </div>
                     </Card>
@@ -64,53 +88,45 @@ export default function Dashboard() {
                                     <p className="text-gray-600 dark:text-white/70">
                                         Predicted Breed
                                     </p>
-                                    <p className="font-medium text-green-700 dark:text-green-400">
-                                        94% confidence
+                                    <p className="font-medium">
+                                        {result?.confidence}% confidence
                                     </p>
                                 </div>
 
                                 <h1 className="text-xl font-medium">
-                                    Golden Retriever
+                                    {result?.breed}
                                 </h1>
                                 <h1 className="text-gray-600 dark:text-white/70">
-                                    Top 3 Predictions
+                                    Top Predictions
                                 </h1>
-                                <div>
-                                    <div className="flex justify-between">
-                                        <p className="text-gray-600 dark:text-white/70">
-                                            Golden Retriever
-                                        </p>
-                                        <p className="font-medium">94%</p>
-                                    </div>
-                                    <Progress
-                                        value={94}
-                                        className="[&>div]:bg-green-600"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between">
-                                        <p className="text-gray-600 dark:text-white/70">
-                                            Predicted Breed
-                                        </p>
-                                        <p className="font-medium">94%</p>
-                                    </div>
-                                    <Progress
-                                        value={10}
-                                        className="[&>div]:bg-green-600"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between">
-                                        <p className="text-gray-600 dark:text-white/70">
-                                            Predicted Breed
-                                        </p>
-                                        <p className="font-medium">94%</p>
-                                    </div>
-                                    <Progress
-                                        value={5}
-                                        className="[&>div]:bg-green-600"
-                                    />
-                                </div>
+                                {result?.top_predictions
+                                    ?.slice(0, 3)
+                                    .map((prediction, index) => (
+                                        <div key={index}>
+                                            <div className="flex justify-between">
+                                                <p className="text-gray-600 dark:text-white/70">
+                                                    {prediction.breed}
+                                                </p>
+                                                <p className="font-medium">
+                                                    {prediction.confidence}%
+                                                </p>
+                                            </div>
+                                            <Progress
+                                                value={prediction.confidence}
+                                                className={` ${
+                                                    prediction.confidence >= 80
+                                                        ? '[&>div]:bg-green-600'
+                                                        : prediction.confidence >=
+                                                            60
+                                                          ? '[&>div]:bg-yellow-500'
+                                                          : prediction.confidence >=
+                                                              40
+                                                            ? '[&>div]:bg-orange-500'
+                                                            : '[&>div]:bg-red-500'
+                                                }`}
+                                            />
+                                        </div>
+                                    ))}
                             </div>
                         </Card>
                         <Card className="mt-4 px-6 dark:bg-neutral-900">

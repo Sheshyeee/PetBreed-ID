@@ -9,7 +9,7 @@ import AuthLayout from '@/layouts/auth-layout';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, usePage } from '@inertiajs/react';
 
 interface LoginProps {
     status?: string;
@@ -17,11 +17,19 @@ interface LoginProps {
     canRegister: boolean;
 }
 
+type Errors = {
+    flash?: {
+        error?: string;
+    };
+};
+
 export default function Login({
     status,
     canResetPassword,
     canRegister,
 }: LoginProps) {
+    const { flash } = usePage<Errors>().props;
+
     return (
         <AuthLayout
             title="Log in to your account"
@@ -115,6 +123,15 @@ export default function Login({
                     {status}
                 </div>
             )}
+            {flash?.error && (
+                <div className="mb-4 rounded bg-red-100 p-3 text-red-800">
+                    {flash.error}
+                </div>
+            )}
+
+            <button onClick={() => (window.location.href = '/auth/google')}>
+                Login with Google
+            </button>
         </AuthLayout>
     );
 }

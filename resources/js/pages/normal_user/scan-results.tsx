@@ -3,10 +3,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Activity, Clock, Globe, Sparkles } from 'lucide-react';
 
+type PredictionResult = {
+    breed: string;
+    confidence: number;
+};
+
+type Result = {
+    scan_id: string; // your unique ID
+    image: string; // path to the stored image
+    breed: string; // primary predicted breed
+    confidence: number; // confidence for the primary breed
+    top_predictions: PredictionResult[]; // top 5 predictions
+    created_at?: string; // optional timestamp from DB
+    updated_at?: string; // optional timestamp from DB
+};
+
+type PageProps = {
+    results?: Result;
+};
+
 const ScanResults = () => {
+    const { results } = usePage<PageProps>().props;
+
     return (
         <div>
             <Header />
@@ -29,7 +50,7 @@ const ScanResults = () => {
                 <Card className="mt-6 flex flex-row items-center justify-center bg-cyan-50 p-10 outline outline-cyan-200">
                     <div className="w-35">
                         <img
-                            src="/dogpic.jpg"
+                            src={`/storage/${results?.image}`}
                             alt="Pet"
                             className="h-30 w-30 rounded-2xl shadow-2xs"
                         />
@@ -41,15 +62,15 @@ const ScanResults = () => {
                         >
                             Primary Match
                         </Badge>
-                        <h1 className="text-lg">Golden Retriever</h1>
+                        <h1 className="text-lg">{results?.breed}</h1>
                         <div className="flex w-[300px] justify-between">
                             <p className="text-sm text-gray-600">
                                 Confidence Score
                             </p>
-                            <p>85%</p>
+                            <p>{Math.round(results?.confidence ?? 0)}%</p>
                         </div>
                         <Progress
-                            value={85}
+                            value={results?.confidence ?? 0}
                             className="h-3 w-[300px] [&>div]:bg-blue-500"
                         />
                         <p className="text-gray-600">
@@ -63,57 +84,35 @@ const ScanResults = () => {
                 </Card>
                 <Card className="mt-5 px-10 py-6">
                     <h1>Top Possible Breeds</h1>
-                    <Card className="bg-violet-50 px-6 py-3 outline outline-violet-100">
-                        <div className="flex items-center gap-5">
-                            <div className="flex w-15 items-center justify-center rounded-2xl border bg-white p-4">
-                                1
-                            </div>
-                            <div className="flex-1">
-                                <h1>Golden Retriever</h1>
-                                <div className="flex items-center gap-4">
-                                    <Progress
-                                        value={85}
-                                        className="h-2 w-[300px] [&>div]:bg-blue-500"
-                                    />
-                                    <p>85%</p>
+                    {results?.top_predictions
+                        ?.slice(0, 3)
+                        .map((prediction, index) => (
+                            <Card
+                                key={index}
+                                className="bg-violet-50 px-6 py-3 outline outline-violet-100"
+                            >
+                                <div className="flex items-center gap-5">
+                                    <div className="flex w-15 items-center justify-center rounded-2xl border bg-white p-4">
+                                        {index + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h1>{prediction.breed}</h1>
+                                        <div className="flex items-center gap-4">
+                                            <Progress
+                                                value={prediction.confidence}
+                                                className="h-2 w-[300px] [&>div]:bg-blue-500"
+                                            />
+                                            <p>
+                                                {Math.round(
+                                                    prediction.confidence,
+                                                )}
+                                                %
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="bg-violet-50 px-6 py-3 outline outline-violet-100">
-                        <div className="flex items-center gap-5">
-                            <div className="flex w-15 items-center justify-center rounded-2xl border bg-white p-4">
-                                2
-                            </div>
-                            <div className="flex-1">
-                                <h1>Golden Retriever</h1>
-                                <div className="flex items-center gap-4">
-                                    <Progress
-                                        value={75}
-                                        className="h-2 w-[300px] [&>div]:bg-blue-500"
-                                    />
-                                    <p>75%</p>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="bg-violet-50 px-6 py-3 outline outline-violet-100">
-                        <div className="flex items-center gap-5">
-                            <div className="flex w-15 items-center justify-center rounded-2xl border bg-white p-4">
-                                3
-                            </div>
-                            <div className="flex-1">
-                                <h1>Golden Retriever</h1>
-                                <div className="flex items-center gap-4">
-                                    <Progress
-                                        value={65}
-                                        className="h-2 w-[300px] [&>div]:bg-blue-500"
-                                    />
-                                    <p>65%</p>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
+                            </Card>
+                        ))}
                 </Card>
 
                 <div className="py-6">Explore More Insights</div>

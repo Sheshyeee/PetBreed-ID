@@ -13,7 +13,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     ChartNoAxesCombined,
     ShieldCheck,
@@ -28,7 +28,18 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+type Result = {
+    scan_id: string;
+    breed: string;
+    confidence: number;
+};
+
+type PageProps = {
+    results?: Result[];
+};
+
 export default function Dashboard() {
+    const { results } = usePage<PageProps>().props;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -114,7 +125,7 @@ export default function Dashboard() {
                         </div>
                         <Table className="mt-[-10px]">
                             <TableCaption>
-                                A list of your recent invoices.
+                                A list of your recent scans.
                             </TableCaption>
                             <TableHeader>
                                 <TableRow className="">
@@ -125,16 +136,34 @@ export default function Dashboard() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow>
-                                    <TableCell>INV001</TableCell>
-                                    <TableCell>Paid</TableCell>
-                                    <TableCell>Credit Card</TableCell>
-                                    <TableCell>
-                                        <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                                            High Confidence
-                                        </Badge>
-                                    </TableCell>
-                                </TableRow>
+                                {results?.map((result) => (
+                                    <TableRow>
+                                        <TableCell>{result.scan_id}</TableCell>
+                                        <TableCell>{result.breed}</TableCell>
+                                        <TableCell>
+                                            {result.confidence}%
+                                        </TableCell>
+                                        <TableCell>
+                                            {result.confidence >= 80 ? (
+                                                <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                                    High Confidence
+                                                </Badge>
+                                            ) : result.confidence >= 60 ? (
+                                                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400">
+                                                    Medium Confidence
+                                                </Badge>
+                                            ) : result.confidence >= 40 ? (
+                                                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400">
+                                                    Low Confidence
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400">
+                                                    Very Low Confidence
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
                     </Card>

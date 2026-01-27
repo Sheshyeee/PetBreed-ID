@@ -1,416 +1,392 @@
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Link } from '@inertiajs/react';
-import { Camera, CircleAlert, RefreshCw, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useForm, usePage } from '@inertiajs/react';
+import { Camera, CheckCircle2, CircleAlert, XCircle } from 'lucide-react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
-interface CameraInterfaceProps {
-    onCapture?: (file: File, imageUrl: string) => void;
-    onClose?: () => void;
+interface PredictionResult {
+    breed: string;
+    confidence: number;
 }
 
-const CameraInterface: React.FC<CameraInterfaceProps> = ({
-    onCapture,
-    onClose,
-}) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [stream, setStream] = useState<MediaStream | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
-    const [facingMode, setFacingMode] = useState<'user' | 'environment'>(
-        'environment',
-    );
-    const [hasMultipleCameras, setHasMultipleCameras] =
-        useState<boolean>(false);
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+interface SuccessFlash {
+    breed: string;
+    confidence: number;
+    top_predictions: PredictionResult[];
+    message: string;
+}
+
+interface ErrorFlash {
+    message: string;
+}
+
+interface PageProps {
+    flash?: {
+        success?: SuccessFlash;
+        error?: ErrorFlash;
+    };
+    success?: SuccessFlash;
+    error?: ErrorFlash;
+    [key: string]: any;
+}
+
+const Scan = () => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const pageProps = usePage<PageProps>().props;
+
+    const success = pageProps.flash?.success || pageProps.success;
+    const error = pageProps.flash?.error || pageProps.error;
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        image: null as File | null,
+    });
+
+    const [preview, setPreview] = useState<string | null>(null);
+    const [showResults, setShowResults] = useState(false);
+    const [fileInfo, setFileInfo] = useState<string>('');
 
     useEffect(() => {
-        checkMultipleCameras();
-        startCamera();
-
-        return () => {
-            stopCamera();
-        };
-    }, [facingMode]);
-
-    const checkMultipleCameras = async (): Promise<void> => {
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(
-                (device) => device.kind === 'videoinput',
-            );
-            setHasMultipleCameras(videoDevices.length > 1);
-        } catch (err) {
-            console.error('Error checking cameras:', err);
+        if (success) {
+            setShowResults(true);
         }
-    };
+    }, [success, error]);
 
-    const startCamera = async (): Promise<void> => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            if (stream) {
-                stream.getTracks().forEach((track) => track.stop());
-            }
-
-            const constraints: MediaStreamConstraints = {
-                video: {
-                    facingMode: facingMode,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: false,
-            };
-
-            const mediaStream =
-                await navigator.mediaDevices.getUserMedia(constraints);
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-                setStream(mediaStream);
-            }
-
-            setIsLoading(false);
-        } catch (err) {
-            console.error('Error accessing camera:', err);
-            const error = err as DOMException;
-            setError(
-                error.name === 'NotAllowedError'
-                    ? 'Camera access denied. Please allow camera permissions.'
-                    : error.name === 'NotFoundError'
-                      ? 'No camera found on this device.'
-                      : 'Failed to access camera. Please try again.',
-            );
-            setIsLoading(false);
+    const validateImageFile = (file: File): string | null => {
+        // Check file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+            return 'File is too large. Maximum size is 10MB.';
         }
-    };
 
-    const stopCamera = (): void => {
-        if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
-            setStream(null);
-        }
-    };
-
-    const switchCamera = (): void => {
-        setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
-    };
-
-    const capturePhoto = (): void => {
-        if (!videoRef.current || !canvasRef.current) return;
-
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const context = canvas.getContext('2d');
-        if (!context) return;
-
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob(
-            (blob) => {
-                if (blob) {
-                    const imageUrl = URL.createObjectURL(blob);
-                    setCapturedImage(imageUrl);
-                }
-            },
+        // UPDATED: Accept more image types including AVIF
+        const validTypes = [
             'image/jpeg',
-            0.95,
-        );
-    };
+            'image/jpg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'image/avif', // ADDED: AVIF support
+            'image/bmp',
+            'image/x-ms-bmp',
+            'image/svg+xml',
+        ];
 
-    const retakePhoto = (): void => {
-        setCapturedImage(null);
-        stopCamera();
-        if (onClose) onClose();
-    };
-
-    const confirmPhoto = (): void => {
-        if (capturedImage && onCapture) {
-            fetch(capturedImage)
-                .then((res) => res.blob())
-                .then((blob) => {
-                    const file = new File([blob], 'pet-photo.jpg', {
-                        type: 'image/jpeg',
-                    });
-                    onCapture(file, capturedImage);
-                    stopCamera();
-                });
+        if (!validTypes.includes(file.type)) {
+            console.warn('File type not in valid list:', file.type);
+            // Don't block upload - let server validate
+            // Some browsers report wrong MIME types
         }
+
+        return null;
     };
 
-    const handleClose = (): void => {
-        stopCamera();
-        if (onClose) onClose();
-    };
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            console.log('=== FILE SELECTED ===');
+            console.log('Name:', file.name);
+            console.log('Size:', file.size, 'bytes');
+            console.log('Type:', file.type);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-            <div className="relative h-full w-full max-w-4xl">
-                <button
-                    onClick={handleClose}
-                    className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-                >
-                    <X size={24} />
-                </button>
+            // Validate file
+            const validationError = validateImageFile(file);
+            if (validationError) {
+                alert(validationError);
+                e.target.value = '';
+                return;
+            }
 
-                <div className="flex h-full flex-col items-center justify-center p-4">
-                    {error ? (
-                        <Card className="w-full max-w-md">
-                            <CardContent className="p-6 text-center">
-                                <CircleAlert
-                                    className="mx-auto mb-4 text-red-500"
-                                    size={48}
-                                />
-                                <p className="mb-4 text-red-600">{error}</p>
-                                <Button
-                                    onClick={startCamera}
-                                    className="w-full"
-                                >
-                                    Try Again
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    ) : capturedImage ? (
-                        <div className="flex h-full flex-col items-center justify-center">
-                            <img
-                                src={capturedImage}
-                                alt="Captured"
-                                className="max-h-[70vh] rounded-lg object-contain"
-                            />
-                            <div className="mt-6 flex gap-4">
-                                <Link href="/scan-results">
-                                    <Button className="w-[500px] flex-1 bg-black px-8 dark:bg-white">
-                                        Analyze Image
-                                    </Button>
-                                </Link>
-                                <Button
-                                    onClick={retakePhoto}
-                                    variant="outline"
-                                    className="dark:bg-black dark:text-white"
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="relative w-full max-w-3xl">
-                            {isLoading && (
-                                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-gray-900">
-                                    <div className="text-center text-white">
-                                        <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
-                                        <p>Starting camera...</p>
-                                    </div>
-                                </div>
-                            )}
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                setPreview(result);
 
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full rounded-lg"
-                            />
+                // Verify it's actually an image by loading it
+                const img = new Image();
+                img.onload = () => {
+                    console.log('Image loaded successfully');
+                    console.log('Dimensions:', img.width, 'x', img.height);
+                    setFileInfo(
+                        `${file.name} (${(file.size / 1024).toFixed(1)}KB, ${img.width}x${img.height})`,
+                    );
+                };
+                img.onerror = () => {
+                    console.error('Failed to load image preview');
+                    // Still allow upload - server will validate properly
+                    setFileInfo(
+                        `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
+                    );
+                };
+                img.src = result;
+            };
+            reader.onerror = () => {
+                console.error('Failed to read file');
+                alert('Failed to read the file.');
+            };
+            reader.readAsDataURL(file);
 
-                            <canvas ref={canvasRef} className="hidden" />
-
-                            {!isLoading && (
-                                <div className="absolute right-0 bottom-6 left-0 flex items-center justify-center gap-4">
-                                    {hasMultipleCameras && (
-                                        <button
-                                            onClick={switchCamera}
-                                            className="rounded-full bg-black/50 p-3 text-white hover:bg-black/70"
-                                        >
-                                            <RefreshCw size={24} />
-                                        </button>
-                                    )}
-
-                                    <button
-                                        onClick={capturePhoto}
-                                        className="rounded-full bg-white p-4 hover:bg-gray-200"
-                                    >
-                                        <Camera
-                                            size={32}
-                                            className="text-black"
-                                        />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const Scan: React.FC = () => {
-    const [showCamera, setShowCamera] = useState<boolean>(false);
-    const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileUpload = (
-        event: React.ChangeEvent<HTMLInputElement>,
-    ): void => {
-        const file = event.target.files?.[0];
-        if (file && file.size <= 10 * 1024 * 1024) {
-            const imageUrl = URL.createObjectURL(file);
-            setUploadedImage(imageUrl);
-            console.log('File uploaded:', file);
-        } else {
-            alert('File size must be less than 10MB');
+            setData('image', file);
+            setShowResults(false);
         }
-    };
-
-    const handleCameraCapture = (file: File, imageUrl: string): void => {
-        setUploadedImage(imageUrl);
-        setShowCamera(false);
-        console.log('Photo captured:', file);
     };
 
     const triggerFileInput = (): void => {
         fileInputRef.current?.click();
     };
 
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!data.image) {
+            alert('Please select an image first');
+            return;
+        }
+
+        console.log(
+            'Submitting:',
+            data.image.name,
+            data.image.type,
+            data.image.size,
+        );
+
+        post('/analyze', {
+            forceFormData: true,
+            preserveScroll: true,
+            preserveState: (page) =>
+                Object.keys(page.props.errors || {}).length > 0,
+            onStart: () => {
+                setShowResults(false);
+            },
+        });
+    };
+
+    const handleReset = () => {
+        reset();
+        setPreview(null);
+        setShowResults(false);
+        setFileInfo('');
+    };
+
     return (
         <>
-            <div>
-                <Header />
-            </div>
+            <Header />
+
             <div className="flex flex-col items-center bg-[#FDFDFC] text-[#1b1b18] dark:bg-[#0a0a0a]">
-                <div className="mx-auto w-full max-w-7xl pl-10">
+                <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
                     <div>
                         <h1 className="mt-6 text-lg font-bold dark:text-white">
                             Scan Your Pet
                         </h1>
-                        <h1 className="text-sm text-gray-600 dark:text-white/70">
+                        <p className="text-sm text-gray-600 dark:text-white/70">
                             Upload a photo or use your camera to identify your
                             pet's breed.
-                        </h1>
+                        </p>
                     </div>
 
-                    <Card className="mx-auto mt-8 w-full max-w-4xl">
-                        <CardContent className="p-6">
-                            {uploadedImage ? (
-                                <div className="text-center">
-                                    <img
-                                        src={uploadedImage}
-                                        alt="Uploaded pet"
-                                        className="mx-auto max-h-96 rounded-lg object-contain"
+                    {/* Error Message */}
+                    {error && (
+                        <Card className="mx-auto mt-6 w-full max-w-4xl border-red-400 bg-red-50 dark:bg-red-950">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-2">
+                                    <XCircle
+                                        size={20}
+                                        className="text-red-600 dark:text-red-400"
                                     />
-                                    <div className="flex gap-4 pr-10 pl-10">
-                                        <Button asChild className="mt-4 flex-1">
-                                            <Link href="/scan-results">
-                                                Analyze Image
-                                            </Link>
-                                        </Button>
-
-                                        <Button
-                                            onClick={() =>
-                                                setUploadedImage(null)
-                                            }
-                                            variant="outline"
-                                            className="mt-4"
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
+                                    <p className="font-bold text-red-700 dark:text-red-400">
+                                        Error
+                                    </p>
                                 </div>
-                            ) : (
-                                <>
-                                    <div
-                                        onClick={triggerFileInput}
-                                        className="flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-                                    >
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            onChange={handleFileUpload}
-                                            className="hidden"
-                                        />
-                                        <div className="rounded-full bg-gray-200 dark:bg-gray-800">
-                                            <Camera
-                                                size={36}
-                                                className="p-2 text-black dark:text-white"
+                                <p className="mt-2 text-sm text-red-600 dark:text-red-300">
+                                    {error.message}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Success Message with Results */}
+                    {success && showResults && (
+                        <Card className="mx-auto mt-6 w-full max-w-4xl border-green-400 bg-green-50 dark:bg-green-950">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2
+                                        size={24}
+                                        className="text-green-600 dark:text-green-400"
+                                    />
+                                    <h2 className="text-xl font-bold text-green-700 dark:text-green-400">
+                                        Analysis Complete!
+                                    </h2>
+                                </div>
+
+                                <div className="mt-4">
+                                    <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                                        Detected Breed:{' '}
+                                        <span className="text-green-600 dark:text-green-400">
+                                            {success.breed}
+                                        </span>
+                                    </p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                                        Confidence:{' '}
+                                        {(success.confidence * 100).toFixed(2)}%
+                                    </p>
+                                </div>
+
+                                {success.top_predictions &&
+                                    success.top_predictions.length > 0 && (
+                                        <div className="mt-4">
+                                            <h3 className="font-semibold text-gray-700 dark:text-gray-300">
+                                                Top Predictions:
+                                            </h3>
+                                            <ul className="mt-2 space-y-2">
+                                                {success.top_predictions.map(
+                                                    (pred, idx) => (
+                                                        <li
+                                                            key={idx}
+                                                            className="flex justify-between text-sm"
+                                                        >
+                                                            <span className="text-gray-700 dark:text-gray-300">
+                                                                {idx + 1}.{' '}
+                                                                {pred.breed}
+                                                            </span>
+                                                            <span className="text-gray-600 dark:text-gray-400">
+                                                                {(
+                                                                    pred.confidence *
+                                                                    100
+                                                                ).toFixed(2)}
+                                                                %
+                                                            </span>
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                <Button
+                                    onClick={handleReset}
+                                    className="mt-4 w-full"
+                                    variant="outline"
+                                >
+                                    Scan Another Image
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Card className="mx-auto mt-8 w-full max-w-4xl">
+                        <form onSubmit={handleSubmit}>
+                            <CardContent className="p-6">
+                                {!preview ? (
+                                    <>
+                                        <div
+                                            onClick={triggerFileInput}
+                                            className="flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition-colors hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                                        >
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handleFileChange}
+                                            />
+
+                                            <div className="rounded-full bg-gray-200 dark:bg-gray-800">
+                                                <Camera
+                                                    size={36}
+                                                    className="p-2 text-black dark:text-white"
+                                                />
+                                            </div>
+
+                                            <p className="mt-2 text-sm text-gray-600 dark:text-white/70">
+                                                Drop your image here
+                                            </p>
+                                            <p className="text-sm text-gray-600 dark:text-white/70">
+                                                or click to browse
+                                            </p>
+                                            <p className="text-sm text-gray-600 dark:text-white/70">
+                                                All image formats supported (Max
+                                                10 MB)
+                                            </p>
+                                        </div>
+
+                                        {errors.image && (
+                                            <p className="mt-2 text-sm text-red-600">
+                                                {errors.image}
+                                            </p>
+                                        )}
+
+                                        <Card className="mt-6 border-blue-400 bg-blue-50 dark:bg-gray-950">
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center gap-2">
+                                                    <CircleAlert
+                                                        size={20}
+                                                        className="text-blue-600 dark:text-blue-400"
+                                                    />
+                                                    <p className="font-bold text-gray-700 dark:text-white/70">
+                                                        Tips for Best Results
+                                                    </p>
+                                                </div>
+
+                                                <ul className="mt-2 list-disc space-y-1 pl-8">
+                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                        Ensure your pet is
+                                                        clearly visible
+                                                    </li>
+                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                        Use good lighting
+                                                    </li>
+                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                        Center your pet in the
+                                                        frame
+                                                    </li>
+                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                        Better angles improve
+                                                        accuracy
+                                                    </li>
+                                                </ul>
+                                            </CardContent>
+                                        </Card>
+                                    </>
+                                ) : (
+                                    <div>
+                                        <div className="overflow-hidden rounded-lg">
+                                            <img
+                                                src={preview}
+                                                className="mx-auto max-h-96 w-full object-contain"
+                                                alt="Preview"
                                             />
                                         </div>
-                                        <p className="mt-2 text-sm text-gray-600 dark:text-white/70">
-                                            Drop your image here
-                                        </p>
-                                        <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
-                                            or click to browse
-                                        </p>
-                                        <p className="mt-1 text-sm text-gray-600 dark:text-white/70">
-                                            Supports: JPG, PNG, WebP (Max 10 MB)
-                                        </p>
+                                        {fileInfo && (
+                                            <p className="mt-2 text-center text-xs text-gray-500">
+                                                {fileInfo}
+                                            </p>
+                                        )}
+                                        <div className="mt-4 flex gap-2">
+                                            <Button
+                                                type="submit"
+                                                className="flex-1"
+                                                disabled={processing}
+                                            >
+                                                {processing
+                                                    ? 'Analyzing...'
+                                                    : 'Analyze Image'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                className="w-32"
+                                                variant="outline"
+                                                onClick={handleReset}
+                                                disabled={processing}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
                                     </div>
-
-                                    <div className="my-6 flex items-center">
-                                        <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                                        <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">
-                                            or use camera
-                                        </span>
-                                        <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                                    </div>
-
-                                    <Button
-                                        onClick={() => setShowCamera(true)}
-                                        className="w-full dark:bg-gray-900 dark:text-white"
-                                    >
-                                        <Camera className="mr-2" size={20} />
-                                        Use Camera
-                                    </Button>
-
-                                    <Card className="mt-6 border-blue-400 bg-blue-50 dark:bg-gray-950">
-                                        <CardContent className="p-4">
-                                            <div className="flex items-center gap-2">
-                                                <CircleAlert
-                                                    size={20}
-                                                    className="text-blue-600 dark:text-blue-400"
-                                                />
-                                                <p className="font-bold text-gray-700 dark:text-white/70">
-                                                    Tips for Best Results
-                                                </p>
-                                            </div>
-                                            <ul className="mt-2 list-disc space-y-1 pl-8">
-                                                <li className="text-sm text-gray-600 dark:text-white/70">
-                                                    Ensure your pet is clearly
-                                                    visible in the photo
-                                                </li>
-                                                <li className="text-sm text-gray-600 dark:text-white/70">
-                                                    Use a well-lit environment
-                                                    for better image quality
-                                                </li>
-                                                <li className="text-sm text-gray-600 dark:text-white/70">
-                                                    Position your pet in the
-                                                    center of the frame
-                                                </li>
-                                                <li className="text-sm text-gray-600 dark:text-white/70">
-                                                    Better angles can improve
-                                                    accuracy
-                                                </li>
-                                            </ul>
-                                        </CardContent>
-                                    </Card>
-                                </>
-                            )}
-                        </CardContent>
+                                )}
+                            </CardContent>
+                        </form>
                     </Card>
                 </div>
-
-                {showCamera && (
-                    <CameraInterface
-                        onCapture={handleCameraCapture}
-                        onClose={() => setShowCamera(false)}
-                    />
-                )}
             </div>
         </>
     );
