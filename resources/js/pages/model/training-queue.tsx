@@ -1,7 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import {
     Table,
     TableBody,
@@ -14,8 +12,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { CircleCheckBig, Clock, TriangleAlert, Zap } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { CircleCheckBig, ListTodo, Trash2 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -28,7 +26,26 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Dashboard() {
+interface Correction {
+    id: number;
+    scan_id: string;
+    image_path: string;
+    original_breed: string;
+    corrected_breed: string;
+    confidence: number;
+    created_at: string;
+    status: string;
+}
+
+interface DashboardProps {
+    corrections: Correction[];
+    stats: {
+        pending: number; // Total uncorrected results
+        added: number; // Total corrected items
+    };
+}
+
+export default function Dashboard({ corrections, stats }: DashboardProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -41,120 +58,106 @@ export default function Dashboard() {
                         Track corrections and monitor model retraining progress
                     </h1>
                 </div>
+
+                {/* Statistics Cards */}
                 <div className="flex gap-4">
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
+                    {/* TOTAL CORRECTIONS CARD */}
+                    <Card className="flex w-[25%] flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
                             <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                Pending
+                                Total Corrections
                             </h1>
-                            <p className="mt-[-5px] text-lg font-bold">1000</p>
-                        </div>
-                        <div className="flex w-[50px] items-center justify-center rounded-md bg-blue-600 p-2">
-                            <Clock className="text-white" />
-                        </div>
-                    </Card>
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
-                        <div className="">
-                            <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                Added to Dataset
-                            </h1>
-                            <p className="mt-[-5px] text-lg font-bold">1000</p>
+                            <p className="mt-[-5px] text-lg font-bold">
+                                {stats?.added || 0}
+                            </p>
                         </div>
                         <div className="flex w-[50px] items-center justify-center rounded-md bg-blue-600 p-2">
                             <CircleCheckBig className="text-white" />
                         </div>
                     </Card>
-                    <Card className="flex flex-1 flex-row justify-between px-4 py-4 dark:bg-neutral-900">
+
+                    {/* PENDING CARD (Updated) */}
+                    <Card className="flex w-[25%] flex-row justify-between px-4 py-4 dark:bg-neutral-900">
                         <div className="">
                             <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                Used in Training
+                                Pending Review
                             </h1>
-
-                            <p className="mt-[-5px] text-lg font-bold">1000</p>
+                            <p className="mt-[-5px] text-lg font-bold">
+                                {stats?.pending || 0}
+                            </p>
                         </div>
-                        <div className="flex w-[50px] items-center justify-center rounded-md bg-blue-600 p-2">
-                            <Zap className="text-white" />
+                        <div className="flex w-[50px] items-center justify-center rounded-md bg-amber-500 p-2">
+                            <ListTodo className="text-white" />
                         </div>
                     </Card>
                 </div>
 
-                <Card className="px-6 dark:bg-neutral-900">
-                    <h1 className="font-medium">Retraining Status</h1>
-                    <Card className="bg-blue-50 px-8 pl-8 outline outline-blue-300 dark:bg-slate-900 dark:outline-blue-800">
-                        <div className="flex gap-4">
-                            <TriangleAlert className="text-blue dark:text-blue-400" />
-                            <div className="flex w-full flex-col gap-2">
-                                <span className="text-sm font-bold text-blue-900 dark:text-blue-300">
-                                    Collecting Corrections
-                                </span>
-                                <span className="text-sm text-blue-800 dark:text-blue-400">
-                                    Need 49 more corrections before retraining
-                                    (minimum 50 required)
-                                </span>
-                                <Progress
-                                    value={94}
-                                    className="w-full [&>div]:bg-blue-600"
-                                />
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Button className="bg-blue-600 text-white dark:bg-blue-300 dark:text-slate-950">
-                        Retraining Not Available
-                    </Button>
-                </Card>
-
                 <div className="flex flex-1 gap-4">
                     <Card className="flex-1 px-8 py-5 dark:bg-neutral-900">
-                        <h1 className="font-medium">Corrcetion History</h1>
+                        <h1 className="font-medium">Correction History</h1>
                         <Table className="mt-[-10px]">
-                            <TableCaption>Correction history</TableCaption>
+                            <TableCaption>
+                                {corrections.length === 0
+                                    ? 'No corrections submitted yet.'
+                                    : 'Recent correction history'}
+                            </TableCaption>
                             <TableHeader>
                                 <TableRow className="">
                                     <TableHead>Scan ID</TableHead>
+                                    <TableHead>Image</TableHead>
                                     <TableHead>Original Prediction</TableHead>
-                                    <TableHead>Corrected Breed</TableHead>
-                                    <TableHead>Confidence</TableHead>
+                                    <TableHead>Correction</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">
+                                        Action
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow>
-                                    <TableCell>INV001</TableCell>
-                                    <TableCell className="text-gray-600 dark:text-white/80">
-                                        Pug
-                                    </TableCell>
-                                    <TableCell>Golden Retriever</TableCell>
-                                    <TableCell>
-                                        <p className="text-gray-600 dark:text-white/80">
-                                            80%
-                                        </p>
-                                    </TableCell>
-                                    <TableCell className="text-gray-600 dark:text-white/80">
-                                        2024-01-08 14:32
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge className="bg-blue-100 text-blue-700 dark:bg-slate-800 dark:text-blue-400">
-                                            Added to Dataset
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell></TableCell>
-                                </TableRow>
+                                {corrections.map((item) => (
+                                    <TableRow key={item.id}>
+                                        <TableCell>{item.scan_id}</TableCell>
+                                        <TableCell>
+                                            <div className="h-12 w-12 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
+                                                <img
+                                                    src={`/storage/${item.image_path}`}
+                                                    alt="Scan"
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {item.original_breed}
+                                        </TableCell>
+                                        <TableCell className="font-bold text-green-600">
+                                            {item.corrected_breed}
+                                        </TableCell>
+                                        <TableCell className="text-gray-600 dark:text-white/80">
+                                            {new Date(
+                                                item.created_at,
+                                            ).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className="bg-blue-100 text-blue-700 dark:bg-slate-800 dark:text-blue-400">
+                                                {item.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Link
+                                                href={`/model-correction/${item.id}`} // Ensure this matches your route name/URL
+                                                method="delete"
+                                                as="button"
+                                                className="p-2 text-gray-500 transition-colors hover:text-red-600"
+                                                title="Delete Record"
+                                            >
+                                                <Trash2 size={18} />
+                                            </Link>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
-                    </Card>
-                    <Card className="w-1/4 px-5 dark:bg-neutral-900">
-                        <h1 className="font-medium">Retraining Histiory</h1>
-                        <div className="px-4">
-                            <div className="flex gap-4">
-                                <p className="font-medium">Model v1.0</p>
-                                <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                                    Current
-                                </Badge>
-                            </div>
-                            <p>Accuracy: 87.49%</p>
-                        </div>
                     </Card>
                 </div>
             </div>

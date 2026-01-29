@@ -48,6 +48,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/model/training-queue', [TrainingQueueController::class, "index"]);
     Route::get('/model/review-dog', [ScanResultController::class, "review"]);
     Route::get('/model/review-dog/{id}', [ScanResultController::class, "preview"]);
+
+    Route::delete('/model-correction/{id}', [ScanResultController::class, "destroyCorrection"])->name('model.correction.delete');
+    // Inside your auth middleware group
+    Route::post('/model/correct', [ScanResultController::class, "correctBreed"])->name('model.correct');
 });
 
 require __DIR__ . '/settings.php';

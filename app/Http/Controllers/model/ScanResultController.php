@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\model;
 
 use App\Http\Controllers\Controller;
+use App\Models\BreedCorrection;
 use App\Models\Results;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -32,7 +33,12 @@ class ScanResultController extends Controller
 
     public function index()
     {
-        $results = Results::latest()->get();
+        $correctedScanIds = BreedCorrection::pluck('scan_id');
+
+        // 2. Fetch Results that are NOT in that list
+        $results = Results::whereNotIn('scan_id', $correctedScanIds)
+            ->latest()
+            ->get();
 
         return inertia('model/scan-results', ['results' => $results]);
     }
@@ -75,14 +81,13 @@ class ScanResultController extends Controller
                 }
             }
 
-            // Validation - UPDATED to support AVIF and more formats
+            // Validation
             Log::info('=== VALIDATION ===');
 
             $validated = $request->validate([
                 'image' => [
                     'required',
                     'file',
-                    // FIXED: Added avif and more flexible MIME types
                     'mimes:jpeg,jpg,png,webp,gif,avif,bmp,svg',
                     'max:10240', // 10MB
                     function ($attribute, $value, $fail) {
@@ -117,7 +122,7 @@ class ScanResultController extends Controller
                             'image/png',
                             'image/webp',
                             'image/gif',
-                            'image/avif',  // ADDED: AVIF support
+                            'image/avif',
                             'image/bmp',
                             'image/x-ms-bmp',
                             'image/svg+xml'
@@ -138,7 +143,7 @@ class ScanResultController extends Controller
 
             Log::info('✓ Validation passed');
 
-            // Get file
+            // Process File
             Log::info('=== FILE PROCESSING ===');
             $image = $request->file('image');
 
@@ -157,29 +162,30 @@ class ScanResultController extends Controller
             // Store file with correct extension
             $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $extension;
             Log::info('Storing as: ' . $filename);
-            Log::info('Detected MIME: ' . $mimeType);
-            Log::info('Using extension: ' . $extension);
 
             $path = $image->storeAs('scans', $filename, 'public');
             Log::info('Stored at: ' . $path);
 
             $fullPath = storage_path('app/public/' . $path);
-            Log::info('Full path: ' . $fullPath);
 
             if (!file_exists($fullPath)) {
                 throw new \Exception('File was not saved properly');
             }
 
-            // Python execution
+            // Python Execution
             Log::info('=== PYTHON EXECUTION ===');
             $pythonPath = env('PYTHON_PATH', 'python');
-            $scriptPath = base_path('ml\\predict.py');
+
+            // Fix: Use correct separator for OS if needed, generally base_path works
+            $scriptPath = base_path('ml/predict.py');
+            $jsonPath = storage_path('app/references.json');
 
             if (!file_exists($scriptPath)) {
                 throw new \Exception('Prediction script not found at: ' . $scriptPath);
             }
 
-            $command = sprintf('"%s" "%s" "%s" 2>&1', $pythonPath, $scriptPath, $fullPath);
+            // Command: python predict.py [image_path] [memory_file_path]
+            $command = sprintf('"%s" "%s" "%s" "%s" 2>&1', $pythonPath, $scriptPath, $fullPath, $jsonPath);
             Log::info('Command: ' . $command);
 
             $startTime = microtime(true);
@@ -189,16 +195,12 @@ class ScanResultController extends Controller
             Log::info('Execution time: ' . $executionTime . 's');
             Log::info('Output length: ' . strlen($output ?? ''));
 
-
-
             if (empty($output)) {
                 throw new \Exception('No output from prediction script');
             }
 
             // Parse JSON
             Log::info('=== JSON PARSING ===');
-
-            // Extract JSON from output
             $jsonStart = strpos($output, '{');
             $jsonEnd = strrpos($output, '}');
 
@@ -212,7 +214,7 @@ class ScanResultController extends Controller
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('JSON error: ' . json_last_error_msg());
                 Log::error('Output: ' . substr($output, 0, 500));
-                throw new \Exception('Invalid JSON from prediction script: ' . json_last_error_msg());
+                throw new \Exception('Invalid JSON from prediction script');
             }
 
             Log::info('Parsed result: ' . json_encode($result));
@@ -221,18 +223,12 @@ class ScanResultController extends Controller
                 throw new \Exception($result['error']);
             }
 
-            if (!isset($result['breed']) || !isset($result['confidence'])) {
-                throw new \Exception('Invalid prediction result structure');
-            }
-            $uniqueId = Str::random(6);
-
-            // FIXED: Convert confidence from decimal to percentage
+            // Calculate Confidence
             $confidence = $result['confidence'];
             if ($confidence <= 1.0) {
                 $confidence = $confidence * 100; // Convert 0.85 to 85
             }
 
-            // FIXED: Convert top_predictions confidences to percentages
             $topPredictions = [];
             if (isset($result['top_5']) && is_array($result['top_5'])) {
                 foreach ($result['top_5'] as $prediction) {
@@ -247,45 +243,103 @@ class ScanResultController extends Controller
                 }
             }
 
-            $result = Results::create([
+            $uniqueId = Str::random(6);
+
+            $dbResult = Results::create([
                 'scan_id' => $uniqueId,
                 'image' => $path,
                 'breed' => $result['breed'],
-                'confidence' => round($confidence, 2), // Save as percentage
+                'confidence' => round($confidence, 2),
                 'top_predictions' => $topPredictions,
             ]);
 
-
-
-            #Log::info('Confidence: ' . ($successData['confidence'] * 100) . '%');
-
-            session(['last_scan_id' => $result->scan_id]);
-
-
+            session(['last_scan_id' => $dbResult->scan_id]);
 
             return redirect('/scan-results');
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('========================================');
             Log::error('=== VALIDATION ERROR ===');
-            Log::error('========================================');
             Log::error('Validation errors: ' . json_encode($e->errors()));
-            Log::error('Error messages: ' . json_encode($e->validator->errors()->all()));
-
-
-
             throw $e;
         } catch (\Exception $e) {
-            Log::error('========================================');
             Log::error('=== EXCEPTION ===');
-            Log::error('========================================');
             Log::error('Message: ' . $e->getMessage());
             Log::error('File: ' . $e->getFile() . ':' . $e->getLine());
 
-
-
             $errorData = ['message' => 'Failed to analyze image: ' . $e->getMessage()];
-
             return back()->with('error', $errorData);
         }
+    }
+
+    public function destroyCorrection($id)
+    {
+        // 1. Find the correction
+        $correction = BreedCorrection::findOrFail($id);
+
+        // 2. Load JSON References
+        $jsonPath = storage_path('app/references.json');
+        if (file_exists($jsonPath)) {
+            $references = json_decode(file_get_contents($jsonPath), true);
+
+            // 3. Filter out the specific image associated with this correction
+            // We look for the image filename in the source_image field
+            $imageName = basename($correction->image_path);
+
+            $newReferences = array_filter($references, function ($ref) use ($imageName) {
+                return $ref['source_image'] !== $imageName;
+            });
+
+            // 4. Save back to JSON
+            file_put_contents($jsonPath, json_encode(array_values($newReferences), JSON_PRETTY_PRINT));
+        }
+
+        // 5. Delete from DB
+        $correction->delete();
+
+        return redirect()->back()->with('success', 'Correction deleted and memory wiped.');
+    }
+
+    public function correctBreed(Request $request)
+    {
+        $validated = $request->validate([
+            'scan_id' => 'required|string',
+            'correct_breed' => 'required|string|max:255',
+        ]);
+
+        $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
+
+        // 1. SAVE TO SEPARATE TABLE (Do not update Results table)
+        BreedCorrection::create([
+            'scan_id' => $result->scan_id,
+            'image_path' => $result->image,
+            'original_breed' => $result->breed, // Keep record of what AI got wrong
+            'corrected_breed' => $validated['correct_breed'],
+            'status' => 'Added',
+        ]);
+
+        // Note: We removed $result->update(...) so the original scan remains "Wrong" in history.
+
+        // 2. Trigger Learning (Memory Update)
+        try {
+            $pythonPath = env('PYTHON_PATH', 'python');
+            $scriptPath = base_path('ml/learn.py');
+            $imagePath = storage_path('app/public/' . $result->image);
+            $jsonPath = storage_path('app/references.json');
+
+            $command = sprintf(
+                '"%s" "%s" "%s" "%s" "%s" 2>&1',
+                $pythonPath,
+                $scriptPath,
+                $imagePath,
+                $validated['correct_breed'],
+                $jsonPath
+            );
+
+            $output = shell_exec($command);
+            Log::info("Learning output: " . $output);
+        } catch (\Exception $e) {
+            Log::error("Learning failed: " . $e->getMessage());
+        }
+
+        return redirect('/model/scan-results')->with('success', 'Correction saved to dataset.');
     }
 }
