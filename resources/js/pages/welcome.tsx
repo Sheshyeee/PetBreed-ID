@@ -10,7 +10,7 @@ export default function Welcome({
         <>
             <div>
                 <Header />
-                <div className="mt-[100px] flex w-full items-center justify-center opacity-100 transition-opacity duration-75">
+                <div className="mt-[10px] flex w-full items-center justify-center opacity-100 transition-opacity duration-75">
                     <main className="flex w-full max-w-[335px] flex-col-reverse items-center justify-center lg:max-w-[1100px] lg:flex-row">
                         <LandingPage />
                     </main>

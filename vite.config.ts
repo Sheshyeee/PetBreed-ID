@@ -24,4 +24,12 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    // 👇 ADD THIS SECTION TO FIX NETWORK ACCESS
+    server: {
+        host: '0.0.0.0', // Allows access from outside localhost
+        cors: true, // Fixes the CORS policy errors
+        hmr: {
+            host: 'localhost', // Your PC's IP address
+        },
+    },
 });

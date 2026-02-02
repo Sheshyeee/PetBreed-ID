@@ -24,7 +24,12 @@ Route::get('/scan', [ScanController::class, "index"])->name('scan');
 Route::get('/scan-results', [ResultController::class, "index"]);
 Route::get('/header', [PageController::class, "header"]);
 Route::get('/simulation', [SimulationController::class, "index"]);
+
+Route::get('/simulation-status', [SimulationController::class, 'checkStatus']);
+
+
 Route::get('/origin', [HistoryController::class, "index"]);
+Route::post('/simulation/generate', [SimulationController::class, 'generate'])->name('simulation.generate');
 Route::get('/health-risk', [HealthRiskController::class, "index"]);
 
 Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.redirect');
@@ -48,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/model/training-queue', [TrainingQueueController::class, "index"]);
     Route::get('/model/review-dog', [ScanResultController::class, "review"]);
     Route::get('/model/review-dog/{id}', [ScanResultController::class, "preview"]);
+    Route::get('/model/review-dog/{id}/delete', [ScanResultController::class, "deleteResult"]);
 
     Route::delete('/model-correction/{id}', [ScanResultController::class, "destroyCorrection"])->name('model.correction.delete');
     // Inside your auth middleware group

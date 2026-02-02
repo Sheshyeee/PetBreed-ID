@@ -1,68 +1,122 @@
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
-import { Camera, Upload } from 'lucide-react';
+import { Calendar, Heart, MapPin, PawPrintIcon } from 'lucide-react';
 
 function LandingPage() {
     return (
-        <div className="flex w-full gap-4">
-            <div className="flex-1 text-black dark:text-white">
-                <h1 className="text-[60px] font-bold">Identify Any Dog</h1>
-                <h1 className="mt-[-30px] text-[60px] font-bold">
-                    Breed Instantly
-                </h1>
-                <p className="text-lg text-gray-600 dark:text-white/70">
-                    Upload a photo or take a picture to discover your dog's
-                    breed using advanced AI recognition technology.
-                </p>
-                <Link href="/scan">
-                    <Button className="mt-8">Start Scanning</Button>
-                </Link>
-                <div className="mt-[60px] flex gap-4">
-                    <div className="flex w-[45%] gap-2 rounded-2xl bg-white p-4 shadow dark:bg-gray-900">
-                        <div className="w-12">
-                            <div className="flex w-full items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-800">
-                                <Camera
-                                    size={36}
-                                    color="#5f97f2"
-                                    className="p-1"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <p className="font-bold">Take a Photo</p>
-                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                Use your camera to capture a photo instantly
+        <div className="flex w-full flex-col gap-4 lg:flex-row">
+            <div className="flex w-full flex-col gap-4">
+                {/* Hero Section */}
+                <div className="flex h-auto w-full flex-col items-center justify-between gap-4 rounded-lg bg-[#0C134F] p-6 text-white sm:p-8 lg:h-[300px] lg:flex-row lg:gap-3">
+                    <div className="flex h-auto flex-1 flex-col justify-center gap-3 text-center lg:h-[270px] lg:gap-4 lg:text-left">
+                        <button className="mx-auto flex w-fit items-center gap-2 rounded-md bg-white/20 px-4 py-2 text-xs font-medium hover:bg-white/30 lg:mx-0">
+                            <PawPrintIcon className="h-4 w-4" />
+                        </button>
+                        <h1 className="text-2xl font-bold sm:text-3xl lg:text-3xl">
+                            Identify dog
+                            <span className="text-violet-500"> breed</span>{' '}
+                            instantly
+                        </h1>
+                        <p className="mx-auto max-w-md text-xs text-white/70 sm:text-sm lg:mx-0">
+                            Upload a photo and get accurate breed identification
+                            powered by advanced AI technology
+                        </p>
+                        <Link href="/scan" className="mx-auto lg:mx-0">
+                            <Button className="w-full sm:w-auto">
+                                Start Scanning
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="ml-8 hidden lg:block">
+                        <img
+                            src="/paww.png"
+                            alt="Dog"
+                            className="mt-[130px] h-[100px] w-[100px] rounded-lg object-cover"
+                        />
+                    </div>
+                </div>
+
+                {/* Feature Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="flex min-h-[150px] flex-col justify-between rounded-lg bg-[#5C469C] p-4 text-white sm:p-6 lg:min-h-[170px]">
+                        <div>
+                            <h3 className="mb-2 text-sm font-semibold">
+                                Growth Simulation
+                            </h3>
+                            <p className="text-xs text-white/70">
+                                Visualize how your dog will look through
+                                different life stages from puppy to senior
                             </p>
+                        </div>
+                        <div className="mt-4 flex w-fit items-center gap-2 rounded-md bg-white/20 px-3 py-1.5 text-xs font-medium hover:bg-white/30 sm:px-4">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">
+                                See simulation
+                            </span>
+                            <span className="sm:hidden">Simulate</span>
                         </div>
                     </div>
-                    <div className="flex w-[45%] gap-2 rounded-2xl bg-white p-4 shadow dark:bg-gray-900">
-                        <div className="w-12">
-                            <div className="flex w-full items-center justify-center rounded-lg bg-violet-200 dark:bg-violet-950">
-                                <Upload
-                                    size={36}
-                                    color="#6623e1"
-                                    className="p-1"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <p className="font-bold">Upload Image</p>
-                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                Drag and drop or select from your device
+
+                    <div className="flex min-h-[150px] flex-col justify-between rounded-lg bg-[#5C469C] p-4 text-white sm:p-6 lg:min-h-[170px]">
+                        <div>
+                            <h3 className="mb-2 text-sm font-semibold">
+                                Health Risk Analysis
+                            </h3>
+                            <p className="text-xs text-white/70">
+                                Discover breed-specific health risks and get
+                                preventive care recommendations
                             </p>
+                        </div>
+                        <div className="mt-4 flex w-fit items-center gap-2 rounded-md bg-white/20 px-3 py-1.5 text-xs font-medium hover:bg-white/30 sm:px-4">
+                            <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">
+                                View health risks
+                            </span>
+                            <span className="sm:hidden">View risks</span>
+                        </div>
+                    </div>
+
+                    <div className="flex min-h-[150px] flex-col justify-between rounded-lg bg-[#5C469C] p-4 text-white sm:col-span-2 sm:p-6 lg:col-span-1 lg:min-h-[170px]">
+                        <div>
+                            <h3 className="mb-2 text-sm font-semibold">
+                                Origin & History
+                            </h3>
+                            <p className="text-xs text-white/70">
+                                Learn about your dog's breed origins, historical
+                                purpose, and cultural significance
+                            </p>
+                        </div>
+                        <div className="mt-4 flex w-fit items-center gap-2 rounded-md bg-white/20 px-3 py-1.5 text-xs font-medium hover:bg-white/30 sm:px-4">
+                            <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">
+                                Explore history
+                            </span>
+                            <span className="sm:hidden">Explore</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1">
-                <div className="w-full">
-                    <img
-                        src="/dogpic.jpg"
-                        alt="My Photo"
-                        className="h-[420px] w-full rounded-lg object-cover"
-                    />
-                </div>
+            {/* Side Card */}
+            <div className="w-full rounded-lg bg-[#1D267D] p-4 sm:p-6 lg:w-[400px]">
+                <img
+                    src="/dog1.png"
+                    className="mb-4 h-[200px] w-full rounded-lg object-cover sm:h-[250px]"
+                    alt="Dog breed identification"
+                />
+                <h2 className="mb-2 text-base font-bold text-white sm:text-lg">
+                    One platform — complete breed identification
+                </h2>
+                <p className="mb-4 text-xs text-white/70 sm:text-sm">
+                    Everything you need to identify and learn about dog breeds
+                    in one place
+                </p>
+
+                <Link href="/scan">
+                    <Button className="w-full bg-white text-[#1D267D] hover:bg-white/90">
+                        Try it now
+                    </Button>
+                </Link>
             </div>
         </div>
     );

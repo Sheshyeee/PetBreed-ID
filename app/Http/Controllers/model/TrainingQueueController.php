@@ -23,7 +23,7 @@ class TrainingQueueController extends Controller
         $totalPendingCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
 
         // 3. Get history
-        $corrections = BreedCorrection::latest()->get();
+        $corrections = BreedCorrection::latest()->paginate(10);
 
         $stats = [
             'pending' => $totalPendingCount, // <--- Correct Total Count

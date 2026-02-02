@@ -3,29 +3,147 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
 import { ArrowLeft, TriangleAlert } from 'lucide-react';
+import { FC, useMemo } from 'react';
+import {
+    PolarAngleAxis,
+    PolarGrid,
+    PolarRadiusAxis,
+    Radar,
+    RadarChart,
+    ResponsiveContainer,
+} from 'recharts';
 
-const ViewHealthRisk = () => {
+// --- Types & Interfaces ---
+
+interface HealthConcern {
+    name: string;
+    risk_level: string;
+    description: string;
+    prevention: string;
+}
+
+interface Screening {
+    name: string;
+    description: string;
+}
+
+interface HealthRisksData {
+    concerns: HealthConcern[];
+    screenings: Screening[];
+    lifespan: string;
+    care_tips: string[];
+}
+
+interface ScanResult {
+    scan_id: string;
+    breed: string;
+    // Data might come as a JSON string from DB or an Object if cast in Model
+    health_risks: string | HealthRisksData;
+    created_at: string;
+}
+
+interface ViewHealthRiskProps {
+    results: ScanResult;
+}
+
+// --- Component ---
+
+const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
+    // 1. Safe Parsing: Ensure we have a valid object even if DB stored a string
+    let healthData: HealthRisksData = {
+        concerns: [],
+        screenings: [],
+        lifespan: 'Unknown',
+        care_tips: [],
+    };
+
+    try {
+        if (typeof results?.health_risks === 'string') {
+            healthData = JSON.parse(results.health_risks);
+        } else if (
+            typeof results?.health_risks === 'object' &&
+            results?.health_risks !== null
+        ) {
+            healthData = results.health_risks as HealthRisksData;
+        }
+    } catch (error) {
+        console.error('Failed to parse health risks JSON:', error);
+    }
+
+    const {
+        concerns = [],
+        screenings = [],
+        lifespan = 'Unknown',
+        care_tips = [],
+    } = healthData;
+
+    // 2. Logic: Split care tips into two columns for the layout
+    const midPoint = Math.ceil(care_tips.length / 2);
+    const tipsCol1 = care_tips.slice(0, midPoint);
+    const tipsCol2 = care_tips.slice(midPoint);
+
+    // 3. Helper: Risk Color Logic
+    const getRiskColor = (risk: string) => {
+        const r = risk.toLowerCase();
+        if (r.includes('high'))
+            return 'bg-red-100 text-red-700 hover:bg-red-200 border-red-200';
+        if (r.includes('moderate'))
+            return 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200';
+        return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200';
+    };
+
+    // 4. Radar Chart Data Processing - FULLY DYNAMIC
+    const radarData = useMemo(() => {
+        // If no concerns, show empty state data
+        if (!concerns || concerns.length === 0) {
+            return [{ category: 'No Data', value: 0 }];
+        }
+
+        // Take up to 8 concerns for optimal radar chart visualization
+        const topConcerns = concerns.slice(0, 8);
+
+        // Map each concern directly to radar data
+        return topConcerns.map((concern) => {
+            const riskLevel = concern.risk_level.toLowerCase();
+
+            // Calculate risk score (0-100) based on risk level
+            let score = 25; // Base value for low/unknown
+            if (riskLevel.includes('high')) score = 80;
+            else if (riskLevel.includes('moderate')) score = 55;
+            else if (riskLevel.includes('low')) score = 30;
+
+            return {
+                category: concern.name, // Use actual concern name
+                value: score,
+            };
+        });
+    }, [concerns]);
+
     return (
-        <div>
+        <div className="min-h-screen w-full bg-background">
             <Header />
-            <main className="flex flex-col gap-4 px-60">
-                <div className="flex items-center space-x-6">
-                    <Link href="/scan-results">
-                        <ArrowLeft color="black" size="19" />
+            <main className="container mx-auto mt-[-15px] flex max-w-5xl flex-col gap-6 px-4 py-6 md:px-8">
+                {/* --- Top Bar --- */}
+                <div className="flex items-start space-x-4 md:items-center md:space-x-6">
+                    {/* Link back to the main results page, preserving the ID if needed */}
+                    <Link href={`/scan-results`} className="mt-1 md:mt-0">
+                        <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="mt-6 text-lg font-bold dark:text-white">
+                        <h1 className="text-lg font-bold dark:text-white">
                             Health Risk Visualization
                         </h1>
-                        <h1 className="text-sm text-gray-600 dark:text-white/70">
-                            Breed-specific health considerations for Golden
-                            Retriever
-                        </h1>
+                        <p className="text-sm text-gray-600 dark:text-white/70">
+                            Breed-specific health considerations for{' '}
+                            {results?.breed || 'your dog'}
+                        </p>
                     </div>
                 </div>
-                <Card className="bg-red-50 px-8 pl-8 outline outline-red-300">
-                    <h1 className="flex gap-4">
-                        <TriangleAlert color="#cc0000" />
+
+                {/* --- Disclaimer --- */}
+                <Card className="bg-red-50 p-6 outline outline-red-300">
+                    <div className="flex gap-4">
+                        <TriangleAlert className="h-6 w-6 shrink-0 text-[#cc0000]" />
                         <div className="flex flex-col gap-2">
                             <span className="text-sm font-bold text-red-700">
                                 Medical Disclaimer
@@ -34,111 +152,174 @@ const ViewHealthRisk = () => {
                                 This information is for educational purposes
                                 only and is not a medical diagnosis. Always
                                 consult with a licensed veterinarian for proper
-                                medical advice and health screenings specific to
-                                your pet.
+                                medical advice specific to your pet.
                             </span>
                         </div>
-                    </h1>
-                </Card>
-
-
-
-
-
-                <Card className="">
-                    <div className="px-8">
-                        <p className="font-medium">Breed Risk Profile</p>
                     </div>
                 </Card>
 
-                <h2 className="font-medium">Common Health Concerns</h2>
+                {/* --- Breed Risk Profile Chart --- */}
+                <Card className="p-6">
+                    <h2 className="mb-6 text-lg font-semibold">
+                        Breed Risk Profile
+                    </h2>
 
-                <Card className="px-8">
-                    <div>
-                        <h1 className="font-medium">Cancer</h1>
-                        <Badge className="bg-red-100 text-red-500">
-                            High Risk
-                        </Badge>
+                    <div className="w-full">
+                        <ResponsiveContainer width="100%" height={400}>
+                            <RadarChart data={radarData}>
+                                <defs>
+                                    <linearGradient
+                                        id="radarGradient"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                    >
+                                        <stop
+                                            offset="0%"
+                                            stopColor="#06b6d4"
+                                            stopOpacity={0.8}
+                                        />
+                                        <stop
+                                            offset="100%"
+                                            stopColor="#0891b2"
+                                            stopOpacity={0.3}
+                                        />
+                                    </linearGradient>
+                                </defs>
+                                <PolarGrid
+                                    stroke="#cbd5e1"
+                                    strokeWidth={1}
+                                    strokeDasharray="3 3"
+                                />
+                                <PolarAngleAxis
+                                    dataKey="category"
+                                    tick={{
+                                        fill: '#475569',
+                                        fontSize: 13,
+                                        fontWeight: 500,
+                                    }}
+                                />
+                                <PolarRadiusAxis
+                                    angle={90}
+                                    domain={[0, 100]}
+                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                    axisLine={false}
+                                />
+                                <Radar
+                                    name="Risk Level"
+                                    dataKey="value"
+                                    stroke="#0891b2"
+                                    strokeWidth={2.5}
+                                    fill="url(#radarGradient)"
+                                    fillOpacity={0.6}
+                                />
+                            </RadarChart>
+                        </ResponsiveContainer>
                     </div>
 
-                    <div>
-                        <h1 className="">Description</h1>
-                        <p className="text-gray-600">
-                            Golden Retrievers have higher rates of certain
-                            cancers, particularly hemangiosarcoma and lymphoma.
-                        </p>
-                    </div>
-                    <div>
-                        <h1 className="">Prevention & Management</h1>
-                        <p className="text-gray-600">
-                            Regular vet check-ups, early detection screenings,
-                            healthy lifestyle
-                        </p>
-                    </div>
+                    <p className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                        Risk levels are relative to breed averages • Higher
+                        values indicate more common health concerns
+                    </p>
                 </Card>
 
-                <Card className="bg-cyan-50 px-8 outline outline-cyan-200">
-                    <h1 className="font-medium">
+                <h2 className="text-lg font-medium">Common Health Concerns</h2>
+
+                {/* --- Dynamic Health Concerns --- */}
+                {concerns.length > 0 ? (
+                    concerns.map((concern, index) => (
+                        <Card key={index} className="flex flex-col gap-4 p-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-medium">{concern.name}</h3>
+                                <Badge
+                                    className={getRiskColor(concern.risk_level)}
+                                >
+                                    {concern.risk_level}
+                                </Badge>
+                            </div>
+
+                            <div>
+                                <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Description
+                                </h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {concern.description}
+                                </p>
+                            </div>
+                            <div>
+                                <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Prevention & Management
+                                </h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {concern.prevention}
+                                </p>
+                            </div>
+                        </Card>
+                    ))
+                ) : (
+                    <div className="text-sm text-gray-500 italic">
+                        No specific health concerns were generated for this
+                        scan.
+                    </div>
+                )}
+
+                {/* --- Recommended Screenings --- */}
+                <Card className="flex flex-col gap-4 bg-cyan-50 p-6 outline outline-cyan-200">
+                    <h3 className="font-medium text-cyan-900">
                         Recommended Health Screenings
-                    </h1>
-                    <div className="flex gap-2">
-                        <div className="flex w-1/2 flex-col gap-2">
-                            <Card className="gap-1 px-6">
-                                <h1>Annual Physical Exam</h1>
-                                <p className="text-gray-600">
-                                    Comprehensive check-up with your
-                                    veterinarian
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {screenings.map((screening, index) => (
+                            <Card
+                                key={index}
+                                className="flex flex-col gap-1 p-4 shadow-sm"
+                            >
+                                <h4 className="text-sm font-semibold">
+                                    {screening.name}
+                                </h4>
+                                <p className="text-xs text-gray-600">
+                                    {screening.description}
                                 </p>
                             </Card>
-                            <Card className="gap-1 px-6">
-                                <h1>Annual Physical Exam</h1>
-                                <p className="text-gray-600">
-                                    Comprehensive check-up with your
-                                    veterinarian
-                                </p>
-                            </Card>
-                        </div>
-                        <div className="flex w-1/2 flex-col gap-2">
-                            <Card className="gap-1 px-6">
-                                <h1>Annual Physical Exam</h1>
-                                <p className="text-gray-600">
-                                    Comprehensive check-up with your
-                                    veterinarian
-                                </p>
-                            </Card>
-                            <Card className="gap-1 px-6">
-                                <h1>Annual Physical Exam</h1>
-                                <p className="text-gray-600">
-                                    Comprehensive check-up with your
-                                    veterinarian
-                                </p>
-                            </Card>
-                        </div>
+                        ))}
                     </div>
                 </Card>
 
-                <Card className="mb-6 px-8">
-                    <h1 className="font-medium">
+                {/* --- Lifespan & Care Tips --- */}
+                <Card className="mb-6 p-6">
+                    <h3 className="mb-6 font-medium">
                         Typical Lifespan & Care Tips
-                    </h1>
-                    <div className="flex justify-evenly">
-                        <div className="flex flex-col items-center justify-center">
-                            <p className="text-4xl text-cyan-700">10-12</p>
+                    </h3>
+
+                    <div className="flex flex-col items-center gap-8 md:flex-row md:items-start md:justify-evenly">
+                        {/* Lifespan Stat */}
+                        <div className="flex flex-col items-center justify-center text-center">
+                            <p className="text-4xl font-bold text-cyan-700">
+                                {lifespan}
+                            </p>
                             <p className="font-medium">Years</p>
-                            <p>Average lifespan</p>
+                            <p className="text-sm text-gray-500">
+                                Average lifespan
+                            </p>
                         </div>
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                            <ul>
-                                <li>Regular exercise (1-2 hours daily)</li>
-                                <li> Balanced, high-quality diet</li>
-                                <li>Weight management</li>
+
+                        {/* Tips Column 1 */}
+                        <div className="flex flex-col items-center justify-center space-y-2 text-center md:items-start md:text-left">
+                            <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
+                                {tipsCol1.map((tip, idx) => (
+                                    <li key={idx}>{tip}</li>
+                                ))}
                             </ul>
                         </div>
-                        <div className="flex flex-col items-center justify-center">
-                            <ul>
-                                <li>Regular exercise (1-2 hours daily)</li>
-                                <li> Balanced, high-quality diet</li>
-                                <li>Weight management</li>
+
+                        {/* Tips Column 2 */}
+                        <div className="flex flex-col items-center justify-center space-y-2 text-center md:items-start md:text-left">
+                            <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
+                                {tipsCol2.map((tip, idx) => (
+                                    <li key={idx}>{tip}</li>
+                                ))}
                             </ul>
                         </div>
                     </div>

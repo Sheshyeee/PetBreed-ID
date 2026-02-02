@@ -172,13 +172,14 @@ const Scan = () => {
         <>
             <Header />
 
-            <div className="flex flex-col items-center bg-[#FDFDFC] text-[#1b1b18] dark:bg-[#0a0a0a]">
-                <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
-                    <div>
-                        <h1 className="mt-6 text-lg font-bold dark:text-white">
+            <div className="mt-[-20px] min-h-screen text-[#1b1b18] dark:bg-[#0a0a0a]">
+                <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10">
+                    {/* Page Header */}
+                    <div className="mb-6 ml-2">
+                        <h1 className="text-md font-bold sm:text-xl lg:text-lg dark:text-white">
                             Scan Your Pet
                         </h1>
-                        <p className="text-sm text-gray-600 dark:text-white/70">
+                        <p className="mt-[-5px] text-xs text-gray-600 sm:text-sm dark:text-white/70">
                             Upload a photo or use your camera to identify your
                             pet's breed.
                         </p>
@@ -186,46 +187,48 @@ const Scan = () => {
 
                     {/* Error Message */}
                     {error && (
-                        <Card className="mx-auto mt-6 w-full max-w-4xl border-red-400 bg-red-50 dark:bg-red-950">
-                            <CardContent className="p-4">
-                                <div className="flex items-center gap-2">
+                        <Card className="mb-6 border-red-400 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                            <CardContent className="p-4 sm:p-6">
+                                <div className="flex items-start gap-2 sm:items-center">
                                     <XCircle
                                         size={20}
-                                        className="text-red-600 dark:text-red-400"
+                                        className="mt-0.5 shrink-0 text-red-600 sm:mt-0 dark:text-red-400"
                                     />
-                                    <p className="font-bold text-red-700 dark:text-red-400">
-                                        Error
-                                    </p>
+                                    <div className="flex-1">
+                                        <p className="font-bold text-red-700 dark:text-red-400">
+                                            Error
+                                        </p>
+                                        <p className="mt-1 text-xs text-red-600 sm:text-sm dark:text-red-300">
+                                            {error.message}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="mt-2 text-sm text-red-600 dark:text-red-300">
-                                    {error.message}
-                                </p>
                             </CardContent>
                         </Card>
                     )}
 
                     {/* Success Message with Results */}
                     {success && showResults && (
-                        <Card className="mx-auto mt-6 w-full max-w-4xl border-green-400 bg-green-50 dark:bg-green-950">
-                            <CardContent className="p-6">
-                                <div className="flex items-center gap-2">
+                        <Card className="mb-6 border-green-400 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                            <CardContent className="p-4 sm:p-6">
+                                <div className="flex items-start gap-2 sm:items-center">
                                     <CheckCircle2
                                         size={24}
-                                        className="text-green-600 dark:text-green-400"
+                                        className="mt-0.5 shrink-0 text-green-600 sm:mt-0 dark:text-green-400"
                                     />
-                                    <h2 className="text-xl font-bold text-green-700 dark:text-green-400">
+                                    <h2 className="text-lg font-bold text-green-700 sm:text-xl dark:text-green-400">
                                         Analysis Complete!
                                     </h2>
                                 </div>
 
                                 <div className="mt-4">
-                                    <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                                    <p className="text-base font-semibold text-gray-800 sm:text-lg dark:text-white">
                                         Detected Breed:{' '}
                                         <span className="text-green-600 dark:text-green-400">
                                             {success.breed}
                                         </span>
                                     </p>
-                                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                                    <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-300">
                                         Confidence:{' '}
                                         {(success.confidence * 100).toFixed(2)}%
                                     </p>
@@ -234,7 +237,7 @@ const Scan = () => {
                                 {success.top_predictions &&
                                     success.top_predictions.length > 0 && (
                                         <div className="mt-4">
-                                            <h3 className="font-semibold text-gray-700 dark:text-gray-300">
+                                            <h3 className="text-sm font-semibold text-gray-700 sm:text-base dark:text-gray-300">
                                                 Top Predictions:
                                             </h3>
                                             <ul className="mt-2 space-y-2">
@@ -242,13 +245,13 @@ const Scan = () => {
                                                     (pred, idx) => (
                                                         <li
                                                             key={idx}
-                                                            className="flex justify-between text-sm"
+                                                            className="flex justify-between gap-4 text-xs sm:text-sm"
                                                         >
                                                             <span className="text-gray-700 dark:text-gray-300">
                                                                 {idx + 1}.{' '}
                                                                 {pred.breed}
                                                             </span>
-                                                            <span className="text-gray-600 dark:text-gray-400">
+                                                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
                                                                 {(
                                                                     pred.confidence *
                                                                     100
@@ -273,14 +276,15 @@ const Scan = () => {
                         </Card>
                     )}
 
-                    <Card className="mx-auto mt-8 w-full max-w-4xl">
+                    {/* Upload Card */}
+                    <Card className="mx-auto w-full max-w-4xl">
                         <form onSubmit={handleSubmit}>
-                            <CardContent className="p-6">
+                            <CardContent className="p-4 sm:p-6">
                                 {!preview ? (
                                     <>
                                         <div
                                             onClick={triggerFileInput}
-                                            className="flex h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition-colors hover:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                                            className="flex h-[180px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition-colors hover:border-gray-400 sm:h-[200px] lg:h-[240px] dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
                                         >
                                             <input
                                                 ref={fileInputRef}
@@ -292,54 +296,54 @@ const Scan = () => {
 
                                             <div className="rounded-full bg-gray-200 dark:bg-gray-800">
                                                 <Camera
-                                                    size={36}
-                                                    className="p-2 text-black dark:text-white"
+                                                    size={32}
+                                                    className="p-2 text-black sm:size-9 dark:text-white"
                                                 />
                                             </div>
 
-                                            <p className="mt-2 text-sm text-gray-600 dark:text-white/70">
+                                            <p className="mt-2 text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                 Drop your image here
                                             </p>
-                                            <p className="text-sm text-gray-600 dark:text-white/70">
+                                            <p className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                 or click to browse
                                             </p>
-                                            <p className="text-sm text-gray-600 dark:text-white/70">
+                                            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                 All image formats supported (Max
                                                 10 MB)
                                             </p>
                                         </div>
 
                                         {errors.image && (
-                                            <p className="mt-2 text-sm text-red-600">
+                                            <p className="mt-2 text-xs text-red-600 sm:text-sm">
                                                 {errors.image}
                                             </p>
                                         )}
 
-                                        <Card className="mt-6 border-blue-400 bg-blue-50 dark:bg-gray-950">
-                                            <CardContent className="p-4">
-                                                <div className="flex items-center gap-2">
+                                        <Card className="mt-4 border-blue-400 bg-blue-50 sm:mt-6 dark:border-blue-800 dark:bg-gray-950">
+                                            <CardContent className="p-3 sm:p-4">
+                                                <div className="flex items-start gap-2 sm:items-center">
                                                     <CircleAlert
-                                                        size={20}
-                                                        className="text-blue-600 dark:text-blue-400"
+                                                        size={18}
+                                                        className="mt-0.5 shrink-0 text-blue-600 sm:mt-0 sm:size-5 dark:text-blue-400"
                                                     />
-                                                    <p className="font-bold text-gray-700 dark:text-white/70">
+                                                    <p className="text-xs font-bold text-gray-700 sm:text-sm dark:text-white/70">
                                                         Tips for Best Results
                                                     </p>
                                                 </div>
 
-                                                <ul className="mt-2 list-disc space-y-1 pl-8">
-                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                <ul className="mt-2 list-disc space-y-1 pl-6 sm:pl-8">
+                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                         Ensure your pet is
                                                         clearly visible
                                                     </li>
-                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                         Use good lighting
                                                     </li>
-                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                         Center your pet in the
                                                         frame
                                                     </li>
-                                                    <li className="text-sm text-gray-600 dark:text-white/70">
+                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
                                                         Better angles improve
                                                         accuracy
                                                     </li>
@@ -352,19 +356,19 @@ const Scan = () => {
                                         <div className="overflow-hidden rounded-lg">
                                             <img
                                                 src={preview}
-                                                className="mx-auto max-h-96 w-full object-contain"
+                                                className="mx-auto max-h-64 w-full object-contain sm:max-h-80 lg:max-h-96"
                                                 alt="Preview"
                                             />
                                         </div>
                                         {fileInfo && (
-                                            <p className="mt-2 text-center text-xs text-gray-500">
+                                            <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
                                                 {fileInfo}
                                             </p>
                                         )}
-                                        <div className="mt-4 flex gap-2">
+                                        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                                             <Button
                                                 type="submit"
-                                                className="flex-1"
+                                                className="w-full sm:flex-1"
                                                 disabled={processing}
                                             >
                                                 {processing
@@ -373,7 +377,7 @@ const Scan = () => {
                                             </Button>
                                             <Button
                                                 type="button"
-                                                className="w-32"
+                                                className="w-full sm:w-32"
                                                 variant="outline"
                                                 onClick={handleReset}
                                                 disabled={processing}
