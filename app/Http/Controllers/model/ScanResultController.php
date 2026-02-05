@@ -20,6 +20,88 @@ use OpenAI\Laravel\Facades\OpenAI;
 
 class ScanResultController extends Controller
 {
+    /**
+     * ==========================================
+     * HELPER: Calculate breed-specific learning progress
+     * ==========================================
+     */
+    private function calculateBreedLearningProgress()
+    {
+        $jsonPath = storage_path('app/references.json');
+        if (!file_exists($jsonPath)) {
+            return [];
+        }
+
+        $references = json_decode(file_get_contents($jsonPath), true);
+        if (!is_array($references) || empty($references)) {
+            return [];
+        }
+
+        // Group by breed
+        $breedGroups = [];
+        foreach ($references as $ref) {
+            $breed = $ref['label'];
+            if (!isset($breedGroups[$breed])) {
+                $breedGroups[$breed] = [];
+            }
+            $breedGroups[$breed][] = $ref;
+        }
+
+        // Calculate learning metrics per breed
+        $breedLearning = [];
+        foreach ($breedGroups as $breed => $examples) {
+            $exampleCount = count($examples);
+
+            // Get correction history for this breed
+            $corrections = BreedCorrection::where('corrected_breed', $breed)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            if ($corrections->isEmpty()) {
+                continue;
+            }
+
+            // Get scans AFTER corrections were made for this breed
+            $firstCorrectionDate = $corrections->first()->created_at;
+
+            $scansAfterLearning = Results::where('breed', $breed)
+                ->where('created_at', '>=', $firstCorrectionDate)
+                ->get();
+
+            $avgConfidenceAfter = $scansAfterLearning->avg('confidence') ?? 0;
+
+            // Calculate how many recent scans (last 10) got high confidence
+            $recentScans = Results::where('breed', $breed)
+                ->latest()
+                ->take(10)
+                ->get();
+
+            $recentHighConfidence = $recentScans->where('confidence', '>=', 80)->count();
+            $successRate = $recentScans->count() > 0
+                ? ($recentHighConfidence / $recentScans->count()) * 100
+                : 0;
+
+            $breedLearning[$breed] = [
+                'breed' => $breed,
+                'examples_learned' => $exampleCount,
+                'corrections_made' => $corrections->count(),
+                'avg_confidence' => round($avgConfidenceAfter, 1),
+                'success_rate' => round($successRate, 1),
+                'first_learned' => $firstCorrectionDate->format('M d, Y'),
+                'days_learning' => $firstCorrectionDate->diffInDays(now()),
+                'recent_scans' => $recentScans->count(),
+            ];
+        }
+
+        // Sort by success rate descending
+        usort($breedLearning, function ($a, $b) {
+            return $b['success_rate'] <=> $a['success_rate'];
+        });
+
+        return array_slice($breedLearning, 0, 10); // Top 10 breeds
+    }
+
+
     public function dashboard()
     {
         $results = Results::latest()->take(6)->get();
@@ -32,15 +114,15 @@ class ScanResultController extends Controller
         $lowConfidenceCount = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
-        // ==========================================
-        // IMPROVED REAL LEARNING METRICS
-        // ==========================================
-
         $oneWeekAgo = Carbon::now()->subDays(7);
         $twoWeeksAgo = Carbon::now()->subDays(14);
         $oneMonthAgo = Carbon::now()->subDays(30);
 
-        // 1. Memory Bank Count (from references.json)
+        // ============================================================================
+        // BREED-SPECIFIC LEARNING PROGRESS - Shows learning per breed
+        // ============================================================================
+        $breedLearningProgress = $this->calculateBreedLearningProgress();
+
         $jsonPath = storage_path('app/references.json');
         $memoryCount = 0;
         $uniqueBreeds = [];
@@ -52,18 +134,11 @@ class ScanResultController extends Controller
             }
         }
 
-        // 2. Recent Corrections (last 7 days)
         $recentCorrectionsCount = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
-
-        // 3. REAL METRIC: Memory-Assisted Scans
-        // Count scans where memory actually helped (is_memory_match = true in results)
         $currentWeekResults = Results::where('created_at', '>=', $oneWeekAgo)->get();
 
-        // Parse simulation_data to check if memory was used
         $memoryAssistedScans = 0;
         foreach ($currentWeekResults as $scan) {
-            // Check if this scan used memory (you may need to add a flag in your Results table)
-            // For now, we'll check if there's a matching correction
             $hasCorrection = BreedCorrection::where('scan_id', $scan->scan_id)->exists();
             if ($hasCorrection) {
                 $memoryAssistedScans++;
@@ -73,12 +148,9 @@ class ScanResultController extends Controller
         $weeklyScans = $currentWeekResults->count();
         $memoryHitRate = $weeklyScans > 0 ? ($memoryAssistedScans / $weeklyScans) * 100 : 0;
 
-        // 4. REAL METRIC: Before vs After Correction Accuracy
-        // Compare scans BEFORE first correction vs AFTER corrections started
         $firstCorrection = BreedCorrection::oldest()->first();
 
         if ($firstCorrection) {
-            // Scans BEFORE any corrections
             $scansBeforeCorrections = Results::where('created_at', '<', $firstCorrection->created_at)
                 ->where('confidence', '>=', 80)
                 ->count();
@@ -88,7 +160,6 @@ class ScanResultController extends Controller
                 ? ($scansBeforeCorrections / $totalBeforeCorrections) * 100
                 : 0;
 
-            // Scans AFTER corrections started
             $scansAfterCorrections = Results::where('created_at', '>=', $firstCorrection->created_at)
                 ->where('confidence', '>=', 80)
                 ->count();
@@ -105,7 +176,6 @@ class ScanResultController extends Controller
             $accuracyImprovement = 0;
         }
 
-        // 5. REAL METRIC: Average Confidence (Current Week vs Previous Week)
         $avgConfidence = $currentWeekResults->avg('confidence') ?? 0;
 
         $previousWeekResults = Results::where('created_at', '>=', $twoWeeksAgo)
@@ -117,12 +187,9 @@ class ScanResultController extends Controller
             $confidenceTrend = $avgConfidence - $previousAvgConfidence;
         }
 
-        // 6. REAL METRIC: Breed Coverage
-        // What percentage of corrections have we learned?
         $totalCorrections = BreedCorrection::count();
         $breedCoverage = $totalCorrections > 0 ? (count($uniqueBreeds) / $totalCorrections) * 100 : 0;
 
-        // 7. Weekly Trends for Cards
         $currentWeekScans = Results::where('created_at', '>=', $oneWeekAgo)->count();
         $previousWeekScansCount = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->count();
@@ -155,7 +222,6 @@ class ScanResultController extends Controller
             ? (($currentWeekLow - $previousWeekLow) / $previousWeekLow) * 100
             : 0;
 
-        // 8. Track last milestone for update detection
         $lastMilestone = floor($correctedBreedCount / 5) * 5;
 
         return inertia('dashboard', [
@@ -164,14 +230,10 @@ class ScanResultController extends Controller
             'resultCount' => $resultCount,
             'lowConfidenceCount' => $lowConfidenceCount,
             'highConfidenceCount' => $highConfidenceCount,
-
-            // Weekly trends
             'totalScansWeeklyTrend' => round($totalScansWeeklyTrend, 1),
             'correctedWeeklyTrend' => round($correctedWeeklyTrend, 1),
             'highConfidenceWeeklyTrend' => round($highConfidenceWeeklyTrend, 1),
             'lowConfidenceWeeklyTrend' => round($lowConfidenceWeeklyTrend, 1),
-
-            // IMPROVED learning metrics with descriptions
             'memoryCount' => $memoryCount,
             'uniqueBreedsLearned' => count($uniqueBreeds),
             'recentCorrectionsCount' => $recentCorrectionsCount,
@@ -180,13 +242,10 @@ class ScanResultController extends Controller
             'memoryHitRate' => round($memoryHitRate, 2),
             'accuracyImprovement' => round($accuracyImprovement, 2),
             'breedCoverage' => round($breedCoverage, 2),
-
-            // Before/After comparison
             'accuracyBeforeCorrections' => round($accuracyBeforeCorrections, 2),
             'accuracyAfterCorrections' => round($accuracyAfterCorrections, 2),
-
-            // Milestone tracking
             'lastCorrectionCount' => $lastMilestone,
+            'breedLearningProgress' => $breedLearningProgress, // NEW: Per-breed learning data
         ]);
     }
 
@@ -202,12 +261,10 @@ class ScanResultController extends Controller
                 ], 404);
             }
 
-            // Decode simulation_data from JSON
             $simulationData = is_string($result->simulation_data)
                 ? json_decode($result->simulation_data, true)
                 : $result->simulation_data;
 
-            // Default structure if no simulation data exists
             if (!$simulationData) {
                 $simulationData = [
                     '1_years' => null,
@@ -216,7 +273,6 @@ class ScanResultController extends Controller
                 ];
             }
 
-            // Build full URLs for images
             $responseData = [
                 'breed' => $result->breed,
                 'original_image' => asset('storage/' . $result->image),
@@ -246,10 +302,8 @@ class ScanResultController extends Controller
         }
     }
 
-    /**
-     * Get simulation status for polling (mobile app)
-     * GET /api/v1/results/{scan_id}/simulation-status
-     */
+
+
     public function getSimulationStatus($scan_id)
     {
         try {
@@ -295,8 +349,6 @@ class ScanResultController extends Controller
         }
     }
 
-
-
     public function preview($id)
     {
         $result = Results::findOrFail($id);
@@ -314,15 +366,11 @@ class ScanResultController extends Controller
 
         $correctedScanIds = BreedCorrection::pluck('scan_id');
 
-        // Start building the query
         $query = Results::whereNotIn('scan_id', $correctedScanIds);
 
-        // Log initial count
         $totalBeforeFilters = $query->count();
         Log::info('Total results before filters: ' . $totalBeforeFilters);
 
-        // Apply filters
-        // 1. Min Confidence Filter
         if ($request->has('min_confidence')) {
             $minConfidenceRaw = $request->input('min_confidence');
             Log::info('Min Confidence RAW value: ' . var_export($minConfidenceRaw, true) . ' (Type: ' . gettype($minConfidenceRaw) . ')');
@@ -334,7 +382,6 @@ class ScanResultController extends Controller
                 $query->where('confidence', '>=', $minConfidence);
                 Log::info('✓ Min confidence filter APPLIED: confidence >= ' . $minConfidence);
 
-                // Count after this filter
                 $countAfterConfidence = $query->count();
                 Log::info('Results after confidence filter: ' . $countAfterConfidence);
             } else {
@@ -344,7 +391,6 @@ class ScanResultController extends Controller
             Log::info('✗ Min confidence parameter NOT present in request');
         }
 
-        // 2. Status Filter (based on confidence ranges)
         if ($request->has('status') && $request->status !== 'all') {
             Log::info('Status filter RAW: ' . $request->status);
 
@@ -375,7 +421,6 @@ class ScanResultController extends Controller
             Log::info('✗ Status filter not applied (all or not present)');
         }
 
-        // 3. Date Filter
         if ($request->has('date') && $request->date) {
             Log::info('Date filter RAW: ' . $request->date);
 
@@ -393,18 +438,15 @@ class ScanResultController extends Controller
             Log::info('✗ Date filter not applied');
         }
 
-        // Log the final SQL query
         Log::info('Final SQL Query: ' . $query->toSql());
         Log::info('Query Bindings: ' . json_encode($query->getBindings()));
 
-        // Get paginated results
         $results = $query->latest()->paginate(10)->appends($request->query());
 
         Log::info('FINAL Results count: ' . $results->total());
         Log::info('Current page: ' . $results->currentPage());
         Log::info('Per page: ' . $results->perPage());
 
-        // Log sample of results for debugging
         if ($results->count() > 0) {
             Log::info('Sample result confidence values: ' . $results->pluck('confidence')->take(5)->implode(', '));
         }
@@ -422,7 +464,783 @@ class ScanResultController extends Controller
     }
 
     /**
-     * Original analyze method for web (returns redirect)
+     * ==========================================
+     * HELPER: Calculate image hash
+     * ==========================================
+     */
+    private function calculateImageHash($imagePath)
+    {
+        try {
+            return md5_file($imagePath);
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate image hash: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ==========================================
+     * HELPER: Check for exact image match
+     * ==========================================
+     */
+    private function checkExactImageMatch($imageHash)
+    {
+        if (!$imageHash) {
+            return [false, null];
+        }
+
+        $previousResult = Results::where('image_hash', $imageHash)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($previousResult) {
+            Log::info('✓ EXACT IMAGE MATCH FOUND', [
+                'previous_scan_id' => $previousResult->scan_id,
+                'previous_breed' => $previousResult->breed,
+                'previous_confidence' => $previousResult->confidence,
+                'scan_date' => $previousResult->created_at
+            ]);
+            return [true, $previousResult];
+        }
+
+        return [false, null];
+    }
+
+    /**
+     * ==========================================
+     * HELPER: Check if image has admin correction
+     * ==========================================
+     */
+    private function checkAdminCorrection($imageHash)
+    {
+        if (!$imageHash) {
+            return [false, null];
+        }
+
+        $correctedResult = Results::where('image_hash', $imageHash)->first();
+
+        if ($correctedResult) {
+            $correction = BreedCorrection::where('scan_id', $correctedResult->scan_id)->first();
+
+            if ($correction) {
+                Log::info('✓ ADMIN CORRECTION FOUND FOR IMAGE', [
+                    'corrected_breed' => $correction->corrected_breed,
+                    'original_breed' => $correction->original_breed
+                ]);
+                return [true, $correction];
+            }
+        }
+
+        return [false, null];
+    }
+
+    /**
+     * ==========================================
+     * BREED IDENTIFICATION - DETAILED ANALYTICAL PROMPT
+     * ==========================================
+     */
+    private function identifyBreedWithAPI($imagePath)
+    {
+        Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
+        Log::info('Image path: ' . $imagePath);
+
+        $apiKey = config('openai.api_key');
+        if (empty($apiKey)) {
+            Log::error('✗ OpenAI API key not configured in .env file');
+            return [
+                'success' => false,
+                'error' => 'OpenAI API key not configured'
+            ];
+        }
+        Log::info('✓ OpenAI API key is configured');
+
+        if (!file_exists($imagePath)) {
+            Log::error('✗ Image file not found: ' . $imagePath);
+            return [
+                'success' => false,
+                'error' => 'Image file not found'
+            ];
+        }
+        Log::info('✓ Image file exists');
+
+        try {
+            $imageData = base64_encode(file_get_contents($imagePath));
+            $mimeType = mime_content_type($imagePath);
+            Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType);
+
+            $enhancedBreedPrompt = "You are an elite canine geneticist and veterinary morphologist with expertise in identifying over 400 dog breeds, rare breeds, landrace populations, and complex mixed-breed combinations. Your analysis must be thorough, precise, and evidence-based.
+
+═══════════════════════════════════════════════════════════════
+PHASE 1: SYSTEMATIC MORPHOLOGICAL ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+Conduct a forensic-level examination of every visible feature:
+
+**CRANIAL & FACIAL STRUCTURE:**
+- Skull type: Dolichocephalic (long), Mesocephalic (medium), Brachycephalic (short)
+- Stop angle: Pronounced, moderate, minimal, absent
+- Muzzle ratio: Length vs skull length (1:1, 1:2, 2:3, etc.)
+- Muzzle shape: Tapered, blunt, square, pointed
+- Nose size and pigmentation
+- Jaw structure: Undershot, overshot, scissor bite indicators
+- Facial wrinkles or folds present
+
+**EYE CHARACTERISTICS:**
+- Shape: Almond, round, oval, triangular
+- Size relative to head: Small, medium, large, prominent
+- Set: Deep-set, normal, protruding
+- Color if visible: Brown, amber, blue, green, heterochromia
+- Expression: Alert, gentle, intense, wise
+
+**EAR MORPHOLOGY:**
+- Type: Prick/erect, semi-erect, button, rose, drop/pendant, bat
+- Set: High, medium, low on skull
+- Size: Small, medium, large relative to head
+- Leather thickness: Thin, medium, thick
+- Carriage: Forward, sideways, back
+
+**BODY ARCHITECTURE:**
+- Build: Compact, racy, cobby, rangy, sturdy, refined
+- Proportions: Square, slightly long, very long-backed
+- Chest: Deep, shallow, barrel, narrow
+- Topline: Level, sloping, roached
+- Loin: Short and strong, long, weak
+- Tuck-up: Pronounced (sighthound), moderate, minimal
+- Bone structure: Fine, medium, heavy
+- Muscle definition: Lean, athletic, heavily muscled, moderate
+
+**COAT ANALYSIS:**
+- Length: Hairless, very short, short, medium, long, very long
+- Texture: Smooth, wire/harsh, silky, woolly, corded, curly
+- Density: Single coat, double coat, triple coat
+- Pattern distribution: Uniform, feathering on legs/tail, ruff on neck
+- Undercoat presence: Yes/no
+
+**COLOR & PATTERN GENETICS:**
+- Base color: Solid (black, white, brown, red, cream, fawn, blue, etc.)
+- Pattern type: 
+  * Solid/self-colored
+  * Bicolor (specify distribution)
+  * Tricolor (specify colors and placement)
+  * Sable (hair banding)
+  * Brindle (tiger striping)
+  * Merle (mottled/dappled)
+  * Piebald/parti-color (white patches)
+  * Ticking/roan (colored dots on white)
+  * Saddle pattern
+  * Blanket pattern
+  * Points (darker on extremities)
+  * Mask (face darkening)
+- Specific markings: Blazes, collars, socks, patches, spectacles
+
+**TAIL CHARACTERISTICS:**
+- Set: High, medium, low
+- Carriage: Sickle, ring/curled, saber, flag, gay/upright, low
+- Shape: Straight, curved, kinked, bobbed, screw
+- Feathering: None, light, heavy, plumed
+
+**SIZE ESTIMATION:**
+- Weight class: Toy (<10 lbs), Small (10-25 lbs), Medium (25-50 lbs), Large (50-90 lbs), Giant (90+ lbs)
+- Height estimate: Under 10\", 10-15\", 15-20\", 20-25\", 25\"+ at shoulder
+- Body mass index: Slender, ideal, stocky, overweight
+
+**SPECIALIZED FEATURES:**
+- Dewclaws: Present/absent, single/double
+- Feet: Cat-like, hare-like, webbed
+- Gait indicators if visible: Stilted, fluid, bouncy
+- Specialized adaptations: Cold weather (thick coat, small ears), hot weather (large ears, short coat), water work (webbing), etc.
+
+═══════════════════════════════════════════════════════════════
+PHASE 2: BREED CANDIDATE IDENTIFICATION
+═══════════════════════════════════════════════════════════════
+
+Based on your morphological analysis, generate a list of 8-12 possible breed candidates:
+
+**PRIMARY CANDIDATES (3-4 breeds):**
+- List breeds that match 80%+ of observed features
+- Include both common and RARE breeds if features align
+- Do NOT exclude rare breeds just because they're uncommon
+
+**SECONDARY CANDIDATES (3-4 breeds):**
+- Breeds matching 60-79% of features
+- May have 1-2 significant differences
+
+**TERTIARY CANDIDATES (2-4 breeds):**
+- Breeds matching 40-59% of features
+- Useful for mixed breed analysis
+
+**MIXED BREED CONSIDERATIONS:**
+- Could this be a cross between any 2-3 candidates?
+- Are features inconsistent within a single breed standard?
+- Are there conflicting type characteristics (e.g., sighthound head + mastiff body)?
+
+═══════════════════════════════════════════════════════════════
+PHASE 3: DIFFERENTIAL DIAGNOSIS
+═══════════════════════════════════════════════════════════════
+
+For each PRIMARY candidate, perform detailed comparison:
+
+**For Each Candidate, Answer:**
+
+1. **SUPPORTING EVIDENCE** - What features MATCH this breed?
+   - List specific features that align with breed standard
+   - Include percentages (e.g., \"ear set matches 95%\")
+
+2. **CONTRADICTING EVIDENCE** - What features DON'T MATCH?
+   - List specific deviations from breed standard
+   - Assess if deviations are within acceptable variation or disqualifying
+
+3. **RARITY ASSESSMENT** - How common is this breed?
+   - FCI/AKC recognized: Common, Uncommon, Rare, Very Rare
+   - Regional breed: Specify region
+   - Landrace/Village dog: Specify population
+
+4. **CONFIDENCE MODIFIERS:**
+   - Age variation: Puppies/juveniles may not show full characteristics
+   - Grooming: Could grooming obscure/reveal features?
+   - Photo quality: Are features clearly visible?
+   - Atypical specimen: Could this be non-standard but still purebred?
+
+═══════════════════════════════════════════════════════════════
+PHASE 4: MIXED BREED ANALYSIS (If Applicable)
+═══════════════════════════════════════════════════════════════
+
+**CRITICAL MIXED BREED INDICATORS:**
+- Feature combinations from different breed groups (e.g., terrier head + retriever body)
+- Intermediate characteristics not standard to any breed
+- Simultaneous presence of conflicting traits
+- Lack of breed type consistency
+
+**IF MIXED BREED DETECTED:**
+- Identify most likely parent breeds (2-3 breeds)
+- Explain which features come from which parent
+- Assign contribution percentages (e.g., 60% Labrador, 40% Border Collie)
+- Consider F1, F2, or multi-generational mix
+
+**REGIONAL MIXED BREEDS:**
+- **Aspin/Asong Pinoy (Philippines):** Medium size, erect/semi-erect ears, short coat, athletic build, often tan/brown/black, curled or sickle tail, primitive features
+- **Indian Pariah Dog:** Similar to Basenji, erect ears, wedge head, curled tail, short coat, 15-20\" height
+- **African Village Dog:** Variable appearance, survival-adapted features
+- **Latin American Street Dog:** Mixed ancestry, often medium-sized, adaptable
+- **European Landrace:** Regional variations, working dog ancestry
+
+═══════════════════════════════════════════════════════════════
+PHASE 5: CONFIDENCE CALIBRATION
+═══════════════════════════════════════════════════════════════
+
+Assign confidence using STRICT criteria:
+
+**95-100% - DEFINITIVE IDENTIFICATION:**
+- ALL major breed-specific features present
+- NO contradicting features
+- Breed-specific unique traits visible (e.g., Rhodesian Ridgeback ridge, Lundehund extra toes)
+- Photo quality excellent, multiple angles would confirm
+- Example: \"This is unmistakably a purebred Border Collie\"
+
+**85-94% - HIGHLY CONFIDENT:**
+- All major features match strongly
+- Minor variations within acceptable breed range
+- 1-2 features not fully visible but no contradictions
+- Example: \"Strong evidence for purebred Australian Shepherd\"
+
+**75-84% - CONFIDENT:**
+- Most features match well
+- 2-3 minor deviations or unclear features
+- Could be purebred or very high-percentage mix
+- Example: \"Likely purebred German Shepherd, possibly working line\"
+
+**60-74% - MODERATE CONFIDENCE:**
+- Good feature match but some inconsistencies
+- Could be purebred with atypical features OR high-percentage mix
+- Example: \"Probable Golden Retriever mix or field-bred Golden Retriever\"
+
+**45-59% - LOW CONFIDENCE:**
+- Multiple breed influences visible
+- Features suggest specific mix but other combinations possible
+- Example: \"Likely Husky x German Shepherd mix\"
+
+**30-44% - VERY LOW CONFIDENCE:**
+- Multi-generational mix or complex ancestry
+- Can identify general type but not specific breeds
+- Example: \"Mixed breed with terrier and herding influences\"
+
+**Below 30% - INSUFFICIENT:**
+- Photo quality too poor
+- Puppy too young to assess adult features
+- Extreme grooming obscuring features
+- Cannot make reliable identification
+
+═══════════════════════════════════════════════════════════════
+PHASE 6: FINAL DETERMINATION & REASONING
+═══════════════════════════════════════════════════════════════
+
+**DECISION RULES:**
+
+1. **If confidence ≥85% for single breed → Identify as that purebred**
+2. **If confidence 60-84% with contradictions → Consider high-percentage mix**
+3. **If multiple breeds score 60-75% → Likely F1 cross of top 2**
+4. **If features from 3+ breeds → Multi-generational mix**
+5. **If regional landrace features → Use specific designation (Aspin, Pariah, etc.)**
+6. **NEVER force-fit into common breed if rare breed matches better**
+7. **NEVER misidentify regional dogs as standardized breeds**
+8. **BE HONEST about uncertainty - low confidence is better than false confidence**
+
+**RARE BREED PROTOCOL:**
+- If a rare breed scores ≥80%, IDENTIFY IT even if uncommon
+- Examples: Azawakh, Kai Ken, Norwegian Lundehund, Stabyhoun, Thai Ridgeback
+- Provide educational note about breed rarity
+
+**MIXED BREED PROTOCOL:**
+- Be specific: \"Labrador Retriever x Border Collie mix\" NOT just \"Mixed Breed\"
+- Explain reasoning: \"Shows Labrador head/coat with Border Collie build/tail\"
+- If 3+ breeds: \"Mixed breed with primarily Terrier and Hound ancestry\"
+
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT - STRICT JSON STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+{
+  \"morphological_analysis\": {
+    \"skull_type\": \"mesocephalic/dolichocephalic/brachycephalic\",
+    \"ear_type\": \"detailed description\",
+    \"body_structure\": \"detailed description\",
+    \"coat_features\": \"detailed texture, length, density\",
+    \"color_genetics\": \"base color + pattern with genetic terms\",
+    \"tail_type\": \"detailed description\",
+    \"distinctive_features\": [\"feature 1\", \"feature 2\", \"feature 3\"],
+    \"size_category\": \"toy/small/medium/large/giant\",
+    \"specialized_adaptations\": \"any working dog features visible\"
+  },
+  
+  \"candidate_breeds\": [
+    {
+      \"breed\": \"Breed Name\",
+      \"match_percentage\": 85,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
+    },
+    {
+      \"breed\": \"Breed Name 2\",
+      \"match_percentage\": 72,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\", \"feature 2\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
+    }
+  ],
+  
+  \"breed\": \"FINAL BREED NAME or 'Breed A x Breed B mix' or 'Aspin' or 'Mixed Breed'\",
+  
+  \"confidence\": 87.5,
+  
+  \"reasoning\": \"Comprehensive 4-6 sentence explanation synthesizing all evidence. Start with: 'Based on comprehensive morphological analysis...' Include: (1) Key identifying features, (2) Why this breed over others, (3) Any contradictions explained, (4) Confidence justification. Be specific and technical.\",
+  
+  \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\" or \"regional_street_dog\",
+  
+  \"genetic_composition\": \"For mixes: '60% Breed A, 40% Breed B' or 'Primary: Breed A, Secondary: Breed B, Breed C' or 'Purebred' or 'Complex multi-generational'\",
+  
+  \"alternative_possibilities\": [
+    {
+      \"breed\": \"Alternative 1\",
+      \"confidence\": 15.0,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    },
+    {
+      \"breed\": \"Alternative 2\",
+      \"confidence\": 8.5,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    }
+  ],
+  
+  \"key_identifiers\": [
+    \"Most distinctive feature that drives identification\",
+    \"Second most important diagnostic feature\",
+    \"Third critical feature\"
+  ],
+  
+  \"uncertainty_factors\": [
+    \"Any factors reducing confidence (age, photo angle, grooming, etc.)\"
+  ],
+  
+  \"rare_breed_note\": \"If rare breed: 'This is a [Breed], a rare breed from [Region] known for [characteristics]' or null\"
+}
+
+═══════════════════════════════════════════════════════════════
+CRITICAL INSTRUCTIONS - READ CAREFULLY
+═══════════════════════════════════════════════════════════════
+
+✓ PRIORITIZE ACCURACY OVER FAMILIARITY - Rare breed that fits perfectly > Common breed that fits poorly
+✓ BE HONEST ABOUT MIXED BREEDS - Don't force pure breed identification when features conflict
+✓ USE TECHNICAL TERMINOLOGY - Show your expertise with proper morphological terms
+✓ PROVIDE EVIDENCE - Every conclusion must be backed by specific observable features
+✓ CONSIDER REGIONAL VARIATIONS - Aspin, Pariah dogs, village dogs are VALID identifications
+✓ CALIBRATE CONFIDENCE PROPERLY - High confidence requires high certainty, not just a guess
+✓ EXPLAIN CONTRADICTIONS - If features don't perfectly align, explain why in reasoning
+✓ MULTI-STAGE THINKING - Don't jump to conclusions, work through the analysis phases
+✓ BE HONEST ABOUT UNCERTAINTY - If unsure, give LOW confidence (30-60%) so users know the identification may be wrong
+
+✗ DO NOT default to common breeds when rare breeds match better
+✗ DO NOT ignore contradicting evidence
+✗ DO NOT give high confidence without strong supporting evidence
+✗ DO NOT misidentify street dogs/landrace as standardized pure breeds
+✗ DO NOT overlook mixed breed possibilities when features conflict
+✗ DO NOT artificially inflate confidence when uncertain
+
+NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
+
+            Log::info('✓ Sending request to OpenAI API with enhanced multi-stage prompt...');
+
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'You are a world-class canine geneticist and morphologist specializing in rare breed identification and complex mixed-breed analysis. You have encyclopedic knowledge of 400+ breeds including regional landrace populations. Your analysis is systematic, evidence-based, and technically precise. You never guess - you analyze methodically. When uncertain, you provide honest low confidence scores to help users understand the identification may be incorrect.'
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => $enhancedBreedPrompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                    'detail' => 'high'
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 3000,
+                'temperature' => 0.2,
+            ]);
+
+            Log::info('✓ Received response from OpenAI API');
+
+            $rawContent = $response->choices[0]->message->content ?? null;
+            Log::info('Raw API response: ' . substr($rawContent, 0, 1500) . '...');
+
+            if (empty($rawContent)) {
+                throw new \Exception('Empty response from OpenAI API');
+            }
+
+            $apiResult = json_decode($rawContent, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('JSON decode error: ' . json_last_error_msg());
+                throw new \Exception('Failed to decode JSON response');
+            }
+
+            if (!$apiResult || !isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
+                Log::error('Invalid API response structure');
+                Log::error('Response keys: ' . json_encode(array_keys($apiResult ?? [])));
+                throw new \Exception('Missing required fields in API response');
+            }
+
+            // Use the ACTUAL confidence from the API - NO MODIFICATIONS
+            $actualConfidence = (float)$apiResult['confidence'];
+
+            Log::info('✓ ENHANCED API breed identification successful', [
+                'breed' => $apiResult['breed'],
+                'actual_confidence' => $actualConfidence,
+                'breed_type' => $apiResult['breed_type'] ?? 'unknown',
+                'genetic_composition' => $apiResult['genetic_composition'] ?? 'N/A',
+                'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
+                'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
+                'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
+            ]);
+
+            // Build top predictions array
+            $topPredictions = [];
+            $topPredictions[] = [
+                'breed' => $apiResult['breed'],
+                'confidence' => round($actualConfidence, 2)
+            ];
+
+            if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
+                foreach ($apiResult['alternative_possibilities'] as $alt) {
+                    if (isset($alt['breed']) && isset($alt['confidence'])) {
+                        $topPredictions[] = [
+                            'breed' => $alt['breed'],
+                            'confidence' => round((float)$alt['confidence'], 2)
+                        ];
+                    }
+                }
+            }
+
+            // Add candidate breeds if not enough alternatives
+            if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
+                foreach ($apiResult['candidate_breeds'] as $candidate) {
+                    if (isset($candidate['breed']) && count($topPredictions) < 5) {
+                        // Skip if already in predictions
+                        $alreadyExists = false;
+                        foreach ($topPredictions as $existing) {
+                            if ($existing['breed'] === $candidate['breed']) {
+                                $alreadyExists = true;
+                                break;
+                            }
+                        }
+                        if (!$alreadyExists) {
+                            $topPredictions[] = [
+                                'breed' => $candidate['breed'],
+                                'confidence' => round((float)($candidate['match_percentage'] ?? 0), 2)
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Fill remaining slots with "Other Breeds"
+            while (count($topPredictions) < 5) {
+                $topPredictions[] = [
+                    'breed' => 'Other Breeds',
+                    'confidence' => 0
+                ];
+            }
+
+            return [
+                'success' => true,
+                'method' => 'api_enhanced',
+                'breed' => $apiResult['breed'],
+                'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
+                'top_predictions' => array_slice($topPredictions, 0, 5),
+                'metadata' => [
+                    'reasoning' => $apiResult['reasoning'] ?? '',
+                    'key_identifiers' => $apiResult['key_identifiers'] ?? [],
+                    'breed_type' => $apiResult['breed_type'] ?? 'unknown',
+                    'genetic_composition' => $apiResult['genetic_composition'] ?? 'Unknown',
+                    'morphological_analysis' => $apiResult['morphological_analysis'] ?? [],
+                    'candidate_breeds' => $apiResult['candidate_breeds'] ?? [],
+                    'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
+                    'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
+                ]
+            ];
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
+            Log::error('✗ OpenAI API Error: ' . $e->getMessage());
+            Log::error('Error code: ' . $e->getCode());
+            return [
+                'success' => false,
+                'error' => 'OpenAI API Error: ' . $e->getMessage()
+            ];
+        } catch (\Exception $e) {
+            Log::error('✗ Enhanced API breed identification failed: ' . $e->getMessage());
+            Log::error('Error type: ' . get_class($e));
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+    /**
+     * ML Model Prediction (Fallback)
+     */
+    private function identifyBreedWithModel($imagePath)
+    {
+        try {
+            Log::info('=== USING ML API SERVICE ===');
+
+            $mlService = new \App\Services\MLApiService();
+
+            // Check if ML API is healthy
+            if (!$mlService->isHealthy()) {
+                throw new \Exception('ML API is not available or unhealthy');
+            }
+
+            $startTime = microtime(true);
+            $result = $mlService->predictBreed($imagePath);
+            $executionTime = round(microtime(true) - $startTime, 2);
+
+            Log::info('ML API Execution time: ' . $executionTime . 's');
+
+            if (!$result['success']) {
+                throw new \Exception($result['error'] ?? 'ML API prediction failed');
+            }
+
+            // Format response to match existing structure
+            return [
+                'success' => true,
+                'method' => $result['method'], // 'model' or 'memory'
+                'breed' => $result['breed'],
+                'confidence' => $result['confidence'] * 100, // Convert to percentage
+                'top_predictions' => $result['top_predictions'],
+                'metadata' => array_merge(
+                    $result['metadata'] ?? [],
+                    ['execution_time' => $executionTime]
+                )
+            ];
+        } catch (\Exception $e) {
+            Log::error('ML API prediction failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * ==========================================
+     * OPTIMIZED: Generate AI descriptions with detailed prompts
+     * ==========================================
+     */
+    private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
+    {
+        $aiData = [
+            'description' => "Identified as $detectedBreed.",
+            'origin_history' => [],
+            'health_risks' => [],
+        ];
+
+        if ($detectedBreed === 'Unknown') {
+            return $aiData;
+        }
+
+        try {
+            $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
+Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
+
+1. 'description': Write a  2 setence summary of the breed's identity and historical significance.
+
+2. 'health_risks': {
+     'concerns': [
+       
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+       
+     ],
+     'screenings': [
+       { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
+       { 'name': 'Exam Name', 'description': 'Detailed explanation.' },
+       
+     ],
+     'lifespan': 'e.g. 10-12',
+     'care_tips': [
+        '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
+        '(generate only 8-10 words only) tip about diet or weight management.',
+        '(generate only 8-10 words only) tip about grooming or coat care.',
+        '(generate only 8-10 words only) tip about training or temperament management.'
+     ]
+},
+
+3. 'origin_data': {
+    'country': 'Country Name (e.g. United Kingdom)',
+    'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
+    'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
+    'description': 'Write a rich, descriptive paragraph (2 sentences) about the geography and climate of the origin region and how it influenced the breed.',
+    'timeline': [
+        { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' }
+    ],
+    'details': [
+        { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 70-80 words) tracing the breed\\'s genetic ancestors and early development.' },
+        { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 70-80 words) describing exactly what work the dog was bred to do, including specific tasks.' },
+        { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 70-80 words) about the breed\\'s current status as pets, service dogs, or working dogs.' }
+    ]
+}
+
+Be verbose and detailed. Output ONLY the JSON.";
+
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You are a veterinary historian. Output only valid JSON. Be verbose and detailed.'],
+                    ['role' => 'user', 'content' => $combinedPrompt]
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 1500,
+                'temperature' => 0.3,
+            ]);
+
+            $content = $response->choices[0]->message->content;
+            $parsed = json_decode($content, true);
+
+            if ($parsed) {
+                $aiData['description'] = $parsed['description'] ?? '';
+                $aiData['health_risks'] = $parsed['health_risks'] ?? [];
+                $aiData['origin_history'] = $parsed['origin_data'] ?? [];
+            }
+
+            Log::info('✓ AI descriptions generated successfully');
+        } catch (\Exception $e) {
+            Log::error("AI generation failed: " . $e->getMessage());
+        }
+
+        return $aiData;
+    }
+
+    /**
+     * ==========================================
+     * OPTIMIZED: Faster feature extraction with detailed prompt
+     * ==========================================
+     */
+    private function extractDogFeatures($fullPath, $detectedBreed)
+    {
+        $dogFeatures = [
+            'coat_color' => 'brown',
+            'coat_pattern' => 'solid',
+            'coat_length' => 'medium',
+            'estimated_age' => 'young adult',
+            'build' => 'medium',
+            'distinctive_markings' => 'none',
+        ];
+
+        try {
+            $imageData = base64_encode(file_get_contents($fullPath));
+            $mimeType = mime_content_type($fullPath);
+
+            $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
+
+{
+  \"coat_color\": \"primary color(s) - be specific (e.g., 'golden', 'black and tan', 'white with brown patches', 'brindle')\",
+  \"coat_pattern\": \"pattern type (solid, spotted, brindle, merle, parti-color, tuxedo, sable)\",
+  \"coat_length\": \"length (short, medium, long, curly)\",
+  \"coat_texture\": \"texture description (silky, wiry, fluffy, smooth)\",
+  \"estimated_age\": \"age range (puppy, young adult, adult, mature, senior) based on face, eyes, and coat\",
+  \"build\": \"body type (lean/athletic, stocky/muscular, compact, large/heavy)\",
+  \"distinctive_markings\": \"any unique features (facial markings, chest patches, eyebrow marks, ear color, tail characteristics)\",
+  \"ear_type\": \"ear shape (floppy, erect, semi-erect)\",
+  \"eye_color\": \"eye color if visible (brown, blue, amber, heterochromic)\",
+  \"size_estimate\": \"size category (toy, small, medium, large, giant)\"
+}
+
+Be detailed and specific about colors and patterns.";
+
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $visionPrompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => "data:{$mimeType};base64,{$imageData}"]],
+                    ],
+                ]],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 500,
+            ]);
+
+            $features = json_decode($response->choices[0]->message->content, true);
+            if ($features) {
+                $dogFeatures = array_merge($dogFeatures, $features);
+            }
+        } catch (\Exception $e) {
+            Log::error("Feature extraction failed: " . $e->getMessage());
+        }
+
+        return $dogFeatures;
+    }
+
+    /**
+     * ==========================================
+     * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
+     * ==========================================
      */
     public function analyze(Request $request)
     {
@@ -433,7 +1251,6 @@ class ScanResultController extends Controller
         $path = null;
 
         try {
-            // Validation
             $validated = $request->validate([
                 'image' => [
                     'required',
@@ -489,7 +1306,6 @@ class ScanResultController extends Controller
 
             Log::info('✓ Validation passed');
 
-            // Store file
             $image = $request->file('image');
             $mimeType = $image->getMimeType();
             $extension = match ($mimeType) {
@@ -510,232 +1326,165 @@ class ScanResultController extends Controller
                 throw new \Exception('File was not saved properly');
             }
 
-            // Python Execution
-            Log::info('=== PYTHON EXECUTION ===');
-            $pythonPath = env('PYTHON_PATH', 'python');
-            $scriptPath = base_path('ml/predict.py');
-            $jsonPath = storage_path('app/references.json');
+            Log::info('✓ Image saved to: ' . $fullPath);
 
-            if (!file_exists($scriptPath)) {
-                throw new \Exception('Prediction script not found at: ' . $scriptPath);
-            }
+            // Calculate image hash
+            $imageHash = $this->calculateImageHash($fullPath);
+            Log::info('✓ Image hash calculated: ' . $imageHash);
 
-            $command = sprintf('"%s" "%s" "%s" "%s" 2>&1', $pythonPath, $scriptPath, $fullPath, $jsonPath);
-            Log::info('Command: ' . $command);
+            // Check for exact image match
+            list($hasExactMatch, $previousResult) = $this->checkExactImageMatch($imageHash);
 
-            $startTime = microtime(true);
-            $output = shell_exec($command);
-            $executionTime = round(microtime(true) - $startTime, 2);
+            // Check for admin correction
+            list($hasCorrection, $correction) = $this->checkAdminCorrection($imageHash);
 
-            Log::info('Execution time: ' . $executionTime . 's');
-
-            if (empty($output)) {
-                throw new \Exception('No output from prediction script');
-            }
-
-            // Parse JSON
-            $jsonStart = strpos($output, '{');
-            $jsonEnd = strrpos($output, '}');
-
-            if ($jsonStart !== false && $jsonEnd !== false) {
-                $jsonString = substr($output, $jsonStart, $jsonEnd - $jsonStart + 1);
-                $result = json_decode($jsonString, true);
-            } else {
-                $result = json_decode($output, true);
-            }
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error('JSON error: ' . json_last_error_msg());
-                throw new \Exception('Invalid JSON from prediction script');
-            }
-
-            if (isset($result['error'])) {
-                throw new \Exception($result['error']);
-            }
-
-            // Calculate Confidence
-            $confidence = $result['confidence'];
-            if ($confidence <= 1.0) {
-                $confidence = $confidence * 100;
-            }
-
+            // Determine breed and confidence
+            $detectedBreed = null;
+            $confidence = null;
             $topPredictions = [];
-            if (isset($result['top_5']) && is_array($result['top_5'])) {
-                foreach ($result['top_5'] as $prediction) {
-                    $predConfidence = $prediction['confidence'] ?? 0;
-                    if ($predConfidence <= 1.0) {
-                        $predConfidence = $predConfidence * 100;
+            $predictionMethod = 'exact_match';
+            $dogFeatures = [];
+            $aiData = ['description' => '', 'origin_history' => [], 'health_risks' => []];
+            $simulationData = [];
+
+            if ($hasCorrection) {
+                // EXACT IMAGE WITH ADMIN CORRECTION = 100%
+                $detectedBreed = $correction->corrected_breed;
+                $confidence = 100.0;
+                $topPredictions = [
+                    ['breed' => $detectedBreed, 'confidence' => 100.0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                ];
+                $predictionMethod = 'admin_corrected';
+
+                // REUSE ALL DATA FROM PREVIOUS RESULT INCLUDING SIMULATIONS
+                $aiData = [
+                    'description' => $previousResult->description,
+                    'origin_history' => $previousResult->origin_history,
+                    'health_risks' => $previousResult->health_risks,
+                ];
+
+                $previousSimulationData = is_string($previousResult->simulation_data)
+                    ? json_decode($previousResult->simulation_data, true)
+                    : $previousResult->simulation_data;
+
+                $dogFeatures = $previousSimulationData['dog_features'] ?? [];
+
+                // CACHE SIMULATIONS - Copy from previous result
+                $simulationData = [
+                    '1_years' => $previousSimulationData['1_years'] ?? null,
+                    '3_years' => $previousSimulationData['3_years'] ?? null,
+                    'status' => $previousSimulationData['status'] ?? 'complete',
+                    'dog_features' => $dogFeatures,
+                    'prediction_method' => $predictionMethod,
+                    'is_exact_match' => true,
+                    'has_admin_correction' => true,
+                ];
+
+                Log::info('✓✓✓ ADMIN-CORRECTED EXACT MATCH - SIMULATIONS CACHED', [
+                    'breed' => $detectedBreed,
+                    'confidence' => '100%',
+                    'method' => 'admin_corrected',
+                    'simulations_cached' => [
+                        '1_years' => !is_null($simulationData['1_years']),
+                        '3_years' => !is_null($simulationData['3_years']),
+                    ]
+                ]);
+            } elseif ($hasExactMatch && $previousResult) {
+                // EXACT IMAGE WITHOUT CORRECTION - CACHE EVERYTHING
+                $detectedBreed = $previousResult->breed;
+                $confidence = $previousResult->confidence;
+                $topPredictions = $previousResult->top_predictions;
+                $predictionMethod = 'exact_match';
+
+                // REUSE ALL DATA INCLUDING AI DESCRIPTIONS AND SIMULATIONS
+                $aiData = [
+                    'description' => $previousResult->description,
+                    'origin_history' => $previousResult->origin_history,
+                    'health_risks' => $previousResult->health_risks,
+                ];
+
+                $previousSimulationData = is_string($previousResult->simulation_data)
+                    ? json_decode($previousResult->simulation_data, true)
+                    : $previousResult->simulation_data;
+
+                $dogFeatures = $previousSimulationData['dog_features'] ?? [];
+
+                // CACHE SIMULATIONS - Copy from previous result
+                $simulationData = [
+                    '1_years' => $previousSimulationData['1_years'] ?? null,
+                    '3_years' => $previousSimulationData['3_years'] ?? null,
+                    'status' => $previousSimulationData['status'] ?? 'complete',
+                    'dog_features' => $dogFeatures,
+                    'prediction_method' => $predictionMethod,
+                    'is_exact_match' => true,
+                    'has_admin_correction' => false,
+                ];
+
+                Log::info('✓ EXACT IMAGE MATCH - ALL DATA CACHED', [
+                    'breed' => $detectedBreed,
+                    'confidence' => $confidence . '%',
+                    'method' => 'exact_match',
+                    'previous_scan' => $previousResult->scan_id,
+                    'simulations_cached' => [
+                        '1_years' => !is_null($simulationData['1_years']),
+                        '3_years' => !is_null($simulationData['3_years']),
+                    ]
+                ]);
+            } else {
+                // NEW IMAGE - Run full AI prediction and feature extraction
+                Log::info('→ New image - running breed identification...');
+
+                $predictionResult = $this->identifyBreedWithAPI($fullPath);
+
+                if (!$predictionResult['success']) {
+                    Log::warning('⚠ API prediction failed, falling back to ML model');
+                    $predictionResult = $this->identifyBreedWithModel($fullPath);
+
+                    if (!$predictionResult['success']) {
+                        throw new \Exception('Both API and ML model predictions failed');
                     }
-                    $topPredictions[] = [
-                        'breed' => $prediction['breed'] ?? 'Unknown',
-                        'confidence' => round($predConfidence, 2)
-                    ];
                 }
-            }
 
-            $detectedBreed = $result['breed'];
+                $detectedBreed = $predictionResult['breed'];
+                $confidence = $predictionResult['confidence']; // USE ACTUAL API CONFIDENCE - NO RANDOMIZATION
+                $predictionMethod = $predictionResult['method'];
 
-            // ==========================================
-            // NEW: ANALYZE DOG'S VISUAL FEATURES USING GPT VISION
-            // ==========================================
-            $dogFeatures = [
-                'coat_color' => 'unknown',
-                'coat_pattern' => 'solid',
-                'coat_length' => 'medium',
-                'estimated_age' => 'young adult',
-                'build' => 'medium',
-                'distinctive_markings' => 'none',
-            ];
-
-            try {
-                Log::info('=== ANALYZING DOG FEATURES WITH GPT VISION ===');
-
-                // Read and encode the image
-                $imageData = base64_encode(file_get_contents($fullPath));
-                $mimeType = mime_content_type($fullPath);
-
-                $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
-
-{
-  \"coat_color\": \"primary color(s) - be specific (e.g., 'golden', 'black and tan', 'white with brown patches', 'brindle')\",
-  \"coat_pattern\": \"pattern type (solid, spotted, brindle, merle, parti-color, tuxedo, sable)\",
-  \"coat_length\": \"length (short, medium, long, curly)\",
-  \"coat_texture\": \"texture description (silky, wiry, fluffy, smooth)\",
-  \"estimated_age\": \"age range (puppy, young adult, adult, mature, senior) based on face, eyes, and coat\",
-  \"build\": \"body type (lean/athletic, stocky/muscular, compact, large/heavy)\",
-  \"distinctive_markings\": \"any unique features (facial markings, chest patches, eyebrow marks, ear color, tail characteristics)\",
-  \"ear_type\": \"ear shape (floppy, erect, semi-erect)\",
-  \"eye_color\": \"eye color if visible (brown, blue, amber, heterochromic)\",
-  \"size_estimate\": \"size category (toy, small, medium, large, giant)\"
-}
-
-Be detailed and specific about colors and patterns.";
-
-                $visionResponse = OpenAI::chat()->create([
-                    'model' => 'gpt-4.1-mini',
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $visionPrompt,
-                                ],
-                                [
-                                    'type' => 'image_url',
-                                    'image_url' => [
-                                        'url' => "data:{$mimeType};base64,{$imageData}",
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                    'response_format' => ['type' => 'json_object'],
-                    'max_tokens' => 500,
+                Log::info('✓ Using ACTUAL API confidence (no modifications)', [
+                    'breed' => $detectedBreed,
+                    'actual_confidence' => $confidence,
+                    'method' => $predictionMethod,
+                    'confidence_range' => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : ($confidence >= 45 ? 'Low' : 'Very Low')),
+                    'uncertainty_factors' => count($predictionResult['metadata']['uncertainty_factors'] ?? [])
                 ]);
 
-                $featuresContent = $visionResponse->choices[0]->message->content;
-                $extractedFeatures = json_decode($featuresContent, true);
+                // Use the top predictions from API directly (no randomization)
+                $topPredictions = $predictionResult['top_predictions'];
 
-                if ($extractedFeatures) {
-                    $dogFeatures = array_merge($dogFeatures, $extractedFeatures);
-                    Log::info('Dog features extracted: ' . json_encode($dogFeatures));
-                } else {
-                    Log::warning('Failed to parse dog features, using defaults');
-                }
-            } catch (\Exception $e) {
-                Log::error("GPT Vision analysis failed: " . $e->getMessage());
-                // Continue with default features
+                // Extract dog features and generate AI data
+                $dogFeatures = $this->extractDogFeatures($fullPath, $detectedBreed);
+                $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures);
+
+                // Initialize simulation data for new scan
+                $simulationData = [
+                    '1_years' => null,
+                    '3_years' => null,
+                    'status' => 'pending',
+                    'dog_features' => $dogFeatures,
+                    'prediction_method' => $predictionMethod,
+                    'is_exact_match' => false,
+                    'has_admin_correction' => false,
+                ];
+
+                Log::info("✓ NEW scan prediction completed", [
+                    'breed' => $detectedBreed,
+                    'actual_confidence' => $confidence,
+                    'method' => $predictionMethod
+                ]);
             }
-
-            // Default values
-            $aiData = [
-                'description' => "Identified as $detectedBreed.",
-                'origin_history' => "History unavailable.",
-                'health_risks' => [],
-            ];
-
-            try {
-                if ($detectedBreed !== 'Unknown') {
-                    $prompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
-Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
-
-1. 'description': Write a comprehensive 2 sentence summary of the breed's identity and historical significance.
-
-2. 'health_risks': {
-     'concerns': [
-       { 'name': 'Condition Name (summarazed 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of why this breed is susceptible.', 'prevention': 'Specific medical and lifestyle prevention tips.' },
-       { 'name': 'Condition Name (summarazed 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
-       { 'name': 'Condition Name (summarazed 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
-       { 'name': 'Condition Name (summarazed 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
-     ],
-     'screenings': [
-       { 'name': 'Exam Name', 'description': ' explanation of what this exam checks for and why it is critical.' },
-       { 'name': 'Exam Name', 'description': ' explanation.' },
-       { 'name': 'Exam Name', 'description': ' explanation.' },
-       { 'name': 'Exam Name', 'description': ' explanation.' }
-     ],
-     'lifespan': 'e.g. 10-12',
-     'care_tips': [
-        '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
-        '(generate only 8-10 words only) tip about diet or weight management.',
-        ' (generate only 8-10 words only)tip about grooming or coat care.',
-        '(generate only 8-10 words only) tip about training or temperament management.'
-     ]
-},
-
-3. 'origin_data': {
-    'country': 'Country Name (e.g. United Kingdom)',
-    'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
-    'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
-    'description': 'Write a rich, descriptive paragraph ( 3 sentences) about the geography and climate of the origin region and how it influenced the breed.',
-    'timeline': [
-        { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
-        { 'year': 'Year', 'event': 'Write 1 sentences explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentences explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentences explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentences explaining this event.' }
-    ],
-    'details': [
-        { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 100-110 words) tracing the breed\'s genetic ancestors and early development.' },
-        { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 100-110 words) describing exactly what work the dog was bred to do, including specific tasks.' },
-        { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 100-110 words) about the breed\'s current status as pets, service dogs, or working dogs.' }
-    ]
-}";
-
-                    $chatResponse = OpenAI::chat()->create([
-                        'model' => 'gpt-4.1-mini',
-                        'messages' => [
-                            ['role' => 'system', 'content' => 'You are a veterinary historian. Output strictly valid JSON. Be verbose and detailed.'],
-                            ['role' => 'user', 'content' => $prompt]
-                        ],
-                        'response_format' => ['type' => 'json_object'],
-                        'max_tokens' => 1500,
-                    ]);
-
-                    $content = $chatResponse->choices[0]->message->content;
-                    $parsedAi = json_decode($content, true);
-
-                    if ($parsedAi) {
-                        $aiData['description'] = $parsedAi['description'] ?? '';
-                        $aiData['health_risks'] = $parsedAi['health_risks'] ?? [];
-                        $aiData['origin_history'] = $parsedAi['origin_data'] ?? [];
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::error("OpenAI Generation Failed: " . $e->getMessage());
-            }
-
-            // ==========================================
-            // FIXED: Store empty simulation data initially
-            // Job will generate ONLY 2 images (1 year and 3 years)
-            // ==========================================
-            $simulationData = [
-                '1_years' => null,
-                '3_years' => null,
-                'status' => 'pending',
-                'dog_features' => $dogFeatures, // Store features for reference
-            ];
 
             // Save to Database
             $uniqueId = strtoupper(Str::random(6));
@@ -743,52 +1492,68 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
             $dbResult = Results::create([
                 'scan_id' => $uniqueId,
                 'image' => $path,
+                'image_hash' => $imageHash,
                 'breed' => $detectedBreed,
                 'confidence' => round($confidence, 2),
                 'top_predictions' => $topPredictions,
                 'description' => $aiData['description'],
                 'origin_history' => is_string($aiData['origin_history']) ? $aiData['origin_history'] : json_encode($aiData['origin_history']),
                 'health_risks' => is_string($aiData['health_risks']) ? $aiData['health_risks'] : json_encode($aiData['health_risks']),
-                'age_simulation' => null, // REMOVED - No longer storing aging text
+                'age_simulation' => null,
                 'simulation_data' => json_encode($simulationData),
             ]);
 
             session(['last_scan_id' => $dbResult->scan_id]);
 
-            // Dispatch async job with dog features for ONLY 2 images
-            \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $dogFeatures);
+            // Only dispatch simulation job for NEW images (not exact matches)
+            if (!$hasExactMatch) {
+                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $dogFeatures);
+                Log::info('✓ Simulation job dispatched for new image');
+            } else {
+                Log::info('✓ Simulations cached from previous scan - no job dispatched');
+            }
 
             $responseData = [
                 'scan_id' => $dbResult->scan_id,
                 'breed' => $dbResult->breed,
                 'confidence' => $dbResult->confidence,
                 'image' => $dbResult->image,
-                // Use asset() or Storage::url() to create a full URL for the mobile app
                 'image_url' => asset('storage/' . $dbResult->image),
                 'top_predictions' => $dbResult->top_predictions,
                 'description' => $dbResult->description,
                 'created_at' => $dbResult->created_at,
+                'prediction_method' => $predictionMethod,
+                'is_exact_match' => $hasExactMatch,
+                'has_admin_correction' => $hasCorrection,
             ];
 
-            // Check if request wants JSON (API) or is from Web
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => true,
                     'data' => $responseData,
-                    'message' => 'Analysis completed successfully'
+                    'message' => 'Analysis completed successfully using ' . strtoupper($predictionMethod)
                 ], 200);
             }
 
             return redirect('/scan-results');
         } catch (\Exception $e) {
             Log::error('Analyze Error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            if ($path && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Analysis failed: ' . $e->getMessage()
+                ], 500);
+            }
+
             return back()->withErrors(['image' => 'Analysis failed: ' . $e->getMessage()]);
         }
     }
-
-    // Add this method to your ScanResultController
-    // Inside app/Http/Controllers/model/ScanResultController.php
-    // Add this method to your ScanResultController.php
 
     public function getOriginHistory($scan_id)
     {
@@ -801,12 +1566,10 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
             ], 404);
         }
 
-        // Decode the JSON string from the database into an array
         $originData = is_string($result->origin_history)
             ? json_decode($result->origin_history, true)
             : $result->origin_history;
 
-        // Add logging to see what's being returned
         \Illuminate\Support\Facades\Log::info('Origin History Data for ' . $scan_id, [
             'breed' => $result->breed,
             'origin_data' => $originData
@@ -823,8 +1586,6 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
     public function getResult($scan_id)
     {
-        // 1. Fetch the record from the database using scan_id
-        // Assuming your model is named 'Results' or 'ScanResult'
         $result = \App\Models\Results::where('scan_id', $scan_id)->first();
 
         if (!$result) {
@@ -834,7 +1595,6 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
             ], 404);
         }
 
-        // 2. Return the data formatted for your Mobile 'Result' type
         return response()->json([
             'success' => true,
             'data' => [
@@ -842,7 +1602,7 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
                 'breed' => $result->breed,
                 'description' => $result->description,
                 'confidence' => (float)$result->confidence,
-                'image_url' => asset('storage/' . $result->image), // Ensure full URL
+                'image_url' => asset('storage/' . $result->image),
                 'top_predictions' => is_string($result->top_predictions)
                     ? json_decode($result->top_predictions)
                     : $result->top_predictions,
@@ -850,9 +1610,6 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
             ]
         ]);
     }
-
-    // app/Http/Controllers/model/ScanResultController.php
-    // app/Http/Controllers/model/ScanResultController.php
 
     public function getHealthRisk($scan_id)
     {
@@ -865,12 +1622,10 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
             ], 404);
         }
 
-        // Decode the JSON string from the database into an array
         $healthData = is_string($result->health_risks)
             ? json_decode($result->health_risks, true)
             : $result->health_risks;
 
-        // Add logging to see what's being returned
         \Illuminate\Support\Facades\Log::info('Health Risk Data for ' . $scan_id, [
             'breed' => $result->breed,
             'health_data' => $healthData
@@ -887,31 +1642,26 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
     public function destroyCorrection($id)
     {
-        // 1. Find the correction
         $correction = BreedCorrection::findOrFail($id);
 
-        // 2. Load JSON References
         $jsonPath = storage_path('app/references.json');
         if (file_exists($jsonPath)) {
             $references = json_decode(file_get_contents($jsonPath), true);
 
-            // 3. Filter out the specific image associated with this correction
-            // We look for the image filename in the source_image field
             $imageName = basename($correction->image_path);
 
             $newReferences = array_filter($references, function ($ref) use ($imageName) {
                 return $ref['source_image'] !== $imageName;
             });
 
-            // 4. Save back to JSON
             file_put_contents($jsonPath, json_encode(array_values($newReferences), JSON_PRETTY_PRINT));
         }
 
-        // 5. Delete from DB
         $correction->delete();
 
         return redirect()->back()->with('success', 'Correction deleted and memory wiped.');
     }
+
 
     public function correctBreed(Request $request)
     {
@@ -922,35 +1672,31 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
         $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
 
-        // 1. SAVE TO SEPARATE TABLE (Do not update Results table)
         BreedCorrection::create([
             'scan_id' => $result->scan_id,
             'image_path' => $result->image,
-            'original_breed' => $result->breed, // Keep record of what AI got wrong
+            'original_breed' => $result->breed,
             'corrected_breed' => $validated['correct_breed'],
             'status' => 'Added',
         ]);
 
-        // Note: We removed $result->update(...) so the original scan remains "Wrong" in history.
-
-        // 2. Trigger Learning (Memory Update)
+        // === UPDATED: Use ML API instead of shell_exec ===
         try {
-            $pythonPath = env('PYTHON_PATH', 'python');
-            $scriptPath = base_path('ml/learn.py');
+            $mlService = new \App\Services\MLApiService();
             $imagePath = storage_path('app/public/' . $result->image);
-            $jsonPath = storage_path('app/references.json');
 
-            $command = sprintf(
-                '"%s" "%s" "%s" "%s" "%s" 2>&1',
-                $pythonPath,
-                $scriptPath,
-                $imagePath,
-                $validated['correct_breed'],
-                $jsonPath
-            );
+            $learnResult = $mlService->learnBreed($imagePath, $validated['correct_breed']);
 
-            $output = shell_exec($command);
-            Log::info("Learning output: " . $output);
+            if ($learnResult['success']) {
+                Log::info("✓ ML API learning successful", [
+                    'status' => $learnResult['status'],
+                    'breed' => $learnResult['breed']
+                ]);
+            } else {
+                Log::warning("ML API learning failed", [
+                    'error' => $learnResult['error'] ?? 'Unknown error'
+                ]);
+            }
         } catch (\Exception $e) {
             Log::error("Learning failed: " . $e->getMessage());
         }
@@ -961,9 +1707,41 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
     public function deleteResult($id)
     {
         $result = Results::findOrFail($id);
-
         $result->delete();
 
         return redirect()->back()->with('success', 'Deleted');
     }
+
+    public function checkMLApiHealth()
+{
+    try {
+        $mlService = new \App\Services\MLApiService();
+        $isHealthy = $mlService->isHealthy();
+        
+        if ($isHealthy) {
+            $stats = $mlService->getMemoryStats();
+            
+            return response()->json([
+                'success' => true,
+                'status' => 'healthy',
+                'ml_api_url' => env('PYTHON_ML_API_URL'),
+                'memory_stats' => $stats['data'] ?? []
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'status' => 'unhealthy',
+                'ml_api_url' => env('PYTHON_ML_API_URL'),
+                'message' => 'ML API is not responding or model not loaded'
+            ], 503);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ], 500);
+    }
 }
+}
+

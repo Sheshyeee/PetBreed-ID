@@ -1,3 +1,4 @@
+import AnalysisLoadingDialog from '@/components/AnalysisLoadingDialog';
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -45,27 +46,30 @@ const Scan = () => {
     const [preview, setPreview] = useState<string | null>(null);
     const [showResults, setShowResults] = useState(false);
     const [fileInfo, setFileInfo] = useState<string>('');
+    const [showLoading, setShowLoading] = useState(false);
 
     useEffect(() => {
         if (success) {
             setShowResults(true);
+            setShowLoading(false);
+        }
+        if (error) {
+            setShowLoading(false);
         }
     }, [success, error]);
 
     const validateImageFile = (file: File): string | null => {
-        // Check file size (10MB limit)
         if (file.size > 10 * 1024 * 1024) {
             return 'File is too large. Maximum size is 10MB.';
         }
 
-        // UPDATED: Accept more image types including AVIF
         const validTypes = [
             'image/jpeg',
             'image/jpg',
             'image/png',
             'image/webp',
             'image/gif',
-            'image/avif', // ADDED: AVIF support
+            'image/avif',
             'image/bmp',
             'image/x-ms-bmp',
             'image/svg+xml',
@@ -73,8 +77,6 @@ const Scan = () => {
 
         if (!validTypes.includes(file.type)) {
             console.warn('File type not in valid list:', file.type);
-            // Don't block upload - let server validate
-            // Some browsers report wrong MIME types
         }
 
         return null;
@@ -88,7 +90,6 @@ const Scan = () => {
             console.log('Size:', file.size, 'bytes');
             console.log('Type:', file.type);
 
-            // Validate file
             const validationError = validateImageFile(file);
             if (validationError) {
                 alert(validationError);
@@ -96,13 +97,11 @@ const Scan = () => {
                 return;
             }
 
-            // Create preview
             const reader = new FileReader();
             reader.onload = (e) => {
                 const result = e.target?.result as string;
                 setPreview(result);
 
-                // Verify it's actually an image by loading it
                 const img = new Image();
                 img.onload = () => {
                     console.log('Image loaded successfully');
@@ -113,7 +112,6 @@ const Scan = () => {
                 };
                 img.onerror = () => {
                     console.error('Failed to load image preview');
-                    // Still allow upload - server will validate properly
                     setFileInfo(
                         `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
                     );
@@ -150,6 +148,8 @@ const Scan = () => {
             data.image.size,
         );
 
+        setShowLoading(true);
+
         post('/analyze', {
             forceFormData: true,
             preserveScroll: true,
@@ -157,6 +157,9 @@ const Scan = () => {
                 Object.keys(page.props.errors || {}).length > 0,
             onStart: () => {
                 setShowResults(false);
+            },
+            onError: () => {
+                setShowLoading(false);
             },
         });
     };
@@ -166,11 +169,15 @@ const Scan = () => {
         setPreview(null);
         setShowResults(false);
         setFileInfo('');
+        setShowLoading(false);
     };
 
     return (
         <>
             <Header />
+
+            {/* Compact Loading Dialog */}
+            <AnalysisLoadingDialog isOpen={showLoading} />
 
             <div className="mt-[-20px] min-h-screen text-[#1b1b18] dark:bg-[#0a0a0a]">
                 <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10">

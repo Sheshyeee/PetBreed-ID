@@ -20,6 +20,7 @@ class Results extends Model
         'health_risks',
         'age_simulation',
         'simulation_data',
+        'image_hash',
     ];
 
     protected $casts = [

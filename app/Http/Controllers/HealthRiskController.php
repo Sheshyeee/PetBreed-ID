@@ -23,7 +23,7 @@ class HealthRiskController extends Controller
 
         // 3. Return the view with the fetched data
         return Inertia::render('normal_user/view-health-risk', [
-            'results' => $result
+        'results' => $result
         ]);
     }
 }

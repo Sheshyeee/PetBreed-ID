@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Link, usePage } from '@inertiajs/react';
-import { Activity, Clock, Globe, Sparkles } from 'lucide-react';
+import {
+    Activity,
+    Brain,
+    CheckCircle2,
+    Clock,
+    Globe,
+    Sparkles,
+} from 'lucide-react';
 
 type PredictionResult = {
     breed: string;
@@ -17,13 +24,16 @@ type Result = {
     breed: string;
     confidence: number;
     top_predictions: PredictionResult[];
-    // Add the new fields here
     description?: string;
     origin_history?: string;
     health_risks?: string;
     age_simulation?: string;
     created_at?: string;
     updated_at?: string;
+    // NEW: Learning indicators
+    prediction_method?: string; // 'exact_match', 'admin_corrected', 'memory_assisted', etc.
+    is_exact_match?: boolean;
+    has_admin_correction?: boolean;
 };
 
 type PageProps = {
@@ -32,6 +42,15 @@ type PageProps = {
 
 const ScanResults = () => {
     const { results } = usePage<PageProps>().props;
+
+    // Determine if this scan benefited from learning
+    const isMemoryAssisted =
+        results?.prediction_method === 'admin_corrected' ||
+        results?.is_exact_match ||
+        results?.has_admin_correction;
+
+    const showLearningBadge =
+        results?.confidence === 100 && results?.has_admin_correction;
 
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
@@ -47,7 +66,6 @@ const ScanResults = () => {
                             Here's what we found about your pet
                         </p>
                     </div>
-                    {/* Desktop New Scan Button */}
                     <Link href="/scan" className="hidden sm:block">
                         <Button>New Scan</Button>
                     </Link>
@@ -63,15 +81,34 @@ const ScanResults = () => {
                         />
                     </div>
                     <div className="flex-1 space-y-3">
-                        <Badge
-                            variant="secondary"
-                            className="bg-cyan-700 text-white dark:bg-cyan-600"
-                        >
-                            Primary Match
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                                variant="secondary"
+                                className="bg-cyan-700 text-white dark:bg-cyan-600"
+                            >
+                                Primary Match
+                            </Badge>
+
+                            {/* NEW: Learning Indicator Badges */}
+                            {showLearningBadge && (
+                                <Badge className="gap-1 border-0 bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+                                    <Brain className="h-3 w-3" />
+                                    Learned Recognition
+                                </Badge>
+                            )}
+
+                            {results?.is_exact_match && !showLearningBadge && (
+                                <Badge className="gap-1 border-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Memory Match
+                                </Badge>
+                            )}
+                        </div>
+
                         <h2 className="text-2xl font-bold sm:text-3xl lg:text-xl xl:text-xl dark:text-white">
                             {results?.breed}
                         </h2>
+
                         <div className="flex w-full max-w-md justify-between lg:w-[350px] xl:w-[400px]">
                             <p className="text-sm text-gray-600 dark:text-gray-300">
                                 Confidence Score
@@ -80,17 +117,39 @@ const ScanResults = () => {
                                 {Math.round(results?.confidence ?? 0)}%
                             </p>
                         </div>
+
                         <Progress
                             value={results?.confidence ?? 0}
-                            className="h-3 w-full max-w-md lg:w-[350px] xl:w-[400px] [&>div]:bg-blue-500"
+                            className={`h-3 w-full max-w-md lg:w-[350px] xl:w-[400px] ${
+                                results?.confidence === 100
+                                    ? '[&>div]:bg-gradient-to-r [&>div]:from-purple-500 [&>div]:to-pink-600'
+                                    : '[&>div]:bg-blue-500'
+                            }`}
                         />
+
+                        {/* NEW: Learning Explanation */}
+                        {showLearningBadge && (
+                            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20">
+                                <div className="flex items-start gap-2">
+                                    <Sparkles className="mt-0.5 h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                    <p className="text-xs text-purple-800 dark:text-purple-300">
+                                        <strong>Perfect Match!</strong> Our
+                                        system recognized this exact dog from
+                                        previous corrections. This is proof that
+                                        admin corrections are making the AI
+                                        smarter!
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                             {results?.description}
                         </p>
                     </div>
                 </Card>
 
-                {/* Top Predictions Card */}
+                {/* Rest of the page remains the same ... */}
                 <Card className="mt-5 p-6 sm:p-8 lg:p-10">
                     <h2 className="text-md mb-4 font-bold sm:text-xl dark:text-white">
                         Top Possible Breeds
@@ -132,13 +191,11 @@ const ScanResults = () => {
                     </div>
                 </Card>
 
-                {/* Explore More Section */}
                 <h2 className="text-md mt-8 mb-6 font-bold sm:text-xl dark:text-white">
                     Explore More Insights
                 </h2>
 
                 <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {/* Origin History Card */}
                     <Card className="flex flex-col gap-6 p-6 transition-all hover:border-blue-400 hover:shadow-md sm:col-span-2 sm:p-8 lg:col-span-1">
                         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-200 p-4">
                             <Globe color="#042381" size={32} />
@@ -160,7 +217,6 @@ const ScanResults = () => {
                         </Button>
                     </Card>
 
-                    {/* Health Risk Card */}
                     <Card className="flex flex-col gap-6 p-6 transition-all hover:border-red-400 hover:shadow-md sm:p-8">
                         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-pink-200 p-4">
                             <Activity color="#750056" size={32} />
@@ -205,7 +261,6 @@ const ScanResults = () => {
                     </Card>
                 </div>
 
-                {/* Mobile New Scan Button - Below feature cards */}
                 <div className="mb-10 sm:hidden">
                     <Link href="/scan" className="block">
                         <Button className="w-full">New Scan</Button>

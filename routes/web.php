@@ -27,6 +27,7 @@ Route::get('/simulation', [SimulationController::class, "index"]);
 
 Route::get('/simulation-status', [SimulationController::class, 'checkStatus']);
 
+Route::get('/ml-api/health', [ScanResultController::class, 'checkMLApiHealth']);
 
 Route::get('/origin', [HistoryController::class, "index"]);
 Route::post('/simulation/generate', [SimulationController::class, 'generate'])->name('simulation.generate');

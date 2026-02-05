@@ -10,29 +10,17 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
-    BookOpen,
-    Brain,
     ChartNoAxesCombined,
-    CheckCircle2,
-    Database,
-    Info,
+    GraduationCap,
     ShieldCheck,
     Sparkles,
-    Target,
     TrendingUp,
     TriangleAlert,
-    Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -48,6 +36,17 @@ type Result = {
     scan_id: string;
     breed: string;
     confidence: number;
+};
+
+type BreedLearning = {
+    breed: string;
+    examples_learned: number;
+    corrections_made: number;
+    avg_confidence: number;
+    success_rate: number;
+    first_learned: string;
+    days_learning: number;
+    recent_scans: number;
 };
 
 type PageProps = {
@@ -71,6 +70,7 @@ type PageProps = {
     accuracyBeforeCorrections?: number;
     accuracyAfterCorrections?: number;
     lastCorrectionCount?: number;
+    breedLearningProgress?: BreedLearning[]; // NEW
 };
 
 export default function Dashboard() {
@@ -95,6 +95,7 @@ export default function Dashboard() {
         accuracyBeforeCorrections = 0,
         accuracyAfterCorrections = 0,
         lastCorrectionCount = 0,
+        breedLearningProgress = [],
     } = usePage<PageProps>().props;
 
     const [isUpdating, setIsUpdating] = useState(false);
@@ -118,23 +119,12 @@ export default function Dashboard() {
 
     // Calculate REALISTIC learning capacity based on actual metrics
     const calculateLearningCapacity = () => {
-        // 1. Memory Size Score (0-25 points)
-        // Based on number of unique dog embeddings stored
         const memoryScore = Math.min(25, (memoryCount / 100) * 25);
-
-        // 2. Breed Diversity Score (0-20 points)
-        // How many different breeds we've learned
         const diversityScore = Math.min(20, (uniqueBreedsLearned / 30) * 20);
-
-        // 3. Confidence Improvement Score (0-30 points)
-        // Actual improvement in average confidence
         const confidenceImprovementScore = Math.max(
             0,
             Math.min(30, confidenceTrend * 3),
         );
-
-        // 4. Accuracy Gain Score (0-25 points)
-        // Real before/after correction accuracy
         const accuracyScore = Math.max(
             0,
             Math.min(25, accuracyImprovement * 2.5),
@@ -151,7 +141,6 @@ export default function Dashboard() {
 
     const learningCapacity = calculateLearningCapacity();
 
-    // Determine learning status based on REAL metrics
     const getLearningStatus = () => {
         if (memoryCount === 0) {
             return {
@@ -195,7 +184,6 @@ export default function Dashboard() {
 
     const learningStatus = getLearningStatus();
 
-    // Dynamic progress bar color based on capacity
     const getProgressBarColor = () => {
         if (learningCapacity >= 80)
             return '[&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600';
@@ -208,7 +196,6 @@ export default function Dashboard() {
         return '[&>div]:bg-gradient-to-r [&>div]:from-gray-400 [&>div]:to-gray-500';
     };
 
-    // Check for updates every 10 seconds
     useEffect(() => {
         const interval = setInterval(() => {
             const correctionsUntilUpdate = 5 - (correctedBreedCount % 5);
@@ -227,6 +214,7 @@ export default function Dashboard() {
                         'accuracyBeforeCorrections',
                         'accuracyAfterCorrections',
                         'lastCorrectionCount',
+                        'breedLearningProgress',
                     ],
 
                     onSuccess: () => {
@@ -263,7 +251,6 @@ export default function Dashboard() {
         previousCapacity,
     ]);
 
-    // Store initial capacity
     useEffect(() => {
         if (previousCapacity === null) {
             setPreviousCapacity(learningCapacity);
@@ -272,7 +259,6 @@ export default function Dashboard() {
 
     const correctionsUntilUpdate = 5 - (correctedBreedCount % 5);
 
-    // Metric descriptions for tooltips
     const metricDescriptions = {
         memoryBank:
             'Total number of dog image embeddings stored in the learning system. Each correction adds a new pattern to memory.',
@@ -295,6 +281,7 @@ export default function Dashboard() {
             <Head title="Dashboard" />
 
             <div className="flex h-full flex-col gap-6 p-4">
+                {/* Existing Stats Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card className="flex flex-row justify-between p-4 dark:bg-neutral-900">
                         <div>
@@ -381,6 +368,7 @@ export default function Dashboard() {
                     </Card>
                 </div>
 
+                {/* Main Content Grid */}
                 <div className="flex flex-col gap-4 lg:flex-row">
                     {/* Recent Scans Table */}
                     <Card className="flex-1 p-5 dark:bg-neutral-900">
@@ -444,361 +432,140 @@ export default function Dashboard() {
                             </Table>
                         </div>
                     </Card>
+                </div>
 
-                    {/* Enhanced Learning Intelligence Card */}
-                    <Card className="w-full p-6 lg:w-[28%] dark:bg-neutral-900">
-                        <TooltipProvider>
-                            <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h1 className="text-lg font-bold dark:text-white">
-                                        Learning Intelligence
-                                    </h1>
-                                    <div
-                                        className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500 ${
-                                            isUpdating ? 'scale-110' : ''
-                                        } ${learningCapacity >= 70 ? 'animate-pulse bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}
-                                    >
-                                        <Brain className="h-4 w-4 text-white" />
-                                    </div>
+                {/* NEW: Breed Learning Progress Table */}
+                {breedLearningProgress && breedLearningProgress.length > 0 && (
+                    <Card className="p-6 dark:bg-neutral-900">
+                        <div className="mb-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-pink-600">
+                                    <GraduationCap className="h-5 w-5 text-white" />
                                 </div>
-
-                                {/* Learning Status */}
                                 <div>
-                                    <div className="mb-2 flex items-center justify-between">
-                                        <p className="text-sm text-gray-700 dark:text-white/80">
-                                            Status
-                                        </p>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Badge
-                                                    className={`${learningStatus.bgColor} ${learningStatus.color} cursor-help border-0 transition-all duration-500 ${
-                                                        isUpdating
-                                                            ? 'scale-110'
-                                                            : ''
-                                                    }`}
-                                                >
-                                                    {learningStatus.label}
-                                                </Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p className="max-w-xs text-xs">
-                                                    {learningStatus.description}
-                                                </p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    <Progress
-                                        value={learningCapacity}
-                                        className={`h-2 transition-all duration-1000 ${getProgressBarColor()}`}
-                                    />
-                                    <div className="mt-1 flex items-center justify-between">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {learningCapacity.toFixed(1)}%
-                                            Learning Capacity
-                                        </p>
-                                        {correctionsUntilUpdate < 5 && (
-                                            <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                                {correctionsUntilUpdate} more to
-                                                update
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <hr className="border-gray-300 dark:border-gray-700" />
-
-                                {/* Real Learning Metrics with Tooltips */}
-                                <div className="space-y-4">
-                                    {/* Memory Bank */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div
-                                                className={`flex cursor-help items-center justify-between transition-all duration-500 ${
-                                                    isUpdating
-                                                        ? '-m-2 scale-105 rounded-lg bg-blue-50 p-2 dark:bg-blue-950/20'
-                                                        : ''
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
-                                                        <Database className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                                                Memory Bank
-                                                            </p>
-                                                            <Info className="h-3 w-3 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold dark:text-white">
-                                                            {memoryCount}{' '}
-                                                            Patterns
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {memoryCount > 0 && (
-                                                    <Badge className="border-0 bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                                                        Active
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                {metricDescriptions.memoryBank}
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Breed Diversity */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex cursor-help items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30">
-                                                        <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                                                Breed Diversity
-                                                            </p>
-                                                            <Info className="h-3 w-3 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold dark:text-white">
-                                                            {
-                                                                uniqueBreedsLearned
-                                                            }{' '}
-                                                            Breeds
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {breedCoverage.toFixed(0)}%
-                                                    eff.
-                                                </span>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                {
-                                                    metricDescriptions.breedDiversity
-                                                }
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Average Confidence */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div
-                                                className={`flex cursor-help items-center justify-between transition-all duration-500 ${
-                                                    isUpdating
-                                                        ? '-m-2 scale-105 rounded-lg bg-indigo-50 p-2 dark:bg-indigo-950/20'
-                                                        : ''
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-100 dark:bg-indigo-900/30">
-                                                        <Target className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                                                Avg Confidence
-                                                            </p>
-                                                            <Info className="h-3 w-3 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold dark:text-white">
-                                                            {avgConfidence.toFixed(
-                                                                1,
-                                                            )}
-                                                            %
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {confidenceTrend !== 0 && (
-                                                    <span
-                                                        className={`text-xs font-medium ${getTrendColor(confidenceTrend)}`}
-                                                    >
-                                                        {formatTrend(
-                                                            confidenceTrend,
-                                                        )}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                {
-                                                    metricDescriptions.avgConfidence
-                                                }
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Memory Usage Rate */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex cursor-help items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan-100 dark:bg-cyan-900/30">
-                                                        <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                                                Memory Usage
-                                                            </p>
-                                                            <Info className="h-3 w-3 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold dark:text-white">
-                                                            {memoryHitRate.toFixed(
-                                                                1,
-                                                            )}
-                                                            %
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                {metricDescriptions.memoryUsage}
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Real Accuracy Improvement */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div
-                                                className={`flex cursor-help items-center justify-between transition-all duration-500 ${
-                                                    isUpdating
-                                                        ? '-m-2 scale-105 rounded-lg bg-green-50 p-2 dark:bg-green-950/20'
-                                                        : ''
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-green-100 dark:bg-green-900/30">
-                                                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-xs text-gray-600 dark:text-white/70">
-                                                                Accuracy Gain
-                                                            </p>
-                                                            <Info className="h-3 w-3 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-sm font-bold dark:text-white">
-                                                            {accuracyImprovement >=
-                                                            0
-                                                                ? '+'
-                                                                : ''}
-                                                            {accuracyImprovement.toFixed(
-                                                                1,
-                                                            )}
-                                                            %
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {recentCorrectionsCount > 0 && (
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                        {recentCorrectionsCount}{' '}
-                                                        this week
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                {
-                                                    metricDescriptions.accuracyGain
-                                                }
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </div>
-
-                                <hr className="border-gray-300 dark:border-gray-700" />
-
-                                {/* Before/After Comparison */}
-                                {accuracyBeforeCorrections > 0 && (
-                                    <div className="space-y-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
-                                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                            Learning Impact
-                                        </p>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                Before Corrections:
-                                            </span>
-                                            <span className="font-bold dark:text-white">
-                                                {accuracyBeforeCorrections.toFixed(
-                                                    1,
-                                                )}
-                                                %
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                After Corrections:
-                                            </span>
-                                            <span className="font-bold text-green-600 dark:text-green-400">
-                                                {accuracyAfterCorrections.toFixed(
-                                                    1,
-                                                )}
-                                                %
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-green-500 to-emerald-600 transition-all duration-500"
-                                                style={{
-                                                    width: `${Math.min(100, accuracyAfterCorrections)}%`,
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Dynamic Learning Insight */}
-                                <div
-                                    className={`rounded-lg p-3 transition-all duration-500 ${
-                                        learningCapacity >= 80
-                                            ? 'bg-green-50 dark:bg-green-950/20'
-                                            : learningCapacity >= 60
-                                              ? 'bg-blue-50 dark:bg-blue-950/20'
-                                              : learningCapacity >= 40
-                                                ? 'bg-yellow-50 dark:bg-yellow-950/20'
-                                                : 'bg-orange-50 dark:bg-orange-950/20'
-                                    }`}
-                                >
-                                    <p
-                                        className={`text-xs ${
-                                            learningCapacity >= 80
-                                                ? 'text-green-800 dark:text-green-300'
-                                                : learningCapacity >= 60
-                                                  ? 'text-blue-800 dark:text-blue-300'
-                                                  : learningCapacity >= 40
-                                                    ? 'text-yellow-800 dark:text-yellow-300'
-                                                    : 'text-orange-800 dark:text-orange-300'
-                                        }`}
-                                    >
-                                        {memoryCount === 0
-                                            ? '💡 Start correcting breeds to build the learning memory. The system will improve with each correction you provide.'
-                                            : learningCapacity >= 80
-                                              ? `🎯 Excellent! System has learned ${uniqueBreedsLearned} breeds from ${memoryCount} patterns. Accuracy improved by ${accuracyImprovement.toFixed(1)}% after corrections.`
-                                              : learningCapacity >= 60
-                                                ? `📈 Good progress! ${memoryCount} patterns stored, ${uniqueBreedsLearned} breeds learned. ${correctionsUntilUpdate} more correction${correctionsUntilUpdate === 1 ? '' : 's'} to next update.`
-                                                : learningCapacity >= 40
-                                                  ? `📚 Building knowledge: ${memoryCount} patterns across ${uniqueBreedsLearned} breeds. Add ${correctionsUntilUpdate} more to see improvement.`
-                                                  : `🔄 Early stage: ${memoryCount} patterns stored. System needs ${correctionsUntilUpdate} more correction${correctionsUntilUpdate === 1 ? '' : 's'} for next milestone.`}
+                                    <h2 className="text-lg font-bold dark:text-white">
+                                        Breed Learning Progress
+                                    </h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Track how well the system learned each
+                                        breed from corrections
                                     </p>
                                 </div>
                             </div>
-                        </TooltipProvider>
+                            <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                Top {breedLearningProgress.length} Breeds
+                            </Badge>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Breed</TableHead>
+                                        <TableHead className="text-center">
+                                            Examples
+                                        </TableHead>
+                                        <TableHead className="text-center">
+                                            Corrections
+                                        </TableHead>
+                                        <TableHead>Success Rate</TableHead>
+                                        <TableHead className="text-center">
+                                            Avg Confidence
+                                        </TableHead>
+                                        <TableHead>Learning Time</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {breedLearningProgress.map((breed, idx) => (
+                                        <TableRow key={breed.breed}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {idx === 0 && (
+                                                        <Sparkles className="h-4 w-4 text-yellow-500" />
+                                                    )}
+                                                    {breed.breed}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="font-mono"
+                                                >
+                                                    {breed.examples_learned}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="font-mono"
+                                                >
+                                                    {breed.corrections_made}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Progress
+                                                        value={
+                                                            breed.success_rate
+                                                        }
+                                                        className={`h-2 w-24 ${
+                                                            breed.success_rate >=
+                                                            80
+                                                                ? '[&>div]:bg-green-600'
+                                                                : breed.success_rate >=
+                                                                    60
+                                                                  ? '[&>div]:bg-yellow-500'
+                                                                  : '[&>div]:bg-orange-500'
+                                                        }`}
+                                                    />
+                                                    <span className="w-12 text-xs font-semibold">
+                                                        {breed.success_rate}%
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <span
+                                                    className={`font-bold ${
+                                                        breed.avg_confidence >=
+                                                        80
+                                                            ? 'text-green-600 dark:text-green-400'
+                                                            : breed.avg_confidence >=
+                                                                60
+                                                              ? 'text-yellow-600 dark:text-yellow-400'
+                                                              : 'text-orange-600 dark:text-orange-400'
+                                                    }`}
+                                                >
+                                                    {breed.avg_confidence}%
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">
+                                                    <div>
+                                                        {breed.days_learning}{' '}
+                                                        days
+                                                    </div>
+                                                    <div className="text-xs opacity-75">
+                                                        Since{' '}
+                                                        {breed.first_learned}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="mt-4 rounded-lg bg-purple-50 p-3 dark:bg-purple-950/20">
+                            <p className="text-xs text-purple-800 dark:text-purple-300">
+                                💡 <strong>Success Rate</strong> shows how many
+                                recent scans (last 10) got high confidence
+                                (≥80%) for each breed. Higher rates mean better
+                                learning!
+                            </p>
+                        </div>
                     </Card>
-                </div>
+                )}
             </div>
         </AppLayout>
     );
