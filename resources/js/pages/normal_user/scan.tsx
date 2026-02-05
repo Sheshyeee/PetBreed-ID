@@ -2,7 +2,7 @@ import AnalysisLoadingDialog from '@/components/AnalysisLoadingDialog';
 import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useForm, usePage } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import { Camera, CheckCircle2, CircleAlert, XCircle } from 'lucide-react';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
@@ -182,14 +182,19 @@ const Scan = () => {
             <div className="mt-[-20px] min-h-screen text-[#1b1b18] dark:bg-[#0a0a0a]">
                 <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10">
                     {/* Page Header */}
-                    <div className="mb-6 ml-2">
-                        <h1 className="text-md font-bold sm:text-xl lg:text-lg dark:text-white">
-                            Scan Your Pet
-                        </h1>
-                        <p className="mt-[-5px] text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                            Upload a photo or use your camera to identify your
-                            pet's breed.
-                        </p>
+                    <div className="flex">
+                        <div className="mb-6 ml-2">
+                            <h1 className="text-md font-bold sm:text-xl lg:text-lg dark:text-white">
+                                Scan Your Pet
+                            </h1>
+                            <p className="mt-[-5px] text-xs text-gray-600 sm:text-sm dark:text-white/70">
+                                Upload a photo or use your camera to identify
+                                your pet's breed.
+                            </p>
+                        </div>
+                        <Button asChild>
+                            <Link href='/scanhistory'>Scan history</Link>
+                        </Button>
                     </div>
 
                     {/* Error Message */}

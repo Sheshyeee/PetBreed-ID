@@ -61,6 +61,7 @@ type Result = {
     image: string;
     breed: string;
     confidence: number;
+    pending?: string;
     top_predictions: PredictionResult[];
     created_at?: string;
     updated_at?: string;
@@ -478,6 +479,47 @@ export default function Dashboard() {
                                                 ) : (
                                                     <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/40 dark:text-red-400">
                                                         Very Low Confidence
+                                                    </Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                                {result.pending ===
+                                                'verified' ? (
+                                                    <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                                                        <svg
+                                                            className="mr-1 h-3 w-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M5 13l4 4L19 7"
+                                                            />
+                                                        </svg>
+                                                        Verified
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-orange-500 text-orange-600 dark:text-orange-400"
+                                                    >
+                                                        <svg
+                                                            className="mr-1 h-3 w-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                            />
+                                                        </svg>
+                                                        Pending
                                                     </Badge>
                                                 )}
                                             </TableCell>

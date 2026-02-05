@@ -11,9 +11,11 @@ class Results extends Model
 
     protected $fillable = [
         'scan_id',
+        'user_id', // Add this
         'image',
         'breed',
         'confidence',
+        'pending', // Add this
         'top_predictions',
         'description',
         'origin_history',
@@ -32,6 +34,22 @@ class Results extends Model
     ];
 
     /**
+     * Get the user that owns the scan
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Check if scan is verified
+     */
+    public function isVerified()
+    {
+        return $this->pending === 'verified';
+    }
+
+    /**
      * Get the simulation images with full URLs
      */
     public function getSimulationImagesAttribute()
@@ -39,9 +57,8 @@ class Results extends Model
         $simulations = $this->simulation_data ?? [];
 
         return [
-            '2_years' => $simulations['2_years'] ? asset('storage/' . $simulations['2_years']) : null,
-            '5_years' => $simulations['5_years'] ? asset('storage/' . $simulations['5_years']) : null,
-            '10_years' => $simulations['10_years'] ? asset('storage/' . $simulations['10_years']) : null,
+            '1_years' => $simulations['1_years'] ? asset('storage/' . $simulations['1_years']) : null,
+            '3_years' => $simulations['3_years'] ? asset('storage/' . $simulations['3_years']) : null,
         ];
     }
 }

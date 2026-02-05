@@ -443,6 +443,12 @@ class ScanResultController extends Controller
 
         $results = $query->latest()->paginate(10)->appends($request->query());
 
+        // Transform results to include status label
+        $results->getCollection()->transform(function ($result) {
+            $result->status_label = $result->pending === 'verified' ? 'Verified' : 'Pending';
+            return $result;
+        });
+
         Log::info('FINAL Results count: ' . $results->total());
         Log::info('Current page: ' . $results->currentPage());
         Log::info('Per page: ' . $results->perPage());
@@ -1491,10 +1497,12 @@ Be detailed and specific about colors and patterns.";
 
             $dbResult = Results::create([
                 'scan_id' => $uniqueId,
+                'user_id' => Auth::id(), // ADD THIS LINE
                 'image' => $path,
                 'image_hash' => $imageHash,
                 'breed' => $detectedBreed,
                 'confidence' => round($confidence, 2),
+                'pending' => 'pending', // ADD THIS LINE - default to pending
                 'top_predictions' => $topPredictions,
                 'description' => $aiData['description'],
                 'origin_history' => is_string($aiData['origin_history']) ? $aiData['origin_history'] : json_encode($aiData['origin_history']),
@@ -1672,6 +1680,13 @@ Be detailed and specific about colors and patterns.";
 
         $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
 
+        // Update the result's pending status to 'verified'
+        $result->update([
+            'pending' => 'verified',
+            'breed' => $validated['correct_breed'],
+            'confidence' => 100.0,
+        ]);
+
         BreedCorrection::create([
             'scan_id' => $result->scan_id,
             'image_path' => $result->image,
@@ -1680,7 +1695,30 @@ Be detailed and specific about colors and patterns.";
             'status' => 'Added',
         ]);
 
-        // === UPDATED: Use ML API instead of shell_exec ===
+        // ✨ CREATE NOTIFICATION FOR USER
+        if ($result->user_id) {
+            \App\Models\Notification::create([
+                'user_id' => $result->user_id,
+                'type' => 'scan_verified',
+                'title' => 'Scan Verified by Veterinarian',
+                'message' => "Your scan has been verified! The breed has been confirmed as {$validated['correct_breed']}.",
+                'data' => [
+                    'scan_id' => $result->scan_id,
+                    'breed' => $validated['correct_breed'],
+                    'original_breed' => $result->breed,
+                    'confidence' => 100.0,
+                    'image' => $result->image,
+                ],
+            ]);
+
+            Log::info('✓ Notification created for user', [
+                'user_id' => $result->user_id,
+                'scan_id' => $result->scan_id,
+                'breed' => $validated['correct_breed']
+            ]);
+        }
+
+        // ML API learning (existing code)
         try {
             $mlService = new \App\Services\MLApiService();
             $imagePath = storage_path('app/public/' . $result->image);
@@ -1701,7 +1739,7 @@ Be detailed and specific about colors and patterns.";
             Log::error("Learning failed: " . $e->getMessage());
         }
 
-        return redirect('/model/scan-results')->with('success', 'Correction saved to dataset.');
+        return redirect('/model/scan-results')->with('success', 'Correction saved, status updated to verified, and user notified.');
     }
 
     public function deleteResult($id)
@@ -1713,35 +1751,34 @@ Be detailed and specific about colors and patterns.";
     }
 
     public function checkMLApiHealth()
-{
-    try {
-        $mlService = new \App\Services\MLApiService();
-        $isHealthy = $mlService->isHealthy();
-        
-        if ($isHealthy) {
-            $stats = $mlService->getMemoryStats();
-            
-            return response()->json([
-                'success' => true,
-                'status' => 'healthy',
-                'ml_api_url' => env('PYTHON_ML_API_URL'),
-                'memory_stats' => $stats['data'] ?? []
-            ]);
-        } else {
+    {
+        try {
+            $mlService = new \App\Services\MLApiService();
+            $isHealthy = $mlService->isHealthy();
+
+            if ($isHealthy) {
+                $stats = $mlService->getMemoryStats();
+
+                return response()->json([
+                    'success' => true,
+                    'status' => 'healthy',
+                    'ml_api_url' => env('PYTHON_ML_API_URL'),
+                    'memory_stats' => $stats['data'] ?? []
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'unhealthy',
+                    'ml_api_url' => env('PYTHON_ML_API_URL'),
+                    'message' => 'ML API is not responding or model not loaded'
+                ], 503);
+            }
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'status' => 'unhealthy',
-                'ml_api_url' => env('PYTHON_ML_API_URL'),
-                'message' => 'ML API is not responding or model not loaded'
-            ], 503);
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
         }
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'status' => 'error',
-            'message' => $e->getMessage()
-        ], 500);
     }
 }
-}
-

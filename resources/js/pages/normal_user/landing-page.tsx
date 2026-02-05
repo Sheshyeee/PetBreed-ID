@@ -1,8 +1,29 @@
 import { Button } from '@/components/ui/button';
-import { Link } from '@inertiajs/react';
+import { login } from '@/routes';
+import { type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 import { Calendar, Heart, MapPin, PawPrintIcon } from 'lucide-react';
+import { useState } from 'react';
 
 function LandingPage() {
+    const [open, setOpen] = useState(false);
+    const { auth } = usePage<SharedData>().props;
+
+    // Check if user is admin
+    const allowedEmails = ['clapisdave8@gmail.com'];
+    const isAdmin = auth.user && allowedEmails.includes(auth.user.email);
+
+    // Determine scan button link
+    const getScanLink = () => {
+        if (!auth.user) {
+            return login(); // Not logged in -> go to login
+        }
+        if (isAdmin) {
+            return '/dashboard'; // Admin -> go to dashboard
+        }
+        return '/scan'; // Regular user -> go to scan directly
+    };
+
     return (
         <div className="flex w-full flex-col gap-4 lg:flex-row">
             <div className="flex w-full flex-col gap-4">
@@ -21,9 +42,13 @@ function LandingPage() {
                             Upload a photo and get accurate breed identification
                             powered by advanced AI technology
                         </p>
-                        <Link href="/scan" className="mx-auto lg:mx-0">
-                            <Button className="w-full sm:w-auto">
-                                Start Scanning
+                        <Link href={getScanLink()}>
+                            <Button
+                                variant="outline"
+                                className="w-[300px] text-black"
+                                onClick={() => setOpen(false)}
+                            >
+                                Scan pet
                             </Button>
                         </Link>
                     </div>
@@ -112,11 +137,17 @@ function LandingPage() {
                     in one place
                 </p>
 
-                <Link href="/scan">
-                    <Button className="w-full bg-white text-[#1D267D] hover:bg-white/90">
-                        Try it now
-                    </Button>
-                </Link>
+                <div className="border-t pt-4">
+                    <Link href={login()}>
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => setOpen(false)}
+                        >
+                            Vet Portal
+                        </Button>
+                    </Link>
+                </div>
             </div>
         </div>
     );
