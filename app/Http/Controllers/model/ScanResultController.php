@@ -1781,4 +1781,39 @@ Be detailed and specific about colors and patterns.";
             ], 500);
         }
     }
+
+    public function getRecentResults(Request $request)
+    {
+        try {
+            $limit = $request->input('limit', 10);
+            $userId = $request->user()->id;
+
+            $results = Results::where('user_id', $userId)
+                ->latest()
+                ->take($limit)
+                ->get()
+                ->map(function ($scan) {
+                    return [
+                        'id' => $scan->id,
+                        'scan_id' => $scan->scan_id,
+                        'image_url' => asset('storage/' . $scan->image),
+                        'breed' => $scan->breed,
+                        'confidence' => (float)$scan->confidence,
+                        'created_at' => $scan->created_at->toISOString(),
+                        'status' => $scan->pending, // 'pending' or 'verified'
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $results
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get recent results error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch scan history'
+            ], 500);
+        }
+    }
 }

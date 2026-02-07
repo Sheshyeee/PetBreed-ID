@@ -10,7 +10,7 @@ function LandingPage() {
     const { auth } = usePage<SharedData>().props;
 
     // Check if user is admin
-    const allowedEmails = ['clapisdave8@gmail.com'];
+    const allowedEmails = ['modeltraining2000@gmail.com'];
     const isAdmin = auth.user && allowedEmails.includes(auth.user.email);
 
     // Determine scan button link
@@ -45,7 +45,7 @@ function LandingPage() {
                         <Link href={getScanLink()}>
                             <Button
                                 variant="outline"
-                                className="w-[300px] text-black"
+                                className="w-[300px] text-black dark:bg-white/20 dark:text-white"
                                 onClick={() => setOpen(false)}
                             >
                                 Scan pet

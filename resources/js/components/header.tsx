@@ -1,4 +1,4 @@
-import { dashboard, login } from '@/routes';
+import { dashboard } from '@/routes';
 import { type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 
@@ -48,7 +48,7 @@ export default function Header() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
-    const [dropdownOpen, setDropdownOpen] = useState(false); // NEW: Track dropdown state
+    const [dropdownOpen, setDropdownOpen] = useState(false);
 
     useEffect(() => {
         if (appearance === 'system') {
@@ -183,7 +183,7 @@ export default function Header() {
     const page = usePage();
 
     // Check if user is admin
-    const allowedEmails = ['clapisdave8@gmail.com'];
+    const allowedEmails = ['modeltraining2000@gmail.com'];
     const isAdmin = auth.user && allowedEmails.includes(auth.user.email);
 
     const handleLogout = () => {
@@ -205,15 +205,16 @@ export default function Header() {
     };
 
     return (
-        <div className="px-25 py-5">
-            <Card className="text-md b w-full border-2 p-2 px-12 not-has-[nav]:hidden">
-                <nav className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-1">
-                        <div className="flex aspect-square size-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+        <div className="px-4 py-5 sm:px-6 lg:px-25">
+            <Card className="w-full border-2 p-2 px-4 sm:px-8 lg:px-12">
+                <nav className="flex items-center justify-between gap-2 sm:gap-4">
+                    {/* Logo Section */}
+                    <div className="flex min-w-0 flex-shrink items-center gap-1">
+                        <div className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
                             <PawPrint className="size-4 fill-current text-white dark:text-black" />
                         </div>
-                        <div className="text-md ml-1 grid flex-1 text-left">
-                            <span className="mb-0.5 truncate leading-tight font-semibold">
+                        <div className="ml-1 grid min-w-0 flex-1 text-left">
+                            <span className="mb-0.5 truncate text-sm leading-tight font-semibold sm:text-base">
                                 Pet Breed ID
                             </span>
                         </div>
@@ -221,30 +222,33 @@ export default function Header() {
 
                     {/* Navigation menu for non-logged-in users */}
                     {!auth.user && (
-                        <div>
+                        <div className="hidden lg:block">
                             <NavigationMenu>
                                 {/* ... existing navigation menu ... */}
                             </NavigationMenu>
                         </div>
                     )}
 
-                    <div className="flex items-center gap-3">
+                    {/* Right Side Actions */}
+                    <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
                         {auth.user ? (
                             <>
                                 {/* Dashboard button for admin */}
                                 {isAdmin && (
                                     <Link
                                         href={dashboard()}
-                                        className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                        className="hidden rounded-sm border border-[#19140035] px-3 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] sm:inline-block lg:px-5 dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
                                     >
                                         Dashboard
                                     </Link>
                                 )}
 
                                 {/* Appearance Toggle */}
-                                <AppearanceToggleDropdown className="dark:text-white" />
+                                <div className="">
+                                    <AppearanceToggleDropdown className="dark:text-white" />
+                                </div>
 
-                                {/* 🔔 NOTIFICATION BELL - FIXED */}
+                                {/* 🔔 NOTIFICATION BELL */}
                                 {!isAdmin && (
                                     <DropdownMenu
                                         open={dropdownOpen}
@@ -254,10 +258,10 @@ export default function Header() {
                                         }}
                                     >
                                         <DropdownMenuTrigger asChild>
-                                            <button className="relative rounded-full p-2 hover:bg-gray-100 focus:outline-none dark:hover:bg-gray-800">
-                                                <Bell className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                                            <button className="relative rounded-full p-1.5 hover:bg-gray-100 focus:outline-none sm:p-2 dark:hover:bg-gray-800">
+                                                <Bell className="h-4 w-4 text-gray-700 sm:h-5 sm:w-5 dark:text-gray-300" />
                                                 {unreadCount > 0 && (
-                                                    <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center bg-red-500 p-0 text-xs text-white">
+                                                    <Badge className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-red-500 p-0 text-[10px] text-white sm:h-5 sm:w-5 sm:text-xs">
                                                         {unreadCount > 9
                                                             ? '9+'
                                                             : unreadCount}
@@ -267,10 +271,12 @@ export default function Header() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent
                                             align="end"
-                                            className="w-80"
+                                            className="w-[calc(100vw-2rem)] sm:w-80"
                                         >
-                                            <DropdownMenuLabel className="flex items-center justify-between">
-                                                <span>Notifications</span>
+                                            <DropdownMenuLabel className="flex items-center justify-between px-3 py-2 sm:px-4">
+                                                <span className="text-sm font-semibold sm:text-base">
+                                                    Notifications
+                                                </span>
                                                 {unreadCount > 0 && (
                                                     <Button
                                                         variant="ghost"
@@ -286,7 +292,7 @@ export default function Header() {
                                                 )}
                                             </DropdownMenuLabel>
                                             <DropdownMenuSeparator />
-                                            <ScrollArea className="h-[400px]">
+                                            <ScrollArea className="h-[50vh] sm:h-[400px]">
                                                 {isLoadingNotifications ? (
                                                     <div className="p-4 text-center text-sm text-gray-500">
                                                         Loading notifications...
@@ -303,7 +309,7 @@ export default function Header() {
                                                                 key={
                                                                     notification.id
                                                                 }
-                                                                className={`flex cursor-pointer flex-col items-start p-3 ${
+                                                                className={`flex cursor-pointer flex-col items-start p-2.5 sm:p-3 ${
                                                                     !notification.read
                                                                         ? 'bg-blue-50 dark:bg-blue-950'
                                                                         : ''
@@ -321,28 +327,28 @@ export default function Header() {
                                                                         <img
                                                                             src={`/storage/${notification.data.image}`}
                                                                             alt="Dog"
-                                                                            className="h-10 w-10 rounded object-cover"
+                                                                            className="h-8 w-8 shrink-0 rounded object-cover sm:h-10 sm:w-10"
                                                                         />
                                                                     )}
-                                                                    <div className="flex-1">
-                                                                        <p className="text-sm font-medium">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <p className="text-xs font-medium sm:text-sm">
                                                                             {
                                                                                 notification.title
                                                                             }
                                                                         </p>
-                                                                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                                                        <p className="mt-0.5 text-[11px] text-gray-600 sm:mt-1 sm:text-xs dark:text-gray-400">
                                                                             {
                                                                                 notification.message
                                                                             }
                                                                         </p>
-                                                                        <p className="mt-1 text-xs text-gray-500">
+                                                                        <p className="mt-0.5 text-[10px] text-gray-500 sm:mt-1 sm:text-xs">
                                                                             {formatTimeAgo(
                                                                                 notification.created_at,
                                                                             )}
                                                                         </p>
                                                                     </div>
                                                                     {!notification.read && (
-                                                                        <div className="mt-1 h-2 w-2 rounded-full bg-blue-600" />
+                                                                        <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                                                                     )}
                                                                 </div>
                                                             </DropdownMenuItem>
@@ -358,12 +364,12 @@ export default function Header() {
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button className="flex items-center gap-2 rounded-full focus:ring-2 focus:ring-offset-2 focus:outline-none">
-                                            <Avatar className="h-8 w-8 cursor-pointer">
+                                            <Avatar className="h-7 w-7 cursor-pointer sm:h-8 sm:w-8">
                                                 <AvatarImage
                                                     src={auth.user.avatar}
                                                     alt={auth.user.name}
                                                 />
-                                                <AvatarFallback className="bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
+                                                <AvatarFallback className="bg-neutral-200 text-xs text-black sm:text-sm dark:bg-neutral-700 dark:text-white">
                                                     {getInitials(
                                                         auth.user.name,
                                                     )}
@@ -373,19 +379,20 @@ export default function Header() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent
                                         align="end"
-                                        className="w-56"
+                                        className="w-52 sm:w-56"
                                     >
                                         <DropdownMenuLabel>
                                             <div className="flex flex-col space-y-1">
-                                                <p className="text-sm leading-none font-medium">
+                                                <p className="truncate text-sm leading-none font-medium">
                                                     {auth.user.name}
                                                 </p>
-                                                <p className="text-xs leading-none text-muted-foreground">
+                                                <p className="truncate text-xs leading-none text-muted-foreground">
                                                     {auth.user.email}
                                                 </p>
                                             </div>
                                         </DropdownMenuLabel>
                                         <DropdownMenuSeparator />
+
                                         <DropdownMenuItem
                                             onClick={handleLogout}
                                             className="cursor-pointer text-red-600 focus:text-red-600"
@@ -398,16 +405,9 @@ export default function Header() {
                             </>
                         ) : (
                             <>
-                                <AppearanceToggleDropdown className="dark:text-white" />
-
-                                {page.url === '/' && (
-                                    <Button
-                                        variant="outline"
-                                        className="h-[30px]"
-                                    >
-                                        <Link href={login()}>Vet Portal</Link>
-                                    </Button>
-                                )}
+                                <div className="">
+                                    <AppearanceToggleDropdown className="dark:text-white" />
+                                </div>
                             </>
                         )}
                     </div>

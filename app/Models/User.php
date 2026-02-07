@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens; // Added for Sanctum
+use Illuminate\Notifications\Notifiable; // Re-added for standard functionality
 
 class User extends Authenticatable
 {
-    use HasFactory, TwoFactorAuthenticatable;
-    // REMOVED Notifiable trait to avoid conflicts
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -76,5 +77,5 @@ class User extends Authenticatable
     public function getUnreadNotificationCountAttribute()
     {
         return $this->customNotifications()->where('read', false)->count();
-    }
+}
 }

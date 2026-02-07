@@ -12,8 +12,17 @@ use Laravel\Socialite\Facades\Socialite;
 
 class GoogleController extends Controller
 {
-    public function redirect()
+    public function redirect(Request $request)
     {
+        // Store mobile parameters in session
+        if ($request->has('redirect_to')) {
+            session(['mobile_redirect_to' => $request->redirect_to]);
+        }
+
+        if ($request->has('mobile')) {
+            session(['is_mobile' => true]);
+        }
+
         return Socialite::driver('google')->redirect();
     }
 
@@ -22,6 +31,13 @@ class GoogleController extends Controller
         try {
             $googleUser = Socialite::driver('google')->user();
         } catch (ClientException $e) {
+            // Check if this is a mobile request
+            $mobileRedirect = session('mobile_redirect_to');
+            if ($mobileRedirect || session('is_mobile')) {
+                session()->forget(['mobile_redirect_to', 'is_mobile']);
+                return redirect()->away($mobileRedirect . '?error=cancelled');
+            }
+
             return redirect('/login')->withErrors([
                 'login' => 'Google login was cancelled.'
             ]);
@@ -40,7 +56,7 @@ class GoogleController extends Controller
             }
         }
 
-        // Create or update user FIRST
+        // Create or update user
         $user = User::updateOrCreate(
             [
                 'google_id' => $googleUser->id,
@@ -53,11 +69,28 @@ class GoogleController extends Controller
             ]
         );
 
-        // Log in the user
+        // Handle Mobile Redirect
+        $mobileRedirect = session('mobile_redirect_to');
+        $isMobile = session('is_mobile');
+
+        if ($mobileRedirect || $isMobile) {
+            // Create API token for mobile
+            $token = $user->createToken('mobile-app')->plainTextToken;
+            $baseRedirect = $mobileRedirect ?? 'mobileapp://auth-success';
+
+            // Clean session
+            session()->forget(['mobile_redirect_to', 'is_mobile']);
+
+            // Append token to the URI
+            $separator = parse_url($baseRedirect, PHP_URL_QUERY) ? '&' : '?';
+            return redirect()->away($baseRedirect . $separator . "token=" . $token);
+        }
+
+        // Standard Web Login
         Auth::login($user);
 
-        // Check if admin and redirect accordingly
-        $allowedEmail = ['clapisdave8@gmail.com'];
+        // Check if admin
+        $allowedEmail = ['modeltraining2000@gmail.com'];
         if (in_array($googleUser->email, $allowedEmail)) {
             return redirect('/dashboard');
         }

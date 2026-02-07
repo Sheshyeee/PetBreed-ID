@@ -15,7 +15,7 @@ class MLApiService
   public function __construct()
   {
     // Get ML API URL from environment
-    $this->baseUrl = rtrim(env('PYTHON_ML_API_URL', 'http://localhost:8001'), '/');
+    $this->baseUrl = rtrim(env('PYTHON_ML_API_URL', 'https://dave20042709-dog-breed-ml-api.hf.space'), '/');
     $this->timeout = (int) env('PYTHON_ML_API_TIMEOUT', 60);
 
     Log::info('MLApiService initialized', ['base_url' => $this->baseUrl]);

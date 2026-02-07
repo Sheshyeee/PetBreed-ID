@@ -179,38 +179,42 @@ const Scan = () => {
             {/* Compact Loading Dialog */}
             <AnalysisLoadingDialog isOpen={showLoading} />
 
-            <div className="mt-[-20px] min-h-screen text-[#1b1b18] dark:bg-[#0a0a0a]">
-                <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-10">
+            <div className="mt-[-45px] p-4 text-gray-900 sm:mt-[-20px] sm:p-0 dark:text-white">
+                <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
                     {/* Page Header */}
-                    <div className="flex">
-                        <div className="mb-6 ml-2">
-                            <h1 className="text-md font-bold sm:text-xl lg:text-lg dark:text-white">
+                    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1">
+                            <h1 className="text-lg font-bold tracking-tight text-gray-900 sm:text-lg dark:text-white">
                                 Scan Your Pet
                             </h1>
-                            <p className="mt-[-5px] text-xs text-gray-600 sm:text-sm dark:text-white/70">
+                            <p className="mt-[-5px] text-sm text-gray-600 sm:text-sm dark:text-gray-400">
                                 Upload a photo or use your camera to identify
-                                your pet's breed.
+                                your pet's breed with AI-powered analysis.
                             </p>
                         </div>
-                        <Button asChild>
-                            <Link href='/scanhistory'>Scan history</Link>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="shrink-0 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                        >
+                            <Link href="/scanhistory">Scan History</Link>
                         </Button>
                     </div>
 
                     {/* Error Message */}
                     {error && (
-                        <Card className="mb-6 border-red-400 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                        <Card className="mb-6 border-red-300 bg-red-50 shadow-sm dark:border-red-900 dark:bg-red-950/50">
                             <CardContent className="p-4 sm:p-6">
-                                <div className="flex items-start gap-2 sm:items-center">
+                                <div className="flex items-start gap-3">
                                     <XCircle
-                                        size={20}
-                                        className="mt-0.5 shrink-0 text-red-600 sm:mt-0 dark:text-red-400"
+                                        size={22}
+                                        className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                                     />
                                     <div className="flex-1">
-                                        <p className="font-bold text-red-700 dark:text-red-400">
+                                        <p className="font-semibold text-red-900 dark:text-red-400">
                                             Error
                                         </p>
-                                        <p className="mt-1 text-xs text-red-600 sm:text-sm dark:text-red-300">
+                                        <p className="mt-1 text-sm text-red-700 dark:text-red-300">
                                             {error.message}
                                         </p>
                                     </div>
@@ -221,66 +225,74 @@ const Scan = () => {
 
                     {/* Success Message with Results */}
                     {success && showResults && (
-                        <Card className="mb-6 border-green-400 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                            <CardContent className="p-4 sm:p-6">
-                                <div className="flex items-start gap-2 sm:items-center">
+                        <Card className="mb-6 border-green-300 bg-green-50 shadow-sm dark:border-green-900 dark:bg-green-950/50">
+                            <CardContent className="p-6">
+                                <div className="flex items-start gap-3">
                                     <CheckCircle2
-                                        size={24}
-                                        className="mt-0.5 shrink-0 text-green-600 sm:mt-0 dark:text-green-400"
+                                        size={26}
+                                        className="mt-0.5 shrink-0 text-green-600 dark:text-green-400"
                                     />
-                                    <h2 className="text-lg font-bold text-green-700 sm:text-xl dark:text-green-400">
+                                    <h2 className="text-xl font-bold text-green-900 dark:text-green-400">
                                         Analysis Complete!
                                     </h2>
                                 </div>
 
-                                <div className="mt-4">
-                                    <p className="text-base font-semibold text-gray-800 sm:text-lg dark:text-white">
-                                        Detected Breed:{' '}
-                                        <span className="text-green-600 dark:text-green-400">
+                                <div className="mt-6 space-y-4">
+                                    <div className="rounded-lg bg-white p-4 dark:bg-gray-900/50">
+                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Detected Breed
+                                        </p>
+                                        <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
                                             {success.breed}
-                                        </span>
-                                    </p>
-                                    <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-300">
-                                        Confidence:{' '}
-                                        {(success.confidence * 100).toFixed(2)}%
-                                    </p>
-                                </div>
+                                        </p>
+                                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                            Confidence:{' '}
+                                            <span className="font-semibold text-gray-900 dark:text-white">
+                                                {(
+                                                    success.confidence * 100
+                                                ).toFixed(2)}
+                                                %
+                                            </span>
+                                        </p>
+                                    </div>
 
-                                {success.top_predictions &&
-                                    success.top_predictions.length > 0 && (
-                                        <div className="mt-4">
-                                            <h3 className="text-sm font-semibold text-gray-700 sm:text-base dark:text-gray-300">
-                                                Top Predictions:
-                                            </h3>
-                                            <ul className="mt-2 space-y-2">
-                                                {success.top_predictions.map(
-                                                    (pred, idx) => (
-                                                        <li
-                                                            key={idx}
-                                                            className="flex justify-between gap-4 text-xs sm:text-sm"
-                                                        >
-                                                            <span className="text-gray-700 dark:text-gray-300">
-                                                                {idx + 1}.{' '}
-                                                                {pred.breed}
-                                                            </span>
-                                                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                                                                {(
-                                                                    pred.confidence *
-                                                                    100
-                                                                ).toFixed(2)}
-                                                                %
-                                                            </span>
-                                                        </li>
-                                                    ),
-                                                )}
-                                            </ul>
-                                        </div>
-                                    )}
+                                    {success.top_predictions &&
+                                        success.top_predictions.length > 0 && (
+                                            <div className="rounded-lg bg-white p-4 dark:bg-gray-900/50">
+                                                <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                                                    Top Predictions
+                                                </h3>
+                                                <ul className="space-y-2">
+                                                    {success.top_predictions.map(
+                                                        (pred, idx) => (
+                                                            <li
+                                                                key={idx}
+                                                                className="flex items-center justify-between gap-4 rounded-md bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800/50"
+                                                            >
+                                                                <span className="font-medium text-gray-900 dark:text-gray-200">
+                                                                    {idx + 1}.{' '}
+                                                                    {pred.breed}
+                                                                </span>
+                                                                <span className="shrink-0 font-semibold text-gray-600 dark:text-gray-400">
+                                                                    {(
+                                                                        pred.confidence *
+                                                                        100
+                                                                    ).toFixed(
+                                                                        2,
+                                                                    )}
+                                                                    %
+                                                                </span>
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                </div>
 
                                 <Button
                                     onClick={handleReset}
-                                    className="mt-4 w-full"
-                                    variant="outline"
+                                    className="mt-6 w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
                                 >
                                     Scan Another Image
                                 </Button>
@@ -289,14 +301,14 @@ const Scan = () => {
                     )}
 
                     {/* Upload Card */}
-                    <Card className="mx-auto w-full max-w-4xl">
+                    <Card className="mx-auto w-full max-w-4xl border-gray-200 bg-white p-1 shadow-md dark:border-gray-800 dark:bg-gray-900">
                         <form onSubmit={handleSubmit}>
-                            <CardContent className="p-4 sm:p-6">
+                            <CardContent className="p-6 sm:p-8">
                                 {!preview ? (
                                     <>
                                         <div
                                             onClick={triggerFileInput}
-                                            className="flex h-[180px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 transition-colors hover:border-gray-400 sm:h-[200px] lg:h-[240px] dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                                            className="group relative flex h-64 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition-all hover:border-gray-400 hover:bg-gray-100 sm:h-72 lg:h-60 dark:border-gray-700 dark:bg-gray-800/50 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                                         >
                                             <input
                                                 ref={fileInputRef}
@@ -306,58 +318,77 @@ const Scan = () => {
                                                 onChange={handleFileChange}
                                             />
 
-                                            <div className="rounded-full bg-gray-200 dark:bg-gray-800">
-                                                <Camera
-                                                    size={32}
-                                                    className="p-2 text-black sm:size-9 dark:text-white"
-                                                />
-                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="rounded-full bg-gray-200 p-4 transition-all group-hover:scale-110 dark:bg-gray-700">
+                                                    <Camera
+                                                        size={40}
+                                                        className="text-gray-600 dark:text-gray-300"
+                                                    />
+                                                </div>
 
-                                            <p className="mt-2 text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                Drop your image here
-                                            </p>
-                                            <p className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                or click to browse
-                                            </p>
-                                            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                All image formats supported (Max
-                                                10 MB)
-                                            </p>
+                                                <p className="mt-4 text-base font-medium text-gray-700 dark:text-gray-300">
+                                                    Drop your image here
+                                                </p>
+                                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                    or click to browse
+                                                </p>
+                                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+                                                    All image formats supported
+                                                    • Max 10 MB
+                                                </p>
+                                            </div>
                                         </div>
 
                                         {errors.image && (
-                                            <p className="mt-2 text-xs text-red-600 sm:text-sm">
+                                            <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
                                                 {errors.image}
                                             </p>
                                         )}
 
-                                        <Card className="mt-4 border-blue-400 bg-blue-50 sm:mt-6 dark:border-blue-800 dark:bg-gray-950">
-                                            <CardContent className="p-3 sm:p-4">
-                                                <div className="flex items-start gap-2 sm:items-center">
+                                        <Card className="mt-4 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
+                                            <CardContent className="p-0 px-4">
+                                                <div className="flex items-center gap-2">
                                                     <CircleAlert
-                                                        size={18}
-                                                        className="mt-0.5 shrink-0 text-blue-600 sm:mt-0 sm:size-5 dark:text-blue-400"
+                                                        size={20}
+                                                        className="shrink-0 text-blue-600 dark:text-blue-400"
                                                     />
-                                                    <p className="text-xs font-bold text-gray-700 sm:text-sm dark:text-white/70">
+                                                    <p className="font-semibold text-blue-900 dark:text-blue-300">
                                                         Tips for Best Results
                                                     </p>
                                                 </div>
 
-                                                <ul className="mt-2 list-disc space-y-1 pl-6 sm:pl-8">
-                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                        Ensure your pet is
-                                                        clearly visible
+                                                <ul className="mt-3 space-y-1 pl-1">
+                                                    <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
+                                                        <span>
+                                                            Ensure your pet is
+                                                            clearly visible in
+                                                            the frame
+                                                        </span>
                                                     </li>
-                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                        Use good lighting
+                                                    <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
+                                                        <span>
+                                                            Use good lighting
+                                                            without harsh
+                                                            shadows
+                                                        </span>
                                                     </li>
-                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                        Center your pet in the
-                                                        frame
+                                                    <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
+                                                        <span>
+                                                            Center your pet and
+                                                            avoid cluttered
+                                                            backgrounds
+                                                        </span>
                                                     </li>
-                                                    <li className="text-xs text-gray-600 sm:text-sm dark:text-white/70">
-                                                        Better angles improve
-                                                        accuracy
+                                                    <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
+                                                        <span>
+                                                            Front or side angles
+                                                            work best for
+                                                            accuracy
+                                                        </span>
                                                     </li>
                                                 </ul>
                                             </CardContent>
@@ -365,22 +396,22 @@ const Scan = () => {
                                     </>
                                 ) : (
                                     <div>
-                                        <div className="overflow-hidden rounded-lg">
+                                        <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                                             <img
                                                 src={preview}
-                                                className="mx-auto max-h-64 w-full object-contain sm:max-h-80 lg:max-h-96"
+                                                className="mx-auto max-h-80 w-full object-contain sm:max-h-96"
                                                 alt="Preview"
                                             />
                                         </div>
                                         {fileInfo && (
-                                            <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                                            <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
                                                 {fileInfo}
                                             </p>
                                         )}
-                                        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                                        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                                             <Button
                                                 type="submit"
-                                                className="w-full sm:flex-1"
+                                                className="w-full bg-blue-600 hover:bg-blue-700 sm:flex-1 dark:bg-blue-600 dark:hover:bg-blue-700"
                                                 disabled={processing}
                                             >
                                                 {processing
@@ -389,7 +420,7 @@ const Scan = () => {
                                             </Button>
                                             <Button
                                                 type="button"
-                                                className="w-full sm:w-32"
+                                                className="w-full border-gray-300 bg-white hover:bg-gray-50 sm:w-auto sm:px-8 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                                                 variant="outline"
                                                 onClick={handleReset}
                                                 disabled={processing}

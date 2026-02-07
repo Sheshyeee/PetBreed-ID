@@ -34,18 +34,22 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
         <div className="min-h-screen w-full bg-background">
             <Header />
 
-            <div className="container mx-auto max-w-7xl px-4 py-8 lg:px-10">
+            <div className="container mx-auto mt-[-30px] max-w-7xl px-8 py-8 sm:mt-[-20px] lg:px-10">
                 {/* Header Section */}
                 <div className="mb-6 flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-bold sm:text-2xl lg:text-3xl dark:text-white">
+                        <h1 className="text-lg font-bold sm:text-2xl lg:text-lg dark:text-white">
                             My Scan History
                         </h1>
-                        <p className="mt-1 text-sm text-gray-600 sm:text-base dark:text-white/70">
+                        <p className="mt-[-5px] text-sm text-gray-600 sm:text-sm dark:text-white/70">
                             View your pet breed identification scans
                         </p>
                     </div>
-                    <Button asChild>
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="shrink-0 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                    >
                         <Link href="/scan">New Scan</Link>
                     </Button>
                 </div>
@@ -69,7 +73,7 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                             </svg>
                         </div>
                         <div>
-                            <h3 className="mb-2 text-lg font-semibold text-blue-900 dark:text-blue-100">
+                            <h3 className="text-md mb-2 font-semibold text-blue-900 dark:text-blue-100">
                                 Veterinarian Verification
                             </h3>
                             <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -96,7 +100,11 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                         <p className="mb-6 text-gray-600 dark:text-gray-400">
                             Start by scanning your first pet!
                         </p>
-                        <Button asChild>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="shrink-0 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                        >
                             <Link href="/scan">Scan Your Pet</Link>
                         </Button>
                     </Card>
@@ -111,7 +119,7 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                 className="overflow-hidden rounded-lg p-0"
                             >
                                 {/* Image */}
-                                <div className="relative h-48 w-full overflow-hidden">
+                                <div className="relative h-78 w-full overflow-hidden">
                                     <img
                                         src={scan.image}
                                         alt={scan.breed}
