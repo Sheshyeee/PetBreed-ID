@@ -2,8 +2,8 @@ import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Link } from '@inertiajs/react';
-import { Calendar } from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { Calendar, Trash2 } from 'lucide-react';
 
 // Define the Scan interface
 interface Scan {
@@ -30,6 +30,20 @@ interface ScanHistoryProps {
 }
 
 const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
+    const handleDelete = (scanId: number) => {
+        if (confirm('Are you sure you want to delete this scan?')) {
+            router.delete(`/scanhistory/${scanId}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    // Optional: Show success message
+                },
+                onError: () => {
+                    alert('Failed to delete scan. Please try again.');
+                },
+            });
+        }
+    };
+
     return (
         <div className="min-h-screen w-full bg-background">
             <Header />
@@ -125,6 +139,16 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                         alt={scan.breed}
                                         className="h-full w-full object-cover"
                                     />
+                                    {/* Delete Button Overlay */}
+                                    <Button
+                                        onClick={() => handleDelete(scan.id)}
+                                        variant="destructive"
+                                        size="icon"
+                                        className="absolute top-2 right-2 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100"
+                                        title="Delete scan"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
 
                                 {/* Content */}
@@ -185,6 +209,21 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                                 Pending
                                             </Badge>
                                         )}
+                                    </div>
+
+                                    {/* Delete Button in Card Footer */}
+                                    <div className="mt-4 border-t pt-3">
+                                        <Button
+                                            onClick={() =>
+                                                handleDelete(scan.id)
+                                            }
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete Scan
+                                        </Button>
                                     </div>
                                 </div>
                             </Card>

@@ -56,6 +56,9 @@ Route::prefix('v1')->group(function () {
     // Get recent results (GET)
     Route::get('/results', [ScanResultController::class, 'getRecentResults']);
 
+    // Delete scan by ID (DELETE)
+    Route::delete('/results/{id}', [ScanResultController::class, 'deleteScan'])->name('api.results.delete');
+
     // ========================================
     // NOTIFICATION ENDPOINTS
     // ========================================

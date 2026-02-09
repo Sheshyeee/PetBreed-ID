@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/model/scan-results', [ScanResultController::class, "index"]);
     Route::get('/scanhistory', [PageController::class, "scanhistory"]);
+    Route::delete('/scanhistory/{id}', [PageController::class, "deleteScan"])->name('scanhistory.delete');
 
     Route::get('/scan', [ScanController::class, "index"])->name('scan');
     Route::get('/scan-results', [ResultController::class, "index"]);

@@ -306,6 +306,58 @@ class ScanResultController extends Controller
             'breedLearningProgress' => $breedLearningProgress, // NEW: Per-breed learning data
         ]);
     }
+
+    public function deleteScan($id)
+    {
+        try {
+            $user = Auth::user();
+
+            // Find the scan and ensure it belongs to the authenticated user
+            $scan = Results::where('id', $id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$scan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Scan not found or you do not have permission to delete it.'
+                ], 404);
+            }
+
+            // Delete the image from storage if it exists
+            if ($scan->image && Storage::disk('object-storage')->exists($scan->image)) {
+                Storage::disk('object-storage')->delete($scan->image);
+            }
+
+            // Delete related simulation images if they exist
+            if ($scan->simulation_1_year && Storage::disk('object-storage')->exists($scan->simulation_1_year)) {
+                Storage::disk('object-storage')->delete($scan->simulation_1_year);
+            }
+
+            if ($scan->simulation_3_years && Storage::disk('object-storage')->exists($scan->simulation_3_years)) {
+                Storage::disk('object-storage')->delete($scan->simulation_3_years);
+            }
+
+            // Delete the scan record from database
+            $scan->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Scan deleted successfully.'
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Delete scan error:', [
+                'error' => $e->getMessage(),
+                'scan_id' => $id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete scan. Please try again.'
+            ], 500);
+        }
+    }
+
     public function getSimulation($scan_id)
     {
         try {

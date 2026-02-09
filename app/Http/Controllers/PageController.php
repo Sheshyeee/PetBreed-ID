@@ -46,4 +46,32 @@ class PageController extends Controller
             ]
         ]);
     }
+
+    public function deleteScan($id)
+    {
+        $user = Auth::user();
+
+        // Find the scan and ensure it belongs to the authenticated user
+        $scan = Results::where('id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$scan) {
+            return back()->with('error', 'Scan not found or you do not have permission to delete it.');
+        }
+
+        try {
+            // Delete the image from storage if it exists
+            if ($scan->image && Storage::disk('object-storage')->exists($scan->image)) {
+                Storage::disk('object-storage')->delete($scan->image);
+            }
+
+            // Delete the scan record
+            $scan->delete();
+
+            return back()->with('success', 'Scan deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to delete scan. Please try again.');
+        }
+    }
 }
