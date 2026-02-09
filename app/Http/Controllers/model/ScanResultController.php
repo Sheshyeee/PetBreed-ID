@@ -295,7 +295,7 @@ class ScanResultController extends Controller
             'memoryCount' => $memoryCount,
             'uniqueBreedsLearned' => count($uniqueBreeds),
             'recentCorrectionsCount' => $recentCorrectionsCount,
-            'avgConfidence' => round($avgConfidence, 2),    
+            'avgConfidence' => round($avgConfidence, 2),
             'confidenceTrend' => round($confidenceTrend, 2),
             'memoryHitRate' => round($memoryHitRate, 2),
             'accuracyImprovement' => round($accuracyImprovement, 2),
@@ -1086,60 +1086,69 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
                 'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
             ]);
 
-            // Build top predictions array
+            // Build top predictions array with ONLY REAL BREEDS
             $topPredictions = [];
+            $seenBreeds = []; // Track breeds to avoid duplicates
+
+            // Add primary breed first
+            $primaryBreed = $apiResult['breed'];
             $topPredictions[] = [
-                'breed' => $apiResult['breed'],
+                'breed' => $primaryBreed,
                 'confidence' => round($actualConfidence, 2)
             ];
+            $seenBreeds[] = strtolower(trim($primaryBreed));
 
+            // Add alternative possibilities (these have actual breed names and confidence scores)
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
-                        $topPredictions[] = [
-                            'breed' => $alt['breed'],
-                            'confidence' => round((float)$alt['confidence'], 2)
-                        ];
+                        $breedKey = strtolower(trim($alt['breed']));
+
+                        // Skip duplicates and only add if confidence > 0
+                        if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
+                            $topPredictions[] = [
+                                'breed' => $alt['breed'],
+                                'confidence' => round((float)$alt['confidence'], 2)
+                            ];
+                            $seenBreeds[] = $breedKey;
+                        }
                     }
                 }
             }
 
-            // Add candidate breeds if not enough alternatives
+            // Add candidate breeds ONLY if they have meaningful confidence and aren't duplicates
             if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
                 foreach ($apiResult['candidate_breeds'] as $candidate) {
                     if (isset($candidate['breed']) && count($topPredictions) < 5) {
-                        // Skip if already in predictions
-                        $alreadyExists = false;
-                        foreach ($topPredictions as $existing) {
-                            if ($existing['breed'] === $candidate['breed']) {
-                                $alreadyExists = true;
-                                break;
-                            }
-                        }
-                        if (!$alreadyExists) {
+                        $breedKey = strtolower(trim($candidate['breed']));
+                        $confidence = (float)($candidate['match_percentage'] ?? $candidate['confidence'] ?? 0);
+
+                        // Only add if not duplicate and has reasonable confidence
+                        if (!in_array($breedKey, $seenBreeds) && $confidence > 0) {
                             $topPredictions[] = [
                                 'breed' => $candidate['breed'],
-                                'confidence' => round((float)($candidate['match_percentage'] ?? 0), 2)
+                                'confidence' => round($confidence, 2)
                             ];
+                            $seenBreeds[] = $breedKey;
                         }
                     }
                 }
             }
 
-            // Fill remaining slots with "Other Breeds"
-            while (count($topPredictions) < 5) {
-                $topPredictions[] = [
-                    'breed' => 'Other Breeds',
-                    'confidence' => 0
-                ];
-            }
+            // DO NOT fill with "Other Breeds" - only return real predictions
+            // Frontend will handle the display appropriately
+
+            Log::info('✓ Top predictions built', [
+                'count' => count($topPredictions),
+                'breeds' => array_column($topPredictions, 'breed')
+            ]);
 
             return [
                 'success' => true,
                 'method' => 'api_enhanced',
                 'breed' => $apiResult['breed'],
                 'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
-                'top_predictions' => array_slice($topPredictions, 0, 5),
+                'top_predictions' => $topPredictions, // Return only real predictions (no padding)
                 'metadata' => [
                     'reasoning' => $apiResult['reasoning'] ?? '',
                     'key_identifiers' => $apiResult['key_identifiers'] ?? [],

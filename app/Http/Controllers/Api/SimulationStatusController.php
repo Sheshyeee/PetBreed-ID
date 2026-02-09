@@ -10,26 +10,29 @@ use Illuminate\Support\Facades\Log;
 class SimulationStatusController extends Controller
 {
     /**
-     * Get the current simulation status for the user's last scan
+     * Get the current simulation status
+     * FIXED: Now accepts scan_id as query parameter instead of relying on session
      */
     public function getStatus(Request $request)
     {
         try {
-            $scanId = session('last_scan_id');
+            // Try to get scan_id from request first, fall back to session
+            $scanId = $request->input('scan_id') ?? session('last_scan_id');
 
             Log::info("=== SIMULATION STATUS API CALLED ===");
-            Log::info("Session scan_id: " . ($scanId ?? 'NULL'));
-            Log::info("All session data: " . json_encode(session()->all()));
+            Log::info("Request scan_id: " . ($request->input('scan_id') ?? 'NULL'));
+            Log::info("Session scan_id: " . (session('last_scan_id') ?? 'NULL'));
+            Log::info("Using scan_id: " . ($scanId ?? 'NULL'));
 
             if (!$scanId) {
-                Log::warning("No scan_id in session");
+                Log::warning("No scan_id in request or session");
                 return response()->json([
                     'status' => 'failed',
                     'simulations' => [
                         '1_years' => null,
                         '3_years' => null,
                     ],
-                    'message' => 'No scan found in session'
+                    'message' => 'No scan_id provided'
                 ], 404);
             }
 
@@ -51,7 +54,6 @@ class SimulationStatusController extends Controller
             $simulationData = json_decode($result->simulation_data, true);
 
             Log::info("Raw simulation_data from DB: " . $result->simulation_data);
-            Log::info("Decoded simulation_data: " . json_encode($simulationData));
 
             // Ensure proper structure
             if (!$simulationData || !is_array($simulationData)) {
@@ -65,7 +67,6 @@ class SimulationStatusController extends Controller
 
             // Build base URL from object storage
             $baseUrl = config('filesystems.disks.object-storage.url');
-            Log::info("Object storage base URL: " . $baseUrl);
 
             // Extract status and simulations WITH FULL URLS
             $status = $simulationData['status'] ?? 'pending';
@@ -81,29 +82,24 @@ class SimulationStatusController extends Controller
             // Also include original image with full URL
             $originalImage = $baseUrl . '/' . $result->image;
 
-            Log::info("API Response - Status: {$status}");
-            Log::info("API Response - 1_years path: " . ($simulationData['1_years'] ?? 'NULL'));
-            Log::info("API Response - 1_years URL: " . ($simulations['1_years'] ?? 'NULL'));
-            Log::info("API Response - 3_years path: " . ($simulationData['3_years'] ?? 'NULL'));
-            Log::info("API Response - 3_years URL: " . ($simulations['3_years'] ?? 'NULL'));
-            Log::info("API Response - original_image: {$originalImage}");
+            Log::info("✓ Returning status: {$status}");
+            Log::info("✓ 1_years: " . ($simulations['1_years'] ? 'EXISTS' : 'NULL'));
+            Log::info("✓ 3_years: " . ($simulations['3_years'] ? 'EXISTS' : 'NULL'));
 
-            // CRITICAL: Add timestamp to prevent caching
             $responseData = [
                 'status' => $status,
                 'simulations' => $simulations,
                 'original_image' => $originalImage,
                 'scan_id' => $scanId,
-                'timestamp' => now()->timestamp, // Force fresh data
+                'timestamp' => now()->timestamp,
                 'has_1_year' => !is_null($simulations['1_years']),
                 'has_3_years' => !is_null($simulations['3_years']),
             ];
 
-            Log::info("Final API Response: " . json_encode($responseData));
-
             return response()->json($responseData)
                 ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-                ->header('Pragma', 'no-cache');
+                ->header('Pragma', 'no-cache')
+                ->header('Expires', '0');
         } catch (\Exception $e) {
             Log::error('Simulation status API error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());

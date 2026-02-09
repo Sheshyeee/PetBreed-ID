@@ -31,7 +31,7 @@ type Result = {
     created_at?: string;
     updated_at?: string;
     // NEW: Learning indicators
-    prediction_method?: string; // 'exact_match', 'admin_corrected', 'memory_assisted', etc.
+    prediction_method?: string;
     is_exact_match?: boolean;
     has_admin_correction?: boolean;
 };
@@ -52,14 +52,50 @@ const ScanResults = () => {
     const showLearningBadge =
         results?.confidence === 100 && results?.has_admin_correction;
 
-    // FIXED: Filter out "Other Breeds" entries and only show real breed predictions
+    // FIXED: Better filtering and validation of predictions
     const filteredPredictions =
-        results?.top_predictions?.filter(
-            (prediction) =>
-                prediction.breed.toLowerCase() !== 'other breeds' &&
-                prediction.breed.toLowerCase() !== 'other breed' &&
-                prediction.confidence > 0,
-        ) || [];
+        results?.top_predictions?.filter((prediction) => {
+            // Remove invalid entries
+            if (!prediction || !prediction.breed) return false;
+
+            const breedLower = prediction.breed.toLowerCase().trim();
+
+            // Filter out placeholder/invalid breeds
+            const invalidBreeds = [
+                'other breeds',
+                'other breed',
+                'alternative 1',
+                'alternative 2',
+                'alternative 3',
+                'alternative',
+                'unknown',
+                'mixed breed', // Only if you want to exclude generic mixed breed
+            ];
+
+            if (invalidBreeds.includes(breedLower)) return false;
+
+            // Must have positive confidence
+            if (!prediction.confidence || prediction.confidence <= 0)
+                return false;
+
+            // Don't show if it's the same as the primary breed
+            if (
+                results?.breed &&
+                breedLower === results.breed.toLowerCase().trim()
+            ) {
+                return false;
+            }
+
+            return true;
+        }) || [];
+
+    // Sort by confidence descending
+    const sortedPredictions = [...filteredPredictions].sort(
+        (a, b) => (b.confidence || 0) - (a.confidence || 0),
+    );
+
+    // Take top 3 alternatives
+    const topAlternatives = sortedPredictions.slice(0, 3);
 
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
@@ -98,7 +134,7 @@ const ScanResults = () => {
                                 Primary Match
                             </Badge>
 
-                            {/* NEW: Learning Indicator Badges */}
+                            {/* Learning Indicator Badges */}
                             {showLearningBadge && (
                                 <Badge className="gap-1 border-0 bg-gradient-to-r from-purple-500 to-pink-600 text-white">
                                     <Brain className="h-3 w-3" />
@@ -136,7 +172,7 @@ const ScanResults = () => {
                             }`}
                         />
 
-                        {/* NEW: Learning Explanation */}
+                        {/* Learning Explanation */}
                         {showLearningBadge && (
                             <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20">
                                 <div className="flex items-start gap-2">
@@ -158,66 +194,66 @@ const ScanResults = () => {
                     </div>
                 </Card>
 
-                {/* FIXED: Top Possible Breeds - Only show if there are real alternatives */}
-                {filteredPredictions.length > 1 && (
+                {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
+                {topAlternatives.length > 0 && (
                     <Card className="mt-5 p-6 sm:p-8 lg:p-10">
                         <h2 className="text-md mb-4 font-bold sm:text-xl dark:text-white">
-                            Top Possible Breeds
+                            Other Possible Breeds
                         </h2>
                         <div className="space-y-4">
-                            {filteredPredictions
-                                .slice(0, 3)
-                                .map((prediction, index) => (
-                                    <Card
-                                        key={index}
-                                        className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
-                                    >
-                                        <div className="flex items-center gap-4 sm:gap-5">
-                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">
-                                                {index + 1}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h3 className="sm:text-md mb-2 text-base font-semibold dark:text-white">
-                                                    {prediction.breed}
-                                                </h3>
-                                                <div className="flex items-center gap-3 sm:gap-4">
-                                                    <Progress
-                                                        value={
-                                                            prediction.confidence
-                                                        }
-                                                        className="h-2 flex-1 lg:max-w-[400px] [&>div]:bg-blue-500"
-                                                    />
-                                                    <p className="shrink-0 text-sm font-semibold dark:text-white">
-                                                        {Math.round(
-                                                            prediction.confidence,
-                                                        )}
-                                                        %
-                                                    </p>
-                                                </div>
+                            {topAlternatives.map((prediction, index) => (
+                                <Card
+                                    key={`${prediction.breed}-${index}`}
+                                    className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
+                                >
+                                    <div className="flex items-center gap-4 sm:gap-5">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">
+                                            {index + 1}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="sm:text-md mb-2 text-base font-semibold dark:text-white">
+                                                {prediction.breed}
+                                            </h3>
+                                            <div className="flex items-center gap-3 sm:gap-4">
+                                                <Progress
+                                                    value={
+                                                        prediction.confidence
+                                                    }
+                                                    className="h-2 flex-1 lg:max-w-[400px] [&>div]:bg-blue-500"
+                                                />
+                                                <p className="shrink-0 text-sm font-semibold dark:text-white">
+                                                    {Math.round(
+                                                        prediction.confidence,
+                                                    )}
+                                                    %
+                                                </p>
                                             </div>
                                         </div>
-                                    </Card>
-                                ))}
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
                     </Card>
                 )}
 
                 {/* Show message when only one confident prediction */}
-                {filteredPredictions.length === 1 && (
-                    <Card className="mt-5 p-6 sm:p-8 lg:p-10">
-                        <div className="flex items-center justify-center gap-3 text-center">
-                            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                <strong className="text-gray-900 dark:text-white">
-                                    High Confidence Identification
-                                </strong>
-                                {' - '}
-                                Our system is very confident about this breed
-                                identification.
-                            </p>
-                        </div>
-                    </Card>
-                )}
+                {topAlternatives.length === 0 &&
+                    results?.confidence &&
+                    results.confidence >= 80 && (
+                        <Card className="mt-5 p-6 sm:p-8 lg:p-10">
+                            <div className="flex items-center justify-center gap-3 text-center">
+                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    <strong className="text-gray-900 dark:text-white">
+                                        High Confidence Identification
+                                    </strong>
+                                    {' - '}
+                                    Our system is very confident about this
+                                    breed identification.
+                                </p>
+                            </div>
+                        </Card>
+                    )}
 
                 <h2 className="text-md mt-8 mb-6 font-bold sm:text-xl dark:text-white">
                     Explore More Insights

@@ -60,13 +60,16 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
             return;
         }
 
-        console.log(`🔄 Poll #${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS}`);
+        console.log(
+            `🔄 Poll #${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS} for scan_id: ${scan_id}`,
+        );
 
         const poll = async () => {
             try {
                 const timestamp = Date.now();
+                // CRITICAL FIX: Pass scan_id as query parameter
                 const response = await axios.get(
-                    `/api/simulation-status?t=${timestamp}`,
+                    `/api/simulation-status?scan_id=${scan_id}&t=${timestamp}`,
                     {
                         headers: {
                             'Cache-Control':
@@ -83,6 +86,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     status: data.status,
                     has_1: Boolean(data.simulations['1_years']),
                     has_3: Boolean(data.simulations['3_years']),
+                    timestamp: data.timestamp,
                 });
 
                 const dataChanged =
@@ -91,7 +95,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     data.simulations['3_years'] !== simulations['3_years'];
 
                 if (dataChanged) {
-                    console.log('✨ Updating state');
+                    console.log('✨ DATA CHANGED - Updating state');
                     setStatus(data.status);
                     setSimulations({
                         '1_years': data.simulations['1_years'],
@@ -103,16 +107,23 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     }
 
                     setLastUpdate(Date.now());
+                } else {
+                    console.log('⏸️ No changes');
                 }
 
                 setPollingAttempts((prev) => prev + 1);
 
                 if (data.status === 'complete' || data.status === 'failed') {
-                    console.log(`✅ Status: ${data.status} - stopping`);
+                    console.log(
+                        `✅ ${data.status.toUpperCase()} - stopping poll`,
+                    );
                     setIsPolling(false);
                 }
-            } catch (error) {
-                console.error('❌ Poll error:', error);
+            } catch (error: any) {
+                console.error(
+                    '❌ Poll error:',
+                    error.response?.data || error.message,
+                );
                 setPollingAttempts((prev) => prev + 1);
             }
         };
@@ -123,12 +134,13 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         return () => {
             clearInterval(pollInterval);
         };
-    }, [isPolling, pollingAttempts, status, simulations]);
+    }, [isPolling, pollingAttempts, status, simulations, scan_id]);
 
     useEffect(() => {
-        console.log('🎨 Simulations:', {
+        console.log('🎨 Simulations state:', {
             has_1: Boolean(simulations['1_years']),
             has_3: Boolean(simulations['3_years']),
+            urls: simulations,
         });
     }, [simulations]);
 
@@ -136,25 +148,33 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
             <Header />
             <main className="mx-auto mt-[-5px] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-20 xl:px-32">
-                {/* DEBUG INFO */}
+                {/* DEBUG INFO - Shows real-time status */}
                 <div className="mb-4 rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">
                     <div>
-                        Status: <strong>{status}</strong>
-                    </div>
-                    <div>Polling: {isPolling ? '🟢 Active' : '🔴 Stopped'}</div>
-                    <div>
-                        Attempts: {pollingAttempts}/{MAX_POLLING_ATTEMPTS}
+                        <strong>Scan ID:</strong> {scan_id}
                     </div>
                     <div>
-                        1-year:{' '}
+                        <strong>Status:</strong> {status}
+                    </div>
+                    <div>
+                        <strong>Polling:</strong>{' '}
+                        {isPolling ? '🟢 Active' : '🔴 Stopped'}
+                    </div>
+                    <div>
+                        <strong>Attempts:</strong> {pollingAttempts}/
+                        {MAX_POLLING_ATTEMPTS}
+                    </div>
+                    <div>
+                        <strong>1-year:</strong>{' '}
                         {simulations['1_years'] ? '✅ Ready' : '⏳ Waiting'}
                     </div>
                     <div>
-                        3-years:{' '}
+                        <strong>3-years:</strong>{' '}
                         {simulations['3_years'] ? '✅ Ready' : '⏳ Waiting'}
                     </div>
                     <div>
-                        Update: {new Date(lastUpdate).toLocaleTimeString()}
+                        <strong>Last Update:</strong>{' '}
+                        {new Date(lastUpdate).toLocaleTimeString()}
                     </div>
                 </div>
 
