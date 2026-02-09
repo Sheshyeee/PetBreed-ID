@@ -160,7 +160,7 @@ const ScanResults = () => {
                             .map((prediction, index) => (
                                 <Card
                                     key={index}
-                                    className="bg-violet-50 p-5 outline outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
+                                    className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
                                 >
                                     <div className="flex items-center gap-4 sm:gap-5">
                                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">

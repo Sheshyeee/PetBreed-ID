@@ -325,7 +325,11 @@ export default function Header() {
                                                                         .data
                                                                         .image && (
                                                                         <img
-                                                                            src={`/storage/${notification.data.image}`}
+                                                                            src={
+                                                                                notification
+                                                                                    .data
+                                                                                    .image
+                                                                            }
                                                                             alt="Dog"
                                                                             className="h-8 w-8 shrink-0 rounded object-cover sm:h-10 sm:w-10"
                                                                         />
