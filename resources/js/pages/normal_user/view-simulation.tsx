@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface SimulationData {
     '1_years': string | null;
@@ -16,6 +16,7 @@ interface ViewSimulationProps {
     originalImage: string;
     simulations: SimulationData;
     simulation_status?: 'pending' | 'generating' | 'complete' | 'failed';
+    scan_id: string;
 }
 
 const ViewSimulation: React.FC<ViewSimulationProps> = ({
@@ -23,6 +24,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     originalImage,
     simulations: initialSimulations,
     simulation_status: initialStatus = 'pending',
+    scan_id,
 }) => {
     const [simulations, setSimulations] =
         useState<SimulationData>(initialSimulations);
@@ -33,109 +35,129 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         initialStatus !== 'complete' && initialStatus !== 'failed',
     );
     const [pollingAttempts, setPollingAttempts] = useState(0);
-    const MAX_POLLING_ATTEMPTS = 120; // 6 minutes max (120 * 3 seconds)
+    const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+    const MAX_POLLING_ATTEMPTS = 120;
 
-    /**
-     * FIXED: Now handles both relative paths AND full URLs
-     * If the path already starts with http/https, use it as-is
-     * Otherwise, assume it's a relative path and prepend /storage/
-     */
-    const getImageUrl = (path: string | null): string => {
+    const getImageUrl = useCallback((path: string | null): string => {
         if (!path) return '/dogpic.jpg';
-
-        // If it's already a full URL (from object storage), use it directly
         if (path.startsWith('http://') || path.startsWith('https://')) {
             return path;
         }
-
-        // Otherwise, it's a relative path (legacy local storage)
         return `/storage/${path}`;
-    };
+    }, []);
 
-    const hasSimulations =
-        simulations && (simulations['1_years'] || simulations['3_years']);
+    const hasSimulations = Boolean(
+        simulations && (simulations['1_years'] || simulations['3_years']),
+    );
 
-    // Poll for simulation updates
     useEffect(() => {
-        // Don't poll if already complete/failed or max attempts reached
         if (!isPolling || pollingAttempts >= MAX_POLLING_ATTEMPTS) {
             if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
-                console.warn('Max polling attempts reached, stopping');
+                console.warn('❌ Max polling attempts reached');
                 setStatus('failed');
                 setIsPolling(false);
             }
             return;
         }
 
-        console.log(
-            `Starting polling (attempt ${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS})`,
-        );
+        console.log(`🔄 Poll #${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS}`);
 
-        // Start polling immediately
         const poll = async () => {
             try {
-                const response = await axios.get('/api/simulation-status', {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        Pragma: 'no-cache',
+                const timestamp = Date.now();
+                const response = await axios.get(
+                    `/api/simulation-status?t=${timestamp}`,
+                    {
+                        headers: {
+                            'Cache-Control':
+                                'no-cache, no-store, must-revalidate',
+                            Pragma: 'no-cache',
+                            Expires: '0',
+                        },
                     },
-                });
+                );
+
                 const data = response.data;
 
-                console.log('Polling response:', {
+                console.log('📥 Response:', {
                     status: data.status,
-                    has_1_year: !!data.simulations['1_years'],
-                    has_3_years: !!data.simulations['3_years'],
-                    attempt: pollingAttempts + 1,
+                    has_1: Boolean(data.simulations['1_years']),
+                    has_3: Boolean(data.simulations['3_years']),
                 });
 
-                // CRITICAL: Update state with new data
-                if (data.status) {
+                const dataChanged =
+                    data.status !== status ||
+                    data.simulations['1_years'] !== simulations['1_years'] ||
+                    data.simulations['3_years'] !== simulations['3_years'];
+
+                if (dataChanged) {
+                    console.log('✨ Updating state');
                     setStatus(data.status);
-                }
-
-                if (data.simulations) {
                     setSimulations({
-                        '1_years': data.simulations['1_years'] || null,
-                        '3_years': data.simulations['3_years'] || null,
+                        '1_years': data.simulations['1_years'],
+                        '3_years': data.simulations['3_years'],
                     });
+
+                    if (data.original_image) {
+                        setCurrentOriginalImage(data.original_image);
+                    }
+
+                    setLastUpdate(Date.now());
                 }
 
-                // Update original image if API returns it (with full URL)
-                if (data.original_image) {
-                    setCurrentOriginalImage(data.original_image);
-                }
-
-                // Increment polling attempts
                 setPollingAttempts((prev) => prev + 1);
 
-                // Stop polling when complete or failed
                 if (data.status === 'complete' || data.status === 'failed') {
-                    console.log(`✓ Simulation ${data.status}, stopping poll`);
+                    console.log(`✅ Status: ${data.status} - stopping`);
                     setIsPolling(false);
                 }
             } catch (error) {
-                console.error('Failed to check simulation status:', error);
+                console.error('❌ Poll error:', error);
                 setPollingAttempts((prev) => prev + 1);
             }
         };
 
-        // Poll immediately on mount
         poll();
-
-        // Then poll every 3 seconds
         const pollInterval = setInterval(poll, 3000);
 
         return () => {
             clearInterval(pollInterval);
         };
-    }, [isPolling, pollingAttempts]);
+    }, [isPolling, pollingAttempts, status, simulations]);
+
+    useEffect(() => {
+        console.log('🎨 Simulations:', {
+            has_1: Boolean(simulations['1_years']),
+            has_3: Boolean(simulations['3_years']),
+        });
+    }, [simulations]);
 
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
             <Header />
             <main className="mx-auto mt-[-5px] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-20 xl:px-32">
-                {/* Page Header */}
+                {/* DEBUG INFO */}
+                <div className="mb-4 rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">
+                    <div>
+                        Status: <strong>{status}</strong>
+                    </div>
+                    <div>Polling: {isPolling ? '🟢 Active' : '🔴 Stopped'}</div>
+                    <div>
+                        Attempts: {pollingAttempts}/{MAX_POLLING_ATTEMPTS}
+                    </div>
+                    <div>
+                        1-year:{' '}
+                        {simulations['1_years'] ? '✅ Ready' : '⏳ Waiting'}
+                    </div>
+                    <div>
+                        3-years:{' '}
+                        {simulations['3_years'] ? '✅ Ready' : '⏳ Waiting'}
+                    </div>
+                    <div>
+                        Update: {new Date(lastUpdate).toLocaleTimeString()}
+                    </div>
+                </div>
+
                 <div className="flex items-start gap-3 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
@@ -151,7 +173,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     </div>
                 </div>
 
-                {/* Warning Card */}
                 <Card className="mt-4 bg-orange-50 p-4 outline-1 outline-orange-200 sm:p-6 sm:pl-8 dark:bg-orange-950 dark:outline-orange-800">
                     <p className="text-xs sm:text-sm">
                         <span className="font-bold text-orange-900 dark:text-orange-400">
@@ -166,7 +187,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     </p>
                 </Card>
 
-                {/* Loading State */}
                 {(status === 'pending' || status === 'generating') &&
                     !hasSimulations && (
                         <Card className="mt-6 p-8">
@@ -175,15 +195,15 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                 <div className="text-center">
                                     <p className="font-semibold text-gray-800 dark:text-gray-200">
                                         {status === 'pending'
-                                            ? 'Analyzing current age and features...'
-                                            : 'Generating future appearance predictions...'}
+                                            ? 'Analyzing...'
+                                            : 'Generating predictions...'}
                                     </p>
                                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                        Creating personalized age progression
-                                        images. This takes 20-40 seconds.
+                                        Creating age progression images. This
+                                        takes 20-40 seconds.
                                     </p>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                                        Polling attempt: {pollingAttempts + 1}/
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Check {pollingAttempts}/
                                         {MAX_POLLING_ATTEMPTS}
                                     </p>
                                 </div>
@@ -191,7 +211,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                         </Card>
                     )}
 
-                {/* Failed State */}
                 {status === 'failed' && !hasSimulations && (
                     <Card className="mt-6 bg-red-50 p-8 dark:bg-red-950">
                         <div className="flex flex-col items-center justify-center gap-4">
@@ -215,7 +234,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     </Card>
                 )}
 
-                {/* Simulation Tabs */}
                 {hasSimulations && (
                     <div className="mt-4 flex w-full flex-col gap-6 sm:mt-6">
                         {status === 'generating' && (
@@ -227,29 +245,26 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                             </div>
                         )}
 
-                        <Tabs defaultValue="first" className="w-full">
+                        <Tabs
+                            defaultValue="first"
+                            className="w-full"
+                            key={lastUpdate}
+                        >
                             <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger
-                                    value="first"
-                                    className="text-xs sm:text-sm"
-                                >
+                                <TabsTrigger value="first">
                                     In 1 Year
                                 </TabsTrigger>
-                                <TabsTrigger
-                                    value="second"
-                                    className="text-xs sm:text-sm"
-                                >
+                                <TabsTrigger value="second">
                                     In 3 Years
                                 </TabsTrigger>
                             </TabsList>
 
-                            {/* +1 Year Tab */}
                             <TabsContent value="first">
                                 <Card>
                                     <CardContent className="p-4 sm:p-6">
                                         <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
                                             <div className="flex-1">
-                                                <h3 className="sm:text-md mb-3 text-base font-semibold dark:text-white">
+                                                <h3 className="mb-3 text-base font-semibold dark:text-white">
                                                     Current Appearance
                                                 </h3>
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
@@ -259,11 +274,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        key={`orig-${currentOriginalImage}`}
                                                         onError={(e) => {
-                                                            console.error(
-                                                                'Failed to load original image:',
-                                                                currentOriginalImage,
-                                                            );
                                                             e.currentTarget.src =
                                                                 '/dogpic.jpg';
                                                         }}
@@ -274,7 +286,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                 </p>
                                             </div>
                                             <div className="flex-1">
-                                                <h3 className="sm:text-md mb-3 text-base font-semibold dark:text-white">
+                                                <h3 className="mb-3 text-base font-semibold dark:text-white">
                                                     In 1 Year
                                                 </h3>
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
@@ -287,13 +299,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 1 year"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            key={`1yr-${simulations['1_years']}`}
                                                             onError={(e) => {
-                                                                console.error(
-                                                                    'Failed to load 1-year simulation:',
-                                                                    simulations[
-                                                                        '1_years'
-                                                                    ],
-                                                                );
                                                                 e.currentTarget.src =
                                                                     '/dogpic.jpg';
                                                             }}
@@ -319,13 +326,12 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                 </Card>
                             </TabsContent>
 
-                            {/* +3 Years Tab */}
                             <TabsContent value="second">
                                 <Card>
                                     <CardContent className="p-4 sm:p-6">
                                         <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
                                             <div className="flex-1">
-                                                <h3 className="mb-3 text-base font-semibold sm:text-lg dark:text-white">
+                                                <h3 className="mb-3 text-base font-semibold dark:text-white">
                                                     Current Appearance
                                                 </h3>
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
@@ -335,11 +341,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        key={`orig2-${currentOriginalImage}`}
                                                         onError={(e) => {
-                                                            console.error(
-                                                                'Failed to load original image:',
-                                                                currentOriginalImage,
-                                                            );
                                                             e.currentTarget.src =
                                                                 '/dogpic.jpg';
                                                         }}
@@ -350,7 +353,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                 </p>
                                             </div>
                                             <div className="flex-1">
-                                                <h3 className="mb-3 text-base font-semibold sm:text-lg dark:text-white">
+                                                <h3 className="mb-3 text-base font-semibold dark:text-white">
                                                     In 3 Years
                                                 </h3>
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
@@ -363,13 +366,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 3 years"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            key={`3yr-${simulations['3_years']}`}
                                                             onError={(e) => {
-                                                                console.error(
-                                                                    'Failed to load 3-year simulation:',
-                                                                    simulations[
-                                                                        '3_years'
-                                                                    ],
-                                                                );
                                                                 e.currentTarget.src =
                                                                     '/dogpic.jpg';
                                                             }}
