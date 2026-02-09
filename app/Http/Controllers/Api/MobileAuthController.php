@@ -56,8 +56,10 @@ class MobileAuthController extends Controller
                     $avatarContents = file_get_contents($googleUser->picture);
                     // Use a static name based on ID so we don't save duplicates
                     $avatarName = 'avatar_' . $googleUser->sub . '.jpg';
-                    Storage::disk('public')->put('avatars/' . $avatarName, $avatarContents);
-                    $avatarUrl = '/storage/avatars/' . $avatarName;
+                    $avatarPath = 'avatars/' . $avatarName;
+                    Storage::disk('object-storage')->put($avatarPath, $avatarContents);
+                    // Build URL manually
+                    $avatarUrl = config('filesystems.disks.object-storage.url') . '/' . $avatarPath;
                 } catch (\Exception $e) {
                     $avatarUrl = $googleUser->picture;
                 }
@@ -91,7 +93,7 @@ class MobileAuthController extends Controller
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
-                        'avatar' => $user->avatar ? url($user->avatar) : null,
+                        'avatar' => $user->avatar,
                         'is_admin' => $isAdmin,
                     ],
                     'token' => $token,
@@ -122,7 +124,7 @@ class MobileAuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'avatar' => $user->avatar ? url($user->avatar) : null,
+                    'avatar' => $user->avatar,
                     'is_admin' => $isAdmin,
                 ]
             ]

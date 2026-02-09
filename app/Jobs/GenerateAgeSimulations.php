@@ -129,7 +129,7 @@ class GenerateAgeSimulations implements ShouldQueue
         $simulationFilename = "simulation_1_years_" . time() . "_" . Str::random(6) . ".png";
         $simulationPath = "simulations/{$simulationFilename}";
 
-        Storage::disk('public')->put($simulationPath, $generatedImageContent);
+        Storage::disk('object-storage')->put($simulationPath, $generatedImageContent);
         $simulationData['1_years'] = $simulationPath;
 
         // UPDATE DATABASE IMMEDIATELY AFTER FIRST IMAGE
@@ -163,7 +163,7 @@ class GenerateAgeSimulations implements ShouldQueue
         $simulationFilename = "simulation_3_years_" . time() . "_" . Str::random(6) . ".png";
         $simulationPath = "simulations/{$simulationFilename}";
 
-        Storage::disk('public')->put($simulationPath, $generatedImageContent);
+        Storage::disk('object-storage')->put($simulationPath, $generatedImageContent);
         $simulationData['3_years'] = $simulationPath;
 
         Log::info("✓ Generated 3_years simulation: {$simulationPath}");

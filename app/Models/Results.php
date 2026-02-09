@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Results extends Model
 {
@@ -11,11 +12,11 @@ class Results extends Model
 
     protected $fillable = [
         'scan_id',
-        'user_id', // Add this
+        'user_id',
         'image',
         'breed',
         'confidence',
-        'pending', // Add this
+        'pending',
         'top_predictions',
         'description',
         'origin_history',
@@ -55,10 +56,21 @@ class Results extends Model
     public function getSimulationImagesAttribute()
     {
         $simulations = $this->simulation_data ?? [];
+        $baseUrl = config('filesystems.disks.object-storage.url');
 
         return [
-            '1_years' => $simulations['1_years'] ? asset('storage/' . $simulations['1_years']) : null,
-            '3_years' => $simulations['3_years'] ? asset('storage/' . $simulations['3_years']) : null,
+            '1_years' => $simulations['1_years']
+                ? $baseUrl . '/' . $simulations['1_years']
+                : null,
+            '3_years' => $simulations['3_years']
+                ? $baseUrl . '/' . $simulations['3_years']
+                : null,
         ];
+    }
+
+    public function getImageUrlAttribute()
+    {
+        $baseUrl = config('filesystems.disks.object-storage.url');
+        return $baseUrl . '/' . $this->image;
     }
 }

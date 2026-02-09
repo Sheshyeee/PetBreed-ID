@@ -49,8 +49,10 @@ class GoogleController extends Controller
             try {
                 $avatarContents = file_get_contents($googleUser->getAvatar());
                 $avatarName = 'avatar_' . $googleUser->id . '_' . time() . '.jpg';
-                Storage::disk('public')->put('avatars/' . $avatarName, $avatarContents);
-                $avatarUrl = '/storage/avatars/' . $avatarName;
+                $avatarPath = 'avatars/' . $avatarName;
+                Storage::disk('object-storage')->put($avatarPath, $avatarContents);
+                // Build URL manually
+                $avatarUrl = config('filesystems.disks.object-storage.url') . '/' . $avatarPath;
             } catch (\Exception $e) {
                 $avatarUrl = $googleUser->getAvatar();
             }
@@ -82,7 +84,7 @@ class GoogleController extends Controller
             session()->forget(['mobile_redirect_to', 'is_mobile']);
 
             // Append token to the URI
-            $separator = parse_url($baseRedirect, PHP_URL_QUERY) ? '&' : '?';
+            $separator = strpos($baseRedirect, '?') !== false ? '&' : '?';
             return redirect()->away($baseRedirect . $separator . "token=" . $token);
         }
 

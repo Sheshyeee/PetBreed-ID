@@ -1325,9 +1325,12 @@ Be detailed and specific about colors and patterns.";
             };
 
             $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $extension;
-            $path = $image->storeAs('scans', $filename, 'public');
-            $fullPath = storage_path('app/public/' . $path);
+            $path = $image->storeAs('scans', $filename, 'object-storage');
+            $tempPath = $image->getRealPath(); // Use uploaded temp file directly
+            $fullPath = $tempPath; // Use this for AI processing
 
+            // After storing to object storage
+            Storage::disk('object-storage')->put($path, file_get_contents($tempPath));
             if (!file_exists($fullPath)) {
                 throw new \Exception('File was not saved properly');
             }
