@@ -25,13 +25,20 @@ class SimulationController extends Controller
 
             $simulationData = json_decode($result->simulation_data, true) ?? [];
 
+            // Build base URL from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
             $viewData = [
-                'scan_id' => $result->scan_id, // Pass scan_id to frontend
+                'scan_id' => $result->scan_id,
                 'breed' => $result->breed,
-                'originalImage' => $result->image,
+                'originalImage' => $baseUrl . '/' . $result->image, // Build full URL
                 'simulations' => [
-                    '1_years' => $simulationData['1_years'] ?? null,
-                    '3_years' => $simulationData['3_years'] ?? null,
+                    '1_years' => $simulationData['1_years']
+                        ? $baseUrl . '/' . $simulationData['1_years']
+                        : null,
+                    '3_years' => $simulationData['3_years']
+                        ? $baseUrl . '/' . $simulationData['3_years']
+                        : null,
                 ],
                 'simulation_status' => $simulationData['status'] ?? 'pending',
             ];

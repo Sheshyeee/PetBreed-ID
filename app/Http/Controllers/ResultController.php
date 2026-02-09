@@ -12,6 +12,12 @@ class ResultController extends Controller
     {
         $lastResult = Results::where('scan_id', session('last_scan_id'))->first();
 
+        if ($lastResult) {
+            // Build full URL from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+            $lastResult->image = $baseUrl . '/' . $lastResult->image;
+        }
+
         return inertia('normal_user/scan-results', [
             'results' => $lastResult
         ]);

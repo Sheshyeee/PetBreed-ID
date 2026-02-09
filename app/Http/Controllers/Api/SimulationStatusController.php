@@ -61,11 +61,18 @@ class SimulationStatusController extends Controller
                 ];
             }
 
-            // Extract status and simulations
+            // Build base URL from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
+            // Extract status and simulations with full URLs
             $status = $simulationData['status'] ?? 'pending';
             $simulations = [
-                '1_years' => $simulationData['1_years'] ?? null,
-                '3_years' => $simulationData['3_years'] ?? null,
+                '1_years' => $simulationData['1_years']
+                    ? $baseUrl . '/' . $simulationData['1_years']
+                    : null,
+                '3_years' => $simulationData['3_years']
+                    ? $baseUrl . '/' . $simulationData['3_years']
+                    : null,
             ];
 
             Log::info("API Response - Status: {$status}");
