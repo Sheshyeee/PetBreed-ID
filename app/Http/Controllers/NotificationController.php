@@ -91,10 +91,15 @@ class NotificationController extends Controller
                     'user_id' => Auth::id()
                 ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification not found'
-                ], 404);
+                // Check if request expects JSON (API) or Inertia (web)
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Notification not found'
+                    ], 404);
+                }
+
+                return back()->with('error', 'Notification not found');
             }
 
             Log::info('Before update', [
@@ -124,25 +129,35 @@ class NotificationController extends Controller
                 'read_at' => $notification->read_at
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Notification marked as read',
-                'notification' => [
-                    'id' => $notification->id,
-                    'read' => $notification->read,
-                    'read_at' => $notification->read_at
-                ]
-            ]);
+            // Check if request expects JSON (API) or Inertia (web)
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Notification marked as read',
+                    'notification' => [
+                        'id' => $notification->id,
+                        'read' => $notification->read,
+                        'read_at' => $notification->read_at
+                    ]
+                ]);
+            }
+
+            // For Inertia requests, just return back with no redirect
+            return back();
         } catch (\Exception $e) {
             Log::error('Error marking notification as read', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to mark notification as read: ' . $e->getMessage()
-            ], 500);
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to mark notification as read: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to mark notification as read');
         }
     }
 
@@ -172,21 +187,31 @@ class NotificationController extends Controller
                 'count' => $updated
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'All notifications marked as read',
-                'count' => $updated
-            ]);
+            // Check if request expects JSON (API) or Inertia (web)
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'All notifications marked as read',
+                    'count' => $updated
+                ]);
+            }
+
+            // For Inertia requests, just return back with no redirect
+            return back();
         } catch (\Exception $e) {
             Log::error('Error marking all notifications as read', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to mark all notifications as read: ' . $e->getMessage()
-            ], 500);
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to mark all notifications as read: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to mark all notifications as read');
         }
     }
 
@@ -202,19 +227,28 @@ class NotificationController extends Controller
 
             $notification->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Notification deleted'
-            ]);
+            // Check if request expects JSON (API) or Inertia (web)
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Notification deleted'
+                ]);
+            }
+
+            return back();
         } catch (\Exception $e) {
             Log::error('Error deleting notification', [
                 'error' => $e->getMessage()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete notification'
-            ], 500);
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to delete notification'
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to delete notification');
         }
     }
 }

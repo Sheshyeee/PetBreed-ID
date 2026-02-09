@@ -295,7 +295,7 @@ class ScanResultController extends Controller
             'memoryCount' => $memoryCount,
             'uniqueBreedsLearned' => count($uniqueBreeds),
             'recentCorrectionsCount' => $recentCorrectionsCount,
-            'avgConfidence' => round($avgConfidence, 2),
+            'avgConfidence' => round($avgConfidence, 2),    
             'confidenceTrend' => round($confidenceTrend, 2),
             'memoryHitRate' => round($memoryHitRate, 2),
             'accuracyImprovement' => round($accuracyImprovement, 2),

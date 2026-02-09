@@ -32,6 +32,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     const [isPolling, setIsPolling] = useState(
         initialStatus !== 'complete' && initialStatus !== 'failed',
     );
+    const [pollingAttempts, setPollingAttempts] = useState(0);
+    const MAX_POLLING_ATTEMPTS = 120; // 6 minutes max (120 * 3 seconds)
 
     /**
      * FIXED: Now handles both relative paths AND full URLs
@@ -55,43 +57,79 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
     // Poll for simulation updates
     useEffect(() => {
-        // Don't poll if already complete/failed
-        if (!isPolling) {
+        // Don't poll if already complete/failed or max attempts reached
+        if (!isPolling || pollingAttempts >= MAX_POLLING_ATTEMPTS) {
+            if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
+                console.warn('Max polling attempts reached, stopping');
+                setStatus('failed');
+                setIsPolling(false);
+            }
             return;
         }
+
+        console.log(
+            `Starting polling (attempt ${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS})`,
+        );
 
         // Start polling immediately
         const poll = async () => {
             try {
-                const response = await axios.get('/api/simulation-status');
+                const response = await axios.get('/api/simulation-status', {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        Pragma: 'no-cache',
+                    },
+                });
                 const data = response.data;
 
-                console.log('Polling response:', data);
+                console.log('Polling response:', {
+                    status: data.status,
+                    has_1_year: !!data.simulations['1_years'],
+                    has_3_years: !!data.simulations['3_years'],
+                    attempt: pollingAttempts + 1,
+                });
 
-                setStatus(data.status);
-                setSimulations(data.simulations);
+                // CRITICAL: Update state with new data
+                if (data.status) {
+                    setStatus(data.status);
+                }
+
+                if (data.simulations) {
+                    setSimulations({
+                        '1_years': data.simulations['1_years'] || null,
+                        '3_years': data.simulations['3_years'] || null,
+                    });
+                }
 
                 // Update original image if API returns it (with full URL)
                 if (data.original_image) {
                     setCurrentOriginalImage(data.original_image);
                 }
 
+                // Increment polling attempts
+                setPollingAttempts((prev) => prev + 1);
+
+                // Stop polling when complete or failed
                 if (data.status === 'complete' || data.status === 'failed') {
-                    console.log('Simulation complete, stopping poll');
+                    console.log(`✓ Simulation ${data.status}, stopping poll`);
                     setIsPolling(false);
                 }
             } catch (error) {
                 console.error('Failed to check simulation status:', error);
+                setPollingAttempts((prev) => prev + 1);
             }
         };
 
+        // Poll immediately on mount
         poll();
+
+        // Then poll every 3 seconds
         const pollInterval = setInterval(poll, 3000);
 
         return () => {
             clearInterval(pollInterval);
         };
-    }, [isPolling]);
+    }, [isPolling, pollingAttempts]);
 
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
@@ -143,6 +181,10 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                                         Creating personalized age progression
                                         images. This takes 20-40 seconds.
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                                        Polling attempt: {pollingAttempts + 1}/
+                                        {MAX_POLLING_ATTEMPTS}
                                     </p>
                                 </div>
                             </div>
@@ -258,7 +300,12 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         />
                                                     ) : (
                                                         <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
-                                                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                                                            <div className="text-center">
+                                                                <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+                                                                <p className="mt-2 text-xs text-gray-500">
+                                                                    Generating...
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -329,7 +376,12 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         />
                                                     ) : (
                                                         <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
-                                                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                                                            <div className="text-center">
+                                                                <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+                                                                <p className="mt-2 text-xs text-gray-500">
+                                                                    Generating...
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>

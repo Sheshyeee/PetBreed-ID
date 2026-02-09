@@ -31,17 +31,15 @@ interface ScanHistoryProps {
 
 const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
     const handleDelete = (scanId: number) => {
-        if (confirm('Are you sure you want to delete this scan?')) {
-            router.delete(`/scanhistory/${scanId}`, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    // Optional: Show success message
-                },
-                onError: () => {
-                    alert('Failed to delete scan. Please try again.');
-                },
-            });
-        }
+        router.delete(`/scanhistory/${scanId}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Optional: Show success message
+            },
+            onError: () => {
+                alert('Failed to delete scan. Please try again.');
+            },
+        });
     };
 
     return (
