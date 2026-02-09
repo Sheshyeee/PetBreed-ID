@@ -64,7 +64,7 @@ class SimulationStatusController extends Controller
             // Build base URL from object storage
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // Extract status and simulations with full URLs
+            // Extract status and simulations WITH FULL URLS
             $status = $simulationData['status'] ?? 'pending';
             $simulations = [
                 '1_years' => $simulationData['1_years']
@@ -75,13 +75,18 @@ class SimulationStatusController extends Controller
                     : null,
             ];
 
+            // Also include original image with full URL
+            $originalImage = $baseUrl . '/' . $result->image;
+
             Log::info("API Response - Status: {$status}");
             Log::info("API Response - 1_years: " . ($simulations['1_years'] ?? 'NULL'));
             Log::info("API Response - 3_years: " . ($simulations['3_years'] ?? 'NULL'));
+            Log::info("API Response - original_image: {$originalImage}");
 
             return response()->json([
                 'status' => $status,
                 'simulations' => $simulations,
+                'original_image' => $originalImage, // ADD THIS
                 'scan_id' => $scanId,
             ]);
         } catch (\Exception $e) {

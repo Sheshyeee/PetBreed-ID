@@ -72,6 +72,7 @@ class ScanResultController extends Controller
 
             // Calculate how many recent scans (last 10) got high confidence
             $recentScans = Results::where('breed', $breed)
+
                 ->latest()
                 ->take(10)
                 ->get();
@@ -359,6 +360,12 @@ class ScanResultController extends Controller
     {
         $result = Results::findOrFail($id);
 
+        // Build base URL from object storage
+        $baseUrl = config('filesystems.disks.object-storage.url');
+
+        // Transform result to include full image URL
+        $result->image = $baseUrl . '/' . $result->image;
+
         return inertia('model/review-dog', ['result' => $result]);
     }
 
@@ -449,9 +456,13 @@ class ScanResultController extends Controller
 
         $results = $query->latest()->paginate(10)->appends($request->query());
 
-        // Transform results to include status label
-        $results->getCollection()->transform(function ($result) {
+        // Build base URL from object storage
+        $baseUrl = config('filesystems.disks.object-storage.url');
+
+        // Transform results to include status label AND full image URLs
+        $results->getCollection()->transform(function ($result) use ($baseUrl) {
             $result->status_label = $result->pending === 'verified' ? 'Verified' : 'Pending';
+            $result->image = $baseUrl . '/' . $result->image; // THIS IS THE FIX - ADD FULL URL
             return $result;
         });
 
@@ -474,6 +485,7 @@ class ScanResultController extends Controller
             ]
         ]);
     }
+
 
     /**
      * ==========================================

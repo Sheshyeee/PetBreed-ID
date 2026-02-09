@@ -27,12 +27,26 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     const [simulations, setSimulations] =
         useState<SimulationData>(initialSimulations);
     const [status, setStatus] = useState<string>(initialStatus);
+    const [currentOriginalImage, setCurrentOriginalImage] =
+        useState<string>(originalImage);
     const [isPolling, setIsPolling] = useState(
         initialStatus !== 'complete' && initialStatus !== 'failed',
     );
 
+    /**
+     * FIXED: Now handles both relative paths AND full URLs
+     * If the path already starts with http/https, use it as-is
+     * Otherwise, assume it's a relative path and prepend /storage/
+     */
     const getImageUrl = (path: string | null): string => {
         if (!path) return '/dogpic.jpg';
+
+        // If it's already a full URL (from object storage), use it directly
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path;
+        }
+
+        // Otherwise, it's a relative path (legacy local storage)
         return `/storage/${path}`;
     };
 
@@ -56,6 +70,11 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
                 setStatus(data.status);
                 setSimulations(data.simulations);
+
+                // Update original image if API returns it (with full URL)
+                if (data.original_image) {
+                    setCurrentOriginalImage(data.original_image);
+                }
 
                 if (data.status === 'complete' || data.status === 'failed') {
                     console.log('Simulation complete, stopping poll');
@@ -194,10 +213,18 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
                                                     <img
                                                         src={getImageUrl(
-                                                            originalImage,
+                                                            currentOriginalImage,
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        onError={(e) => {
+                                                            console.error(
+                                                                'Failed to load original image:',
+                                                                currentOriginalImage,
+                                                            );
+                                                            e.currentTarget.src =
+                                                                '/dogpic.jpg';
+                                                        }}
                                                     />
                                                 </div>
                                                 <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">
@@ -218,6 +245,16 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 1 year"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            onError={(e) => {
+                                                                console.error(
+                                                                    'Failed to load 1-year simulation:',
+                                                                    simulations[
+                                                                        '1_years'
+                                                                    ],
+                                                                );
+                                                                e.currentTarget.src =
+                                                                    '/dogpic.jpg';
+                                                            }}
                                                         />
                                                     ) : (
                                                         <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
@@ -247,10 +284,18 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                 <div className="mx-auto w-full max-w-md lg:max-w-none">
                                                     <img
                                                         src={getImageUrl(
-                                                            originalImage,
+                                                            currentOriginalImage,
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        onError={(e) => {
+                                                            console.error(
+                                                                'Failed to load original image:',
+                                                                currentOriginalImage,
+                                                            );
+                                                            e.currentTarget.src =
+                                                                '/dogpic.jpg';
+                                                        }}
                                                     />
                                                 </div>
                                                 <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">
@@ -271,6 +316,16 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 3 years"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            onError={(e) => {
+                                                                console.error(
+                                                                    'Failed to load 3-year simulation:',
+                                                                    simulations[
+                                                                        '3_years'
+                                                                    ],
+                                                                );
+                                                                e.currentTarget.src =
+                                                                    '/dogpic.jpg';
+                                                            }}
                                                         />
                                                     ) : (
                                                         <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
