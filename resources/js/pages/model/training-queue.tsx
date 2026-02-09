@@ -166,7 +166,7 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
                                             <TableCell>
                                                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
                                                     <img
-                                                        src={`/storage/${item.image_path}`}
+                                                        src={item.image_path}
                                                         alt="Scan"
                                                         className="h-full w-full object-cover"
                                                     />

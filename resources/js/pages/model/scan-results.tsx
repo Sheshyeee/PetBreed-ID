@@ -425,7 +425,7 @@ export default function Dashboard() {
                                             <TableCell>
                                                 <div className="h-12 w-16 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
                                                     <img
-                                                        src={`/storage/${result.image}`}
+                                                        src={result.image}
                                                         alt={result.breed}
                                                         className="h-full w-full object-cover"
                                                     />

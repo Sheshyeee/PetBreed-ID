@@ -85,7 +85,7 @@ export default function ReviewDog() {
                         {/* Image Container - Responsive sizing */}
                         <div className="mt-6 flex flex-1 items-center justify-center rounded-lg bg-gray-50 py-8 dark:bg-black/20">
                             <img
-                                src={`/storage/${result?.image}`}
+                                src={result?.image}
                                 alt="Scanned Dog"
                                 className="max-h-[300px] w-auto rounded-lg object-contain shadow-md lg:max-h-[400px]"
                             />

@@ -75,7 +75,7 @@ const ScanResults = () => {
                 <Card className="mt-6 flex flex-col gap-6 bg-cyan-50 p-6 outline-1 outline-cyan-200 sm:p-8 lg:flex-row lg:items-center lg:p-10 dark:bg-cyan-950 dark:outline-cyan-800">
                     <div className="mx-auto w-full max-w-[200px] shrink-0 sm:max-w-[250px] lg:mx-0 lg:w-[180px] xl:w-[200px]">
                         <img
-                            src={`/storage/${results?.image}`}
+                            src={results?.image}
                             alt="Pet"
                             className="h-auto w-full rounded-2xl shadow-lg"
                         />
