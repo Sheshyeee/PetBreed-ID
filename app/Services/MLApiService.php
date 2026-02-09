@@ -38,13 +38,23 @@ class MLApiService
         $fileName = $image->getClientOriginalName();
         $mimeType = $image->getMimeType();
       } else {
-        // Image is a file path
+        // Image is a file path - verify it exists
+        if (!file_exists($image)) {
+          throw new \Exception('Image file not found: ' . $image);
+        }
+
         $filePath = $image;
         $fileName = basename($image);
         $mimeType = mime_content_type($image);
       }
 
-      // Send multipart request to ML API
+      Log::info('Sending image to ML API', [
+        'file_path' => $filePath,
+        'file_exists' => file_exists($filePath),
+        'file_size' => file_exists($filePath) ? filesize($filePath) : 0
+      ]);
+
+            // Send multipart request to ML API
       /** @var Response $response */
       $response = Http::timeout($this->timeout)
         ->attach('file', file_get_contents($filePath), $fileName)
@@ -113,14 +123,33 @@ class MLApiService
         $filePath = $image->getRealPath();
         $fileName = $image->getClientOriginalName();
       } else {
+        // Image is a file path - verify it exists
+        if (!file_exists($image)) {
+          throw new \Exception('Image file not found: ' . $image);
+        }
+
         $filePath = $image;
         $fileName = basename($image);
       }
 
-      // Send multipart request with breed name
+      Log::info('Sending image to ML API for learning', [
+        'file_path' => $filePath,
+        'file_exists' => file_exists($filePath),
+        'file_size' => file_exists($filePath) ? filesize($filePath) : 0,
+        'breed' => $correctBreed
+      ]);
+
+      // Read file contents
+      $fileContents = file_get_contents($filePath);
+
+      if ($fileContents === false) {
+        throw new \Exception('Failed to read file contents from: ' . $filePath);
+      }
+
+            // Send multipart request with breed name
       /** @var Response $response */
       $response = Http::timeout($this->timeout)
-        ->attach('file', file_get_contents($filePath), $fileName)
+        ->attach('file', $fileContents, $fileName)
         ->post($this->baseUrl . '/learn', [
           'breed' => $correctBreed
         ]);
@@ -152,7 +181,8 @@ class MLApiService
       ];
     } catch (\Exception $e) {
       Log::error('ML API learn exception', [
-        'error' => $e->getMessage()
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString()
       ]);
 
       return [

@@ -273,15 +273,18 @@ class ScanResultController extends Controller
                 ];
             }
 
+            // Build URLs from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
             $responseData = [
                 'breed' => $result->breed,
-                'original_image' => asset('storage/' . $result->image),
+                'original_image' => $baseUrl . '/' . $result->image,
                 'simulations' => [
                     '1_years' => $simulationData['1_years']
-                        ? asset('storage/' . $simulationData['1_years'])
+                        ? $baseUrl . '/' . $simulationData['1_years']
                         : null,
                     '3_years' => $simulationData['3_years']
-                        ? asset('storage/' . $simulationData['3_years'])
+                        ? $baseUrl . '/' . $simulationData['3_years']
                         : null,
                 ],
                 'status' => $simulationData['status'] ?? 'pending',
@@ -322,12 +325,15 @@ class ScanResultController extends Controller
 
             $status = $simulationData['status'] ?? 'pending';
 
+            // Build URLs from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
             $simulations = [
                 '1_years' => isset($simulationData['1_years']) && $simulationData['1_years']
-                    ? asset('storage/' . $simulationData['1_years'])
+                    ? $baseUrl . '/' . $simulationData['1_years']
                     : null,
                 '3_years' => isset($simulationData['3_years']) && $simulationData['3_years']
-                    ? asset('storage/' . $simulationData['3_years'])
+                    ? $baseUrl . '/' . $simulationData['3_years']
                     : null,
             ];
 
@@ -1606,6 +1612,9 @@ Be detailed and specific about colors and patterns.";
             ], 404);
         }
 
+        // Build URL from object storage
+        $baseUrl = config('filesystems.disks.object-storage.url');
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -1613,7 +1622,7 @@ Be detailed and specific about colors and patterns.";
                 'breed' => $result->breed,
                 'description' => $result->description,
                 'confidence' => (float)$result->confidence,
-                'image_url' => asset('storage/' . $result->image),
+                'image_url' => $baseUrl . '/' . $result->image,
                 'top_predictions' => is_string($result->top_predictions)
                     ? json_decode($result->top_predictions)
                     : $result->top_predictions,
@@ -1721,12 +1730,37 @@ Be detailed and specific about colors and patterns.";
             ]);
         }
 
-        // ML API learning (existing code)
+        // ML API learning - FIXED FOR OBJECT STORAGE
         try {
             $mlService = new \App\Services\MLApiService();
-            $imagePath = storage_path('app/public/' . $result->image);
 
-            $learnResult = $mlService->learnBreed($imagePath, $validated['correct_breed']);
+            // DOWNLOAD IMAGE FROM OBJECT STORAGE TO TEMP FILE
+            $imageContents = Storage::disk('object-storage')->get($result->image);
+
+            if ($imageContents === false) {
+                throw new \Exception('Failed to download image from object storage');
+            }
+
+            // Create temporary file
+            $tempPath = tempnam(sys_get_temp_dir(), 'ml_learn_');
+            $extension = pathinfo($result->image, PATHINFO_EXTENSION);
+            $tempPathWithExt = $tempPath . '.' . $extension;
+            rename($tempPath, $tempPathWithExt);
+
+            file_put_contents($tempPathWithExt, $imageContents);
+
+            Log::info('✓ Image downloaded from object storage to temp file', [
+                'temp_path' => $tempPathWithExt,
+                'file_size' => strlen($imageContents)
+            ]);
+
+            // Now send to ML API
+            $learnResult = $mlService->learnBreed($tempPathWithExt, $validated['correct_breed']);
+
+            // Clean up temp file
+            if (file_exists($tempPathWithExt)) {
+                unlink($tempPathWithExt);
+            }
 
             if ($learnResult['success']) {
                 Log::info("✓ ML API learning successful", [
@@ -1791,15 +1825,18 @@ Be detailed and specific about colors and patterns.";
             $limit = $request->input('limit', 10);
             $userId = $request->user()->id;
 
+            // Build base URL from object storage
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
             $results = Results::where('user_id', $userId)
                 ->latest()
                 ->take($limit)
                 ->get()
-                ->map(function ($scan) {
+                ->map(function ($scan) use ($baseUrl) {
                     return [
                         'id' => $scan->id,
                         'scan_id' => $scan->scan_id,
-                        'image_url' => asset('storage/' . $scan->image),
+                        'image_url' => $baseUrl . '/' . $scan->image,
                         'breed' => $scan->breed,
                         'confidence' => (float)$scan->confidence,
                         'created_at' => $scan->created_at->toISOString(),
