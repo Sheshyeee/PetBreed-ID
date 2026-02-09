@@ -25,81 +25,120 @@ class ScanResultController extends Controller
      * HELPER: Calculate breed-specific learning progress
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: Calculate breed-specific learning progress
+     * Fetches data from ML API instead of local file
+     * ==========================================
+     */
     private function calculateBreedLearningProgress()
     {
-        $jsonPath = storage_path('app/references.json');
-        if (!file_exists($jsonPath)) {
-            return [];
-        }
+        try {
+            Log::info('🔍 Starting breed learning progress calculation');
 
-        $references = json_decode(file_get_contents($jsonPath), true);
-        if (!is_array($references) || empty($references)) {
-            return [];
-        }
+            // Fetch learning data from ML API
+            $mlApiService = app(\App\Services\MLApiService::class);
+            $statsResponse = $mlApiService->getMemoryStats();
 
-        // Group by breed
-        $breedGroups = [];
-        foreach ($references as $ref) {
-            $breed = $ref['label'];
-            if (!isset($breedGroups[$breed])) {
-                $breedGroups[$breed] = [];
-            }
-            $breedGroups[$breed][] = $ref;
-        }
-
-        // Calculate learning metrics per breed
-        $breedLearning = [];
-        foreach ($breedGroups as $breed => $examples) {
-            $exampleCount = count($examples);
-
-            // Get correction history for this breed
-            $corrections = BreedCorrection::where('corrected_breed', $breed)
-                ->orderBy('created_at', 'asc')
-                ->get();
-
-            if ($corrections->isEmpty()) {
-                continue;
+            // Check if ML API returned data successfully
+            if (!$statsResponse['success']) {
+                Log::warning('❌ Failed to fetch ML API memory stats', [
+                    'error' => $statsResponse['error'] ?? 'Unknown error'
+                ]);
+                return [];
             }
 
-            // Get scans AFTER corrections were made for this breed
-            $firstCorrectionDate = $corrections->first()->created_at;
+            $mlData = $statsResponse['data'];
 
-            $scansAfterLearning = Results::where('breed', $breed)
-                ->where('created_at', '>=', $firstCorrectionDate)
-                ->get();
+            if (empty($mlData['breeds'])) {
+                Log::info('ℹ️ No breeds learned yet in ML API memory', [
+                    'total_examples' => $mlData['total_examples'] ?? 0
+                ]);
+                return [];
+            }
 
-            $avgConfidenceAfter = $scansAfterLearning->avg('confidence') ?? 0;
+            Log::info('✓ ML API returned learning data', [
+                'total_examples' => $mlData['total_examples'] ?? 0,
+                'unique_breeds' => $mlData['unique_breeds'] ?? 0,
+                'breeds' => array_keys($mlData['breeds'])
+            ]);
 
-            // Calculate how many recent scans (last 10) got high confidence
-            $recentScans = Results::where('breed', $breed)
+            $breedLearning = [];
 
-                ->latest()
-                ->take(10)
-                ->get();
+            // Iterate through breeds that ML API has actually learned
+            foreach ($mlData['breeds'] as $breed => $exampleCount) {
+                // Get correction history for this breed from Laravel database
+                $corrections = BreedCorrection::where('corrected_breed', $breed)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
 
-            $recentHighConfidence = $recentScans->where('confidence', '>=', 80)->count();
-            $successRate = $recentScans->count() > 0
-                ? ($recentHighConfidence / $recentScans->count()) * 100
-                : 0;
+                if ($corrections->isEmpty()) {
+                    // ML API has this breed, but no Laravel correction record
+                    Log::debug('Breed in ML API but no Laravel corrections', [
+                        'breed' => $breed,
+                        'ml_examples' => $exampleCount
+                    ]);
+                    continue;
+                }
 
-            $breedLearning[$breed] = [
-                'breed' => $breed,
-                'examples_learned' => $exampleCount,
-                'corrections_made' => $corrections->count(),
-                'avg_confidence' => round($avgConfidenceAfter, 1),
-                'success_rate' => round($successRate, 1),
-                'first_learned' => $firstCorrectionDate->format('M d, Y'),
-                'days_learning' => $firstCorrectionDate->diffInDays(now()),
-                'recent_scans' => $recentScans->count(),
-            ];
+                $firstCorrectionDate = $corrections->first()->created_at;
+
+                // Get scans AFTER corrections started for this breed
+                $scansAfterLearning = Results::where('breed', $breed)
+                    ->where('created_at', '>=', $firstCorrectionDate)
+                    ->get();
+
+                $avgConfidenceAfter = $scansAfterLearning->avg('confidence') ?? 0;
+
+                // Calculate success rate from recent scans (last 10)
+                $recentScans = Results::where('breed', $breed)
+                    ->latest()
+                    ->take(10)
+                    ->get();
+
+                $recentHighConfidence = $recentScans->where('confidence', '>=', 80)->count();
+                $successRate = $recentScans->count() > 0
+                    ? ($recentHighConfidence / $recentScans->count()) * 100
+                    : 0;
+
+                $breedLearning[$breed] = [
+                    'breed' => $breed,
+                    'examples_learned' => $exampleCount, // From ML API memory
+                    'corrections_made' => $corrections->count(), // From Laravel DB
+                    'avg_confidence' => round($avgConfidenceAfter, 1),
+                    'success_rate' => round($successRate, 1),
+                    'first_learned' => $firstCorrectionDate->format('M d, Y'),
+                    'days_learning' => $firstCorrectionDate->diffInDays(now()),
+                    'recent_scans' => $recentScans->count(),
+                ];
+
+                Log::debug('✓ Breed learning stats calculated', [
+                    'breed' => $breed,
+                    'examples' => $exampleCount,
+                    'success_rate' => $successRate
+                ]);
+            }
+
+            // Sort by success rate descending
+            usort($breedLearning, function ($a, $b) {
+                return $b['success_rate'] <=> $a['success_rate'];
+            });
+
+            $topBreeds = array_slice($breedLearning, 0, 10); // Top 10 breeds
+
+            Log::info('✓ Breed learning progress calculated successfully', [
+                'total_breeds_with_data' => count($breedLearning),
+                'top_breeds_returned' => count($topBreeds)
+            ]);
+
+            return $topBreeds;
+        } catch (\Exception $e) {
+            Log::error('❌ Error calculating breed learning progress', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [];
         }
-
-        // Sort by success rate descending
-        usort($breedLearning, function ($a, $b) {
-            return $b['success_rate'] <=> $a['success_rate'];
-        });
-
-        return array_slice($breedLearning, 0, 10); // Top 10 breeds
     }
 
 
@@ -124,15 +163,33 @@ class ScanResultController extends Controller
         // ============================================================================
         $breedLearningProgress = $this->calculateBreedLearningProgress();
 
-        $jsonPath = storage_path('app/references.json');
+        // ============================================================================
+        // FIXED: FETCH MEMORY STATS FROM ML API (NOT LOCAL FILE)
+        // ============================================================================
         $memoryCount = 0;
         $uniqueBreeds = [];
-        if (file_exists($jsonPath)) {
-            $references = json_decode(file_get_contents($jsonPath), true);
-            if (is_array($references)) {
-                $memoryCount = count($references);
-                $uniqueBreeds = array_unique(array_column($references, 'label'));
+
+        try {
+            $mlApiService = app(\App\Services\MLApiService::class);
+            $statsResponse = $mlApiService->getMemoryStats();
+
+            if ($statsResponse['success'] && !empty($statsResponse['data'])) {
+                $memoryCount = $statsResponse['data']['total_examples'] ?? 0;
+                $uniqueBreeds = array_keys($statsResponse['data']['breeds'] ?? []);
+
+                Log::info('✓ Memory stats fetched from ML API', [
+                    'memory_count' => $memoryCount,
+                    'unique_breeds' => count($uniqueBreeds)
+                ]);
+            } else {
+                Log::warning('⚠️ ML API memory stats unavailable', [
+                    'error' => $statsResponse['error'] ?? 'Unknown'
+                ]);
             }
+        } catch (\Exception $e) {
+            Log::error('❌ Failed to fetch ML API stats in dashboard', [
+                'error' => $e->getMessage()
+            ]);
         }
 
         $recentCorrectionsCount = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
@@ -249,7 +306,6 @@ class ScanResultController extends Controller
             'breedLearningProgress' => $breedLearningProgress, // NEW: Per-breed learning data
         ]);
     }
-
     public function getSimulation($scan_id)
     {
         try {

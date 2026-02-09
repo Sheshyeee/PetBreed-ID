@@ -20,6 +20,30 @@ class NotificationController extends Controller
             ->latest()
             ->paginate(20);
 
+        // Build base URL from object storage
+        $baseUrl = config('filesystems.disks.object-storage.url');
+
+        // Transform notifications to include full image URLs
+        $notifications->getCollection()->transform(function ($notification) use ($baseUrl) {
+            // Decode data JSON if it's a string
+            $data = is_string($notification->data)
+                ? json_decode($notification->data, true)
+                : $notification->data;
+
+            // If there's an image path in data, prepend base URL
+            if (isset($data['image']) && !empty($data['image'])) {
+                // Check if it's already a full URL
+                if (!str_starts_with($data['image'], 'http://') && !str_starts_with($data['image'], 'https://')) {
+                    $data['image'] = $baseUrl . '/' . $data['image'];
+                }
+            }
+
+            // Update notification data with full URL
+            $notification->data = $data;
+
+            return $notification;
+        });
+
         return response()->json([
             'success' => true,
             'notifications' => $notifications
