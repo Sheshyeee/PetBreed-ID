@@ -20,7 +20,6 @@ class PageController extends Controller
 
         $scans = Results::where('user_id', $user->id)
             ->latest()
-            ->take(6)
             ->get()
             ->map(function ($scan) {
                 // Build URL manually
