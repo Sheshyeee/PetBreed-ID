@@ -52,6 +52,15 @@ const ScanResults = () => {
     const showLearningBadge =
         results?.confidence === 100 && results?.has_admin_correction;
 
+    // FIXED: Filter out "Other Breeds" entries and only show real breed predictions
+    const filteredPredictions =
+        results?.top_predictions?.filter(
+            (prediction) =>
+                prediction.breed.toLowerCase() !== 'other breeds' &&
+                prediction.breed.toLowerCase() !== 'other breed' &&
+                prediction.confidence > 0,
+        ) || [];
+
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
             <Header />
@@ -149,47 +158,66 @@ const ScanResults = () => {
                     </div>
                 </Card>
 
-                {/* Rest of the page remains the same ... */}
-                <Card className="mt-5 p-6 sm:p-8 lg:p-10">
-                    <h2 className="text-md mb-4 font-bold sm:text-xl dark:text-white">
-                        Top Possible Breeds
-                    </h2>
-                    <div className="space-y-4">
-                        {results?.top_predictions
-                            ?.slice(0, 3)
-                            .map((prediction, index) => (
-                                <Card
-                                    key={index}
-                                    className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
-                                >
-                                    <div className="flex items-center gap-4 sm:gap-5">
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">
-                                            {index + 1}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="sm:text-md mb-2 text-base font-semibold dark:text-white">
-                                                {prediction.breed}
-                                            </h3>
-                                            <div className="flex items-center gap-3 sm:gap-4">
-                                                <Progress
-                                                    value={
-                                                        prediction.confidence
-                                                    }
-                                                    className="h-2 flex-1 lg:max-w-[400px] [&>div]:bg-blue-500"
-                                                />
-                                                <p className="shrink-0 text-sm font-semibold dark:text-white">
-                                                    {Math.round(
-                                                        prediction.confidence,
-                                                    )}
-                                                    %
-                                                </p>
+                {/* FIXED: Top Possible Breeds - Only show if there are real alternatives */}
+                {filteredPredictions.length > 1 && (
+                    <Card className="mt-5 p-6 sm:p-8 lg:p-10">
+                        <h2 className="text-md mb-4 font-bold sm:text-xl dark:text-white">
+                            Top Possible Breeds
+                        </h2>
+                        <div className="space-y-4">
+                            {filteredPredictions
+                                .slice(0, 3)
+                                .map((prediction, index) => (
+                                    <Card
+                                        key={index}
+                                        className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
+                                    >
+                                        <div className="flex items-center gap-4 sm:gap-5">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">
+                                                {index + 1}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="sm:text-md mb-2 text-base font-semibold dark:text-white">
+                                                    {prediction.breed}
+                                                </h3>
+                                                <div className="flex items-center gap-3 sm:gap-4">
+                                                    <Progress
+                                                        value={
+                                                            prediction.confidence
+                                                        }
+                                                        className="h-2 flex-1 lg:max-w-[400px] [&>div]:bg-blue-500"
+                                                    />
+                                                    <p className="shrink-0 text-sm font-semibold dark:text-white">
+                                                        {Math.round(
+                                                            prediction.confidence,
+                                                        )}
+                                                        %
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </Card>
-                            ))}
-                    </div>
-                </Card>
+                                    </Card>
+                                ))}
+                        </div>
+                    </Card>
+                )}
+
+                {/* Show message when only one confident prediction */}
+                {filteredPredictions.length === 1 && (
+                    <Card className="mt-5 p-6 sm:p-8 lg:p-10">
+                        <div className="flex items-center justify-center gap-3 text-center">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                <strong className="text-gray-900 dark:text-white">
+                                    High Confidence Identification
+                                </strong>
+                                {' - '}
+                                Our system is very confident about this breed
+                                identification.
+                            </p>
+                        </div>
+                    </Card>
+                )}
 
                 <h2 className="text-md mt-8 mb-6 font-bold sm:text-xl dark:text-white">
                     Explore More Insights
