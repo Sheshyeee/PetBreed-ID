@@ -72,7 +72,7 @@ const Scan = () => {
                 setTimeout(() => {
                     setLocalError(null);
                 }, 500); // Match transition duration
-            }, 5000);
+            }, 7000);
 
             return () => clearTimeout(timer);
         }
@@ -436,14 +436,11 @@ const Scan = () => {
                                         <p className="mt-1 text-sm text-red-700 dark:text-red-300">
                                             {localError.message}
                                         </p>
-                                        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                                            This message will disappear in 5
-                                            seconds
-                                        </p>
+
                                         {localError.not_a_dog && (
                                             <Button
                                                 onClick={handleReset}
-                                                className="mt-4 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                                                className="mt-4 bg-red-600 hover:bg-red-700 dark:bg-white dark:hover:bg-red-600"
                                             >
                                                 Upload Another Image
                                             </Button>
