@@ -3,7 +3,7 @@ import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { Camera, CheckCircle2, CircleAlert, XCircle, SwitchCamera } from 'lucide-react';
+import { Camera, CircleAlert, SwitchCamera, XCircle } from 'lucide-react';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 interface PredictionResult {
@@ -39,8 +39,8 @@ const Scan = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const pageProps = usePage<PageProps>().props;
 
-    const success = pageProps.flash?.success || pageProps.success;
-    const error = pageProps.flash?.error || pageProps.error;
+    const success = pageProps.flash?.success ?? pageProps.success ?? undefined;
+    const error = pageProps.flash?.error ?? pageProps.error ?? undefined;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         image: null as File | null,
@@ -51,23 +51,55 @@ const Scan = () => {
     const [showLoading, setShowLoading] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
-    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>(
+        'environment',
+    );
     const [cameraError, setCameraError] = useState<string | null>(null);
+    const [localError, setLocalError] = useState<ErrorFlash | null>(null);
+    const [showLocalError, setShowLocalError] = useState(false);
+
+    // Handle flash error messages with timeout
+    useEffect(() => {
+        if (error?.message) {
+            setShowLoading(false);
+            setLocalError(error);
+            setShowLocalError(true);
+
+            // Auto-dismiss error after 5 seconds
+            const timer = setTimeout(() => {
+                setShowLocalError(false);
+                // Clear the error after fade out animation
+                setTimeout(() => {
+                    setLocalError(null);
+                }, 500); // Match transition duration
+            }, 5000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
 
     useEffect(() => {
         if (success) {
             setShowLoading(false);
         }
-        if (error) {
-            setShowLoading(false);
-        }
-    }, [success, error]);
+    }, [success]);
 
-    // Cleanup camera stream on unmount or when stopping camera
+    // Auto-dismiss camera error
+    useEffect(() => {
+        if (cameraError) {
+            const timer = setTimeout(() => {
+                setCameraError(null);
+            }, 5000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [cameraError]);
+
+    // Cleanup camera stream on unmount
     useEffect(() => {
         return () => {
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach((track) => track.stop());
             }
         };
     }, [stream]);
@@ -115,32 +147,27 @@ const Scan = () => {
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const result = e.target?.result as string;
-            setPreview(result);
+        // Create preview using URL.createObjectURL instead of FileReader
+        const objectUrl = URL.createObjectURL(file);
+        setPreview(objectUrl);
 
-            const img = new Image();
-            img.onload = () => {
-                console.log('Image loaded successfully');
-                console.log('Dimensions:', img.width, 'x', img.height);
-                setFileInfo(
-                    `${file.name} (${(file.size / 1024).toFixed(1)}KB, ${img.width}x${img.height})`,
-                );
-            };
-            img.onerror = () => {
-                console.error('Failed to load image preview');
-                setFileInfo(
-                    `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
-                );
-            };
-            img.src = result;
+        // Load image to get dimensions
+        const img = new Image();
+        img.onload = () => {
+            console.log('Image loaded successfully');
+            console.log('Dimensions:', img.width, 'x', img.height);
+            setFileInfo(
+                `${file.name} (${(file.size / 1024).toFixed(1)}KB, ${img.width}x${img.height})`,
+            );
+            // Clean up the object URL after image is loaded
+            URL.revokeObjectURL(objectUrl);
         };
-        reader.onerror = () => {
-            console.error('Failed to read file');
-            alert('Failed to read the file.');
+        img.onerror = () => {
+            console.error('Failed to load image preview');
+            setFileInfo(`${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+            URL.revokeObjectURL(objectUrl);
         };
-        reader.readAsDataURL(file);
+        img.src = objectUrl;
 
         setData('image', file);
         stopCamera(); // Stop camera when file is selected
@@ -153,10 +180,10 @@ const Scan = () => {
     const startCamera = async () => {
         try {
             setCameraError(null);
-            
+
             // Stop any existing stream first
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach((track) => track.stop());
                 setStream(null);
             }
 
@@ -164,41 +191,45 @@ const Scan = () => {
                 video: {
                     facingMode: facingMode,
                     width: { ideal: 1920 },
-                    height: { ideal: 1080 }
+                    height: { ideal: 1080 },
                 },
-                audio: false
+                audio: false,
             };
 
             console.log('Requesting camera with facingMode:', facingMode);
-            const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
+            const mediaStream =
+                await navigator.mediaDevices.getUserMedia(constraints);
+
             setStream(mediaStream);
-            
+
             // Wait a bit for state to update before setting video source
             setTimeout(() => {
                 if (videoRef.current && mediaStream.active) {
                     videoRef.current.srcObject = mediaStream;
-                    videoRef.current.play().catch(err => {
+                    videoRef.current.play().catch((err) => {
                         console.error('Error playing video:', err);
                     });
                 }
             }, 100);
-            
+
             setShowCamera(true);
         } catch (err: any) {
             console.error('Error accessing camera:', err);
             let errorMessage = 'Unable to access camera. ';
-            
+
             if (err.name === 'NotAllowedError') {
-                errorMessage += 'Please allow camera permissions and try again.';
+                errorMessage +=
+                    'Please allow camera permissions and try again.';
             } else if (err.name === 'NotFoundError') {
                 errorMessage += 'No camera found on this device.';
             } else if (err.name === 'NotReadableError') {
-                errorMessage += 'Camera is already in use by another application.';
+                errorMessage +=
+                    'Camera is already in use by another application.';
             } else {
-                errorMessage += 'Please check permissions or use file upload instead.';
+                errorMessage +=
+                    'Please check permissions or use file upload instead.';
             }
-            
+
             setCameraError(errorMessage);
             setShowCamera(false);
         }
@@ -206,7 +237,7 @@ const Scan = () => {
 
     const stopCamera = () => {
         if (stream) {
-            stream.getTracks().forEach(track => {
+            stream.getTracks().forEach((track) => {
                 track.stop();
             });
             setStream(null);
@@ -221,41 +252,44 @@ const Scan = () => {
     const switchCamera = async () => {
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
         setFacingMode(newFacingMode);
-        
+
         // Stop current stream
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach((track) => track.stop());
             setStream(null);
         }
-        
+
         // Small delay before starting new stream
         setTimeout(async () => {
             try {
                 setCameraError(null);
-                
+
                 const constraints: MediaStreamConstraints = {
                     video: {
                         facingMode: newFacingMode,
                         width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        height: { ideal: 1080 },
                     },
-                    audio: false
+                    audio: false,
                 };
 
                 console.log('Switching to facingMode:', newFacingMode);
-                const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-                
+                const mediaStream =
+                    await navigator.mediaDevices.getUserMedia(constraints);
+
                 setStream(mediaStream);
-                
+
                 if (videoRef.current && mediaStream.active) {
                     videoRef.current.srcObject = mediaStream;
-                    videoRef.current.play().catch(err => {
+                    videoRef.current.play().catch((err) => {
                         console.error('Error playing video after switch:', err);
                     });
                 }
             } catch (err: any) {
                 console.error('Error switching camera:', err);
-                setCameraError('Failed to switch camera. This device may only have one camera.');
+                setCameraError(
+                    'Failed to switch camera. This device may only have one camera.',
+                );
                 // Try to restart with original facing mode
                 setFacingMode(facingMode === 'user' ? 'environment' : 'user');
             }
@@ -266,30 +300,36 @@ const Scan = () => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
             const canvas = canvasRef.current;
-            
+
             // Check if video is actually playing
             if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-                alert('Camera is still loading. Please wait a moment and try again.');
+                alert(
+                    'Camera is still loading. Please wait a moment and try again.',
+                );
                 return;
             }
-            
+
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
+
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(video, 0, 0);
-                
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const file = new File(
-                            [blob], 
-                            `camera-capture-${Date.now()}.jpg`, 
-                            { type: 'image/jpeg' }
-                        );
-                        processImageFile(file);
-                    }
-                }, 'image/jpeg', 0.95);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) {
+                            const file = new File(
+                                [blob],
+                                `camera-capture-${Date.now()}.jpg`,
+                                { type: 'image/jpeg' },
+                            );
+                            processImageFile(file);
+                        }
+                    },
+                    'image/jpeg',
+                    0.95,
+                );
             }
         }
     };
@@ -313,7 +353,7 @@ const Scan = () => {
 
         post('/analyze', {
             forceFormData: true,
-            preserveScroll: false, // Allow scrolling to top on redirect
+            preserveScroll: false,
             onError: () => {
                 setShowLoading(false);
             },
@@ -321,13 +361,29 @@ const Scan = () => {
     };
 
     const handleReset = () => {
+        // Revoke object URL if preview exists
+        if (preview) {
+            URL.revokeObjectURL(preview);
+        }
+
         reset();
         setPreview(null);
         setFileInfo('');
         setShowLoading(false);
         setCameraError(null);
+        setLocalError(null);
+        setShowLocalError(false);
         stopCamera();
     };
+
+    // Cleanup preview URL on unmount
+    useEffect(() => {
+        return () => {
+            if (preview) {
+                URL.revokeObjectURL(preview);
+            }
+        };
+    }, [preview]);
 
     return (
         <>
@@ -358,9 +414,13 @@ const Scan = () => {
                         </Button>
                     </div>
 
-                    {/* Error Message */}
-                    {error && (
-                        <Card className="mb-6 border-red-300 bg-red-50 shadow-sm dark:border-red-900 dark:bg-red-950/50">
+                    {/* Error Message with Auto-dismiss */}
+                    {localError && showLocalError && (
+                        <Card
+                            className={`mb-6 border-red-300 bg-red-50 shadow-sm transition-opacity duration-500 dark:border-red-900 dark:bg-red-950/50 ${
+                                showLocalError ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        >
                             <CardContent className="p-4 sm:p-6">
                                 <div className="flex items-start gap-3">
                                     <XCircle
@@ -369,12 +429,18 @@ const Scan = () => {
                                     />
                                     <div className="flex-1">
                                         <p className="font-semibold text-red-900 dark:text-red-400">
-                                            {error.not_a_dog ? 'Not a Dog Detected' : 'Error'}
+                                            {localError.not_a_dog
+                                                ? 'Not a Dog Detected'
+                                                : 'Error'}
                                         </p>
                                         <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                                            {error.message}
+                                            {localError.message}
                                         </p>
-                                        {error.not_a_dog && (
+                                        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                                            This message will disappear in 5
+                                            seconds
+                                        </p>
+                                        {localError.not_a_dog && (
                                             <Button
                                                 onClick={handleReset}
                                                 className="mt-4 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
@@ -388,9 +454,9 @@ const Scan = () => {
                         </Card>
                     )}
 
-                    {/* Camera Error */}
+                    {/* Camera Error with Auto-dismiss */}
                     {cameraError && (
-                        <Card className="mb-6 border-orange-300 bg-orange-50 shadow-sm dark:border-orange-900 dark:bg-orange-950/50">
+                        <Card className="mb-6 border-orange-300 bg-orange-50 shadow-sm transition-opacity duration-500 dark:border-orange-900 dark:bg-orange-950/50">
                             <CardContent className="p-4 sm:p-6">
                                 <div className="flex items-start gap-3">
                                     <CircleAlert
@@ -404,14 +470,22 @@ const Scan = () => {
                                         <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
                                             {cameraError}
                                         </p>
+                                        <p className="mt-2 text-xs text-orange-600 dark:text-orange-400">
+                                            This message will disappear in 5
+                                            seconds
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Upload Card */}
-                    <Card className="mx-auto w-full max-w-4xl border-gray-200 bg-white p-1 shadow-md dark:border-gray-800 dark:bg-gray-900">
+                    {/* Upload Card - Wider for camera */}
+                    <Card
+                        className={`mx-auto w-full border-gray-200 bg-white p-1 shadow-md dark:border-gray-800 dark:bg-gray-900 ${
+                            showCamera ? 'max-w-6xl' : 'max-w-4xl'
+                        } transition-all duration-300`}
+                    >
                         <form onSubmit={handleSubmit}>
                             <CardContent className="p-6 sm:p-8">
                                 {!preview && !showCamera ? (
@@ -516,7 +590,8 @@ const Scan = () => {
                                                     <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
                                                         <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
                                                         <span className="font-semibold">
-                                                            Only dog images are accepted
+                                                            Only dog images are
+                                                            accepted
                                                         </span>
                                                     </li>
                                                 </ul>
@@ -531,31 +606,34 @@ const Scan = () => {
                                                 autoPlay
                                                 playsInline
                                                 muted
-                                                className="mx-auto max-h-96 w-full object-contain"
+                                                className="mx-auto h-[70vh] w-full object-cover"
                                             />
                                             <canvas
                                                 ref={canvasRef}
                                                 className="hidden"
                                             />
-                                            
+
                                             {/* Switch Camera Button */}
                                             <button
                                                 type="button"
                                                 onClick={switchCamera}
-                                                className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white transition-all hover:bg-black/70"
+                                                className="absolute top-4 right-4 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70"
                                                 title="Switch Camera"
                                             >
                                                 <SwitchCamera size={24} />
                                             </button>
                                         </div>
-                                        
+
                                         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                                             <Button
                                                 type="button"
                                                 onClick={capturePhoto}
                                                 className="w-full bg-blue-600 hover:bg-blue-700 sm:flex-1 dark:bg-blue-600 dark:hover:bg-blue-700"
                                             >
-                                                <Camera size={20} className="mr-2" />
+                                                <Camera
+                                                    size={20}
+                                                    className="mr-2"
+                                                />
                                                 Capture Photo
                                             </Button>
                                             <Button
@@ -572,7 +650,7 @@ const Scan = () => {
                                     <div>
                                         <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                                             <img
-                                                src={preview}
+                                                src={preview || ''}
                                                 className="mx-auto max-h-80 w-full object-contain sm:max-h-96"
                                                 alt="Preview"
                                             />
