@@ -1383,7 +1383,7 @@ Be detailed and specific about colors and patterns.";
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
      * ==========================================
      */
-    private function validateDogImage($imagePath): array
+     private function validateDogImage($imagePath): array
     {
         try {
             Log::info('🔍 Starting dog validation with OpenAI Vision', [
@@ -1443,7 +1443,12 @@ Be detailed and specific about colors and patterns.";
         }
     }
 
-      public function analyze(Request $request)
+    /**
+     * ==========================================
+     * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING AND DOG VALIDATION
+     * ==========================================
+     */
+    public function analyze(Request $request)
     {
         Log::info('=================================');
         Log::info('=== ANALYZE REQUEST STARTED ===');
@@ -1775,13 +1780,8 @@ Be detailed and specific about colors and patterns.";
                 ], 200);
             }
 
-            // For web requests, redirect back with success message
-            return redirect()->back()->with('success', [
-                'breed' => $dbResult->breed,
-                'confidence' => $dbResult->confidence,
-                'top_predictions' => $dbResult->top_predictions,
-                'message' => 'Analysis complete!'
-            ]);
+            // For web requests, redirect to scan-results page
+            return redirect('/scan-results');
         } catch (\Exception $e) {
             Log::error('Analyze Error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
@@ -1802,6 +1802,7 @@ Be detailed and specific about colors and patterns.";
             ]);
         }
     }
+
 
 
     public function getOriginHistory($scan_id)

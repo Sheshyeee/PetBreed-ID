@@ -47,16 +47,15 @@ const Scan = () => {
     });
 
     const [preview, setPreview] = useState<string | null>(null);
-    const [showResults, setShowResults] = useState(false);
     const [fileInfo, setFileInfo] = useState<string>('');
     const [showLoading, setShowLoading] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+    const [cameraError, setCameraError] = useState<string | null>(null);
 
     useEffect(() => {
         if (success) {
-            setShowResults(true);
             setShowLoading(false);
         }
         if (error) {
@@ -64,7 +63,7 @@ const Scan = () => {
         }
     }, [success, error]);
 
-    // Cleanup camera stream on unmount
+    // Cleanup camera stream on unmount or when stopping camera
     useEffect(() => {
         return () => {
             if (stream) {
@@ -144,8 +143,7 @@ const Scan = () => {
         reader.readAsDataURL(file);
 
         setData('image', file);
-        setShowResults(false);
-        stopCamera();
+        stopCamera(); // Stop camera when file is selected
     };
 
     const triggerFileInput = (): void => {
@@ -154,59 +152,126 @@ const Scan = () => {
 
     const startCamera = async () => {
         try {
-            // Stop any existing stream
+            setCameraError(null);
+            
+            // Stop any existing stream first
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
+                setStream(null);
             }
 
-            const constraints = {
+            const constraints: MediaStreamConstraints = {
                 video: {
                     facingMode: facingMode,
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
-                }
+                },
+                audio: false
             };
 
+            console.log('Requesting camera with facingMode:', facingMode);
             const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-                videoRef.current.play();
+            setStream(mediaStream);
+            
+            // Wait a bit for state to update before setting video source
+            setTimeout(() => {
+                if (videoRef.current && mediaStream.active) {
+                    videoRef.current.srcObject = mediaStream;
+                    videoRef.current.play().catch(err => {
+                        console.error('Error playing video:', err);
+                    });
+                }
+            }, 100);
+            
+            setShowCamera(true);
+        } catch (err: any) {
+            console.error('Error accessing camera:', err);
+            let errorMessage = 'Unable to access camera. ';
+            
+            if (err.name === 'NotAllowedError') {
+                errorMessage += 'Please allow camera permissions and try again.';
+            } else if (err.name === 'NotFoundError') {
+                errorMessage += 'No camera found on this device.';
+            } else if (err.name === 'NotReadableError') {
+                errorMessage += 'Camera is already in use by another application.';
+            } else {
+                errorMessage += 'Please check permissions or use file upload instead.';
             }
             
-            setStream(mediaStream);
-            setShowCamera(true);
-        } catch (err) {
-            console.error('Error accessing camera:', err);
-            alert('Unable to access camera. Please check permissions or use file upload instead.');
+            setCameraError(errorMessage);
+            setShowCamera(false);
         }
     };
 
     const stopCamera = () => {
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach(track => {
+                track.stop();
+            });
             setStream(null);
         }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
         setShowCamera(false);
+        setCameraError(null);
     };
 
     const switchCamera = async () => {
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
         setFacingMode(newFacingMode);
         
-        if (showCamera) {
-            // Restart camera with new facing mode
-            stopCamera();
-            setTimeout(() => {
-                startCamera();
-            }, 100);
+        // Stop current stream
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
         }
+        
+        // Small delay before starting new stream
+        setTimeout(async () => {
+            try {
+                setCameraError(null);
+                
+                const constraints: MediaStreamConstraints = {
+                    video: {
+                        facingMode: newFacingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                };
+
+                console.log('Switching to facingMode:', newFacingMode);
+                const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                setStream(mediaStream);
+                
+                if (videoRef.current && mediaStream.active) {
+                    videoRef.current.srcObject = mediaStream;
+                    videoRef.current.play().catch(err => {
+                        console.error('Error playing video after switch:', err);
+                    });
+                }
+            } catch (err: any) {
+                console.error('Error switching camera:', err);
+                setCameraError('Failed to switch camera. This device may only have one camera.');
+                // Try to restart with original facing mode
+                setFacingMode(facingMode === 'user' ? 'environment' : 'user');
+            }
+        }, 200);
     };
 
     const capturePhoto = () => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current;
             const canvas = canvasRef.current;
+            
+            // Check if video is actually playing
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+                alert('Camera is still loading. Please wait a moment and try again.');
+                return;
+            }
             
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -248,12 +313,7 @@ const Scan = () => {
 
         post('/analyze', {
             forceFormData: true,
-            preserveScroll: true,
-            preserveState: (page) =>
-                Object.keys(page.props.errors || {}).length > 0,
-            onStart: () => {
-                setShowResults(false);
-            },
+            preserveScroll: false, // Allow scrolling to top on redirect
             onError: () => {
                 setShowLoading(false);
             },
@@ -263,9 +323,9 @@ const Scan = () => {
     const handleReset = () => {
         reset();
         setPreview(null);
-        setShowResults(false);
         setFileInfo('');
         setShowLoading(false);
+        setCameraError(null);
         stopCamera();
     };
 
@@ -328,79 +388,24 @@ const Scan = () => {
                         </Card>
                     )}
 
-                    {/* Success Message with Results */}
-                    {success && showResults && (
-                        <Card className="mb-6 border-green-300 bg-green-50 shadow-sm dark:border-green-900 dark:bg-green-950/50">
-                            <CardContent className="p-6">
+                    {/* Camera Error */}
+                    {cameraError && (
+                        <Card className="mb-6 border-orange-300 bg-orange-50 shadow-sm dark:border-orange-900 dark:bg-orange-950/50">
+                            <CardContent className="p-4 sm:p-6">
                                 <div className="flex items-start gap-3">
-                                    <CheckCircle2
-                                        size={26}
-                                        className="mt-0.5 shrink-0 text-green-600 dark:text-green-400"
+                                    <CircleAlert
+                                        size={22}
+                                        className="mt-0.5 shrink-0 text-orange-600 dark:text-orange-400"
                                     />
-                                    <h2 className="text-xl font-bold text-green-900 dark:text-green-400">
-                                        Analysis Complete!
-                                    </h2>
-                                </div>
-
-                                <div className="mt-6 space-y-4">
-                                    <div className="rounded-lg bg-white p-4 dark:bg-gray-900/50">
-                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            Detected Breed
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-orange-900 dark:text-orange-400">
+                                            Camera Error
                                         </p>
-                                        <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-                                            {success.breed}
-                                        </p>
-                                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                            Confidence:{' '}
-                                            <span className="font-semibold text-gray-900 dark:text-white">
-                                                {(
-                                                    success.confidence * 100
-                                                ).toFixed(2)}
-                                                %
-                                            </span>
+                                        <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+                                            {cameraError}
                                         </p>
                                     </div>
-
-                                    {success.top_predictions &&
-                                        success.top_predictions.length > 0 && (
-                                            <div className="rounded-lg bg-white p-4 dark:bg-gray-900/50">
-                                                <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
-                                                    Top Predictions
-                                                </h3>
-                                                <ul className="space-y-2">
-                                                    {success.top_predictions.map(
-                                                        (pred, idx) => (
-                                                            <li
-                                                                key={idx}
-                                                                className="flex items-center justify-between gap-4 rounded-md bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800/50"
-                                                            >
-                                                                <span className="font-medium text-gray-900 dark:text-gray-200">
-                                                                    {idx + 1}.{' '}
-                                                                    {pred.breed}
-                                                                </span>
-                                                                <span className="shrink-0 font-semibold text-gray-600 dark:text-gray-400">
-                                                                    {(
-                                                                        pred.confidence *
-                                                                        100
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                    %
-                                                                </span>
-                                                            </li>
-                                                        ),
-                                                    )}
-                                                </ul>
-                                            </div>
-                                        )}
                                 </div>
-
-                                <Button
-                                    onClick={handleReset}
-                                    className="mt-6 w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
-                                >
-                                    Scan Another Image
-                                </Button>
                             </CardContent>
                         </Card>
                     )}
@@ -525,6 +530,7 @@ const Scan = () => {
                                                 ref={videoRef}
                                                 autoPlay
                                                 playsInline
+                                                muted
                                                 className="mx-auto max-h-96 w-full object-contain"
                                             />
                                             <canvas
