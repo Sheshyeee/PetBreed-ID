@@ -148,36 +148,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
             <Header />
             <main className="mx-auto mt-[-5px] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-20 xl:px-32">
-                {/* DEBUG INFO - Shows real-time status */}
-                <div className="mb-4 rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">
-                    <div>
-                        <strong>Scan ID:</strong> {scan_id}
-                    </div>
-                    <div>
-                        <strong>Status:</strong> {status}
-                    </div>
-                    <div>
-                        <strong>Polling:</strong>{' '}
-                        {isPolling ? '🟢 Active' : '🔴 Stopped'}
-                    </div>
-                    <div>
-                        <strong>Attempts:</strong> {pollingAttempts}/
-                        {MAX_POLLING_ATTEMPTS}
-                    </div>
-                    <div>
-                        <strong>1-year:</strong>{' '}
-                        {simulations['1_years'] ? '✅ Ready' : '⏳ Waiting'}
-                    </div>
-                    <div>
-                        <strong>3-years:</strong>{' '}
-                        {simulations['3_years'] ? '✅ Ready' : '⏳ Waiting'}
-                    </div>
-                    <div>
-                        <strong>Last Update:</strong>{' '}
-                        {new Date(lastUpdate).toLocaleTimeString()}
-                    </div>
-                </div>
-
                 <div className="flex items-start gap-3 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-black dark:text-white" />

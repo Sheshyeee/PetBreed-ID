@@ -1383,7 +1383,67 @@ Be detailed and specific about colors and patterns.";
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
      * ==========================================
      */
-    public function analyze(Request $request)
+    private function validateDogImage($imagePath): array
+    {
+        try {
+            Log::info('🔍 Starting dog validation with OpenAI Vision', [
+                'image_path' => $imagePath
+            ]);
+
+            // Read image and convert to base64
+            $imageData = base64_encode(file_get_contents($imagePath));
+            $mimeType = mime_content_type($imagePath);
+
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'max_tokens' => 10,
+            ]);
+
+            $answer = trim(strtoupper($response->choices[0]->message->content));
+            $isDog = str_contains($answer, 'YES');
+
+            Log::info('✓ OpenAI dog validation complete', [
+                'answer' => $answer,
+                'is_dog' => $isDog
+            ]);
+
+            return [
+                'is_dog' => $isDog,
+                'raw_response' => $answer
+            ];
+        } catch (\Exception $e) {
+            Log::error('❌ Dog validation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // On error, allow the image through (fail-open approach)
+            // Change to ['is_dog' => false] for fail-closed behavior
+            return [
+                'is_dog' => true,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+      public function analyze(Request $request)
     {
         Log::info('=================================');
         Log::info('=== ANALYZE REQUEST STARTED ===');
@@ -1460,9 +1520,41 @@ Be detailed and specific about colors and patterns.";
             };
 
             $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $extension;
-            $path = $image->storeAs('scans', $filename, 'object-storage');
             $tempPath = $image->getRealPath(); // Use uploaded temp file directly
             $fullPath = $tempPath; // Use this for AI processing
+
+            // ==========================================
+            // STEP 1: DOG VALIDATION (NEW)
+            // ==========================================
+            Log::info('→ Starting dog validation...');
+            $dogValidation = $this->validateDogImage($fullPath);
+
+            if (!$dogValidation['is_dog']) {
+                Log::warning('⚠️ Image rejected - Not a dog', [
+                    'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
+                ]);
+
+                // Return error response for non-dog images
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                        'not_a_dog' => true
+                    ], 400);
+                }
+
+                return redirect()->back()->with('error', [
+                    'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                    'not_a_dog' => true
+                ]);
+            }
+
+            Log::info('✓ Dog validation passed - proceeding with breed analysis');
+
+            // ==========================================
+            // STEP 2: STORE IMAGE (only after dog validation passes)
+            // ==========================================
+            $path = $image->storeAs('scans', $filename, 'object-storage');
 
             // After storing to object storage
             Storage::disk('object-storage')->put($path, file_get_contents($tempPath));
@@ -1472,7 +1564,9 @@ Be detailed and specific about colors and patterns.";
 
             Log::info('✓ Image saved to: ' . $fullPath);
 
-            // Calculate image hash
+            // ==========================================
+            // STEP 3: CALCULATE IMAGE HASH
+            // ==========================================
             $imageHash = $this->calculateImageHash($fullPath);
             Log::info('✓ Image hash calculated: ' . $imageHash);
 
@@ -1635,12 +1729,12 @@ Be detailed and specific about colors and patterns.";
 
             $dbResult = Results::create([
                 'scan_id' => $uniqueId,
-                'user_id' => Auth::id(), // ADD THIS LINE
+                'user_id' => Auth::id(),
                 'image' => $path,
                 'image_hash' => $imageHash,
                 'breed' => $detectedBreed,
                 'confidence' => round($confidence, 2),
-                'pending' => 'pending', // ADD THIS LINE - default to pending
+                'pending' => 'pending',
                 'top_predictions' => $topPredictions,
                 'description' => $aiData['description'],
                 'origin_history' => is_string($aiData['origin_history']) ? $aiData['origin_history'] : json_encode($aiData['origin_history']),
@@ -1681,13 +1775,19 @@ Be detailed and specific about colors and patterns.";
                 ], 200);
             }
 
-            return redirect('/scan-results');
+            // For web requests, redirect back with success message
+            return redirect()->back()->with('success', [
+                'breed' => $dbResult->breed,
+                'confidence' => $dbResult->confidence,
+                'top_predictions' => $dbResult->top_predictions,
+                'message' => 'Analysis complete!'
+            ]);
         } catch (\Exception $e) {
             Log::error('Analyze Error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
-            if ($path && Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
+            if ($path && Storage::disk('object-storage')->exists($path)) {
+                Storage::disk('object-storage')->delete($path);
             }
 
             if ($request->expectsJson() || $request->is('api/*')) {
@@ -1697,9 +1797,12 @@ Be detailed and specific about colors and patterns.";
                 ], 500);
             }
 
-            return back()->withErrors(['image' => 'Analysis failed: ' . $e->getMessage()]);
+            return redirect()->back()->with('error', [
+                'message' => 'An unexpected error occurred. Please try again.',
+            ]);
         }
     }
+
 
     public function getOriginHistory($scan_id)
     {
