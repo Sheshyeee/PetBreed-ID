@@ -6,17 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\BreedCorrection;
 use App\Models\Results;
 use Carbon\Carbon;
-
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-
+use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Auth;
 use LDAP\Result;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
-
 use Illuminate\Support\Str;
 use Illuminate\Http\UploadedFile;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -680,15 +676,15 @@ class ScanResultController extends Controller
         Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
 
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = config('openai.api_key');
         if (empty($apiKey)) {
-            Log::error('✗ Gemini API key not configured in .env file');
+            Log::error('✗ OpenAI API key not configured in .env file');
             return [
                 'success' => false,
-                'error' => 'Gemini API key not configured'
+                'error' => 'OpenAI API key not configured'
             ];
         }
-        Log::info('✓ Gemini API key is configured');
+        Log::info('✓ OpenAI API key is configured');
 
         if (!file_exists($imagePath)) {
             Log::error('✗ Image file not found: ' . $imagePath);
@@ -850,108 +846,142 @@ PHASE 4: MIXED BREED ANALYSIS (If Applicable)
 **IF MIXED BREED DETECTED:**
 - Identify most likely parent breeds (2-3 breeds)
 - Explain which features come from which parent
-- Estimate generational cross (F1, F2, multi-generational)
-- Note if one breed is more dominant
+- Assign contribution percentages (e.g., 60% Labrador, 40% Border Collie)
+- Consider F1, F2, or multi-generational mix
+
+**REGIONAL MIXED BREEDS:**
+- **Aspin/Asong Pinoy (Philippines):** Medium size, erect/semi-erect ears, short coat, athletic build, often tan/brown/black, curled or sickle tail, primitive features
+- **Indian Pariah Dog:** Similar to Basenji, erect ears, wedge head, curled tail, short coat, 15-20\" height
+- **African Village Dog:** Variable appearance, survival-adapted features
+- **Latin American Street Dog:** Mixed ancestry, often medium-sized, adaptable
+- **European Landrace:** Regional variations, working dog ancestry
 
 ═══════════════════════════════════════════════════════════════
-PHASE 5: FINAL IDENTIFICATION & CONFIDENCE CALIBRATION
+PHASE 5: CONFIDENCE CALIBRATION
 ═══════════════════════════════════════════════════════════════
 
-**SELECT PRIMARY IDENTIFICATION:**
-- Choose the single most likely breed/mix based on evidence
-- Explain why this beats other candidates
+Assign confidence using STRICT criteria:
 
-**CALIBRATE CONFIDENCE (0-100%):**
+**95-100% - DEFINITIVE IDENTIFICATION:**
+- ALL major breed-specific features present
+- NO contradicting features
+- Breed-specific unique traits visible (e.g., Rhodesian Ridgeback ridge, Lundehund extra toes)
+- Photo quality excellent, multiple angles would confirm
+- Example: \"This is unmistakably a purebred Border Collie\"
 
-90-100%: EXTREMELY HIGH CONFIDENCE
-- All major features match perfectly
-- Rare breed perfectly fits despite being uncommon
-- No significant contradictions
-- High-quality photo showing diagnostic features clearly
+**85-94% - HIGHLY CONFIDENT:**
+- All major features match strongly
+- Minor variations within acceptable breed range
+- 1-2 features not fully visible but no contradictions
+- Example: \"Strong evidence for purebred Australian Shepherd\"
 
-75-89%: HIGH CONFIDENCE
-- Most features match with minor variations
-- 1-2 small contradictions explainable by age/grooming
-- Clear diagnostic features present
+**75-84% - CONFIDENT:**
+- Most features match well
+- 2-3 minor deviations or unclear features
+- Could be purebred or very high-percentage mix
+- Example: \"Likely purebred German Shepherd, possibly working line\"
 
-60-74%: MODERATE-HIGH CONFIDENCE
-- Core features match well
-- Some features within breed variation range
-- A few contradictions but overall strong match
+**60-74% - MODERATE CONFIDENCE:**
+- Good feature match but some inconsistencies
+- Could be purebred with atypical features OR high-percentage mix
+- Example: \"Probable Golden Retriever mix or field-bred Golden Retriever\"
 
-45-59%: MODERATE CONFIDENCE
-- Several features match but some don't
-- Could be mixed breed or atypical specimen
-- Enough evidence for educated guess
+**45-59% - LOW CONFIDENCE:**
+- Multiple breed influences visible
+- Features suggest specific mix but other combinations possible
+- Example: \"Likely Husky x German Shepherd mix\"
 
-30-44%: LOW-MODERATE CONFIDENCE
-- Limited matching features
-- Significant contradictions
-- Possibly mixed breed or rare breed
-- Photo quality may limit analysis
+**30-44% - VERY LOW CONFIDENCE:**
+- Multi-generational mix or complex ancestry
+- Can identify general type but not specific breeds
+- Example: \"Mixed breed with terrier and herding influences\"
 
-15-29%: LOW CONFIDENCE
-- Very few matching features
-- Many contradictions
-- Likely mixed breed or very uncertain
-- Poor photo quality
-
-0-14%: VERY LOW CONFIDENCE
-- Guessing between multiple possibilities
-- Extremely limited information
-- Cannot rule out many breeds
-
-**CONFIDENCE RULES - CRITICAL:**
-✓ Rare breed that fits perfectly = 85-95% confidence
-✓ Common breed that fits poorly = 30-50% confidence
-✓ Mixed breed with clear parent breeds = 50-70% confidence
-✓ Unclear mixed breed = 20-40% confidence
-✓ Adjust DOWN for poor photo quality, unusual angles, or puppy age
-✓ Adjust UP only when evidence is overwhelming
+**Below 30% - INSUFFICIENT:**
+- Photo quality too poor
+- Puppy too young to assess adult features
+- Extreme grooming obscuring features
+- Cannot make reliable identification
 
 ═══════════════════════════════════════════════════════════════
-OUTPUT FORMAT - RETURN ONLY VALID JSON
+PHASE 6: FINAL DETERMINATION & REASONING
+═══════════════════════════════════════════════════════════════
+
+**DECISION RULES:**
+
+1. **If confidence ≥85% for single breed → Identify as that purebred**
+2. **If confidence 60-84% with contradictions → Consider high-percentage mix**
+3. **If multiple breeds score 60-75% → Likely F1 cross of top 2**
+4. **If features from 3+ breeds → Multi-generational mix**
+5. **If regional landrace features → Use specific designation (Aspin, Pariah, etc.)**
+6. **NEVER force-fit into common breed if rare breed matches better**
+7. **NEVER misidentify regional dogs as standardized breeds**
+8. **BE HONEST about uncertainty - low confidence is better than false confidence**
+
+**RARE BREED PROTOCOL:**
+- If a rare breed scores ≥80%, IDENTIFY IT even if uncommon
+- Examples: Azawakh, Kai Ken, Norwegian Lundehund, Stabyhoun, Thai Ridgeback
+- Provide educational note about breed rarity
+
+**MIXED BREED PROTOCOL:**
+- Be specific: \"Labrador Retriever x Border Collie mix\" NOT just \"Mixed Breed\"
+- Explain reasoning: \"Shows Labrador head/coat with Border Collie build/tail\"
+- If 3+ breeds: \"Mixed breed with primarily Terrier and Hound ancestry\"
+
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT - STRICT JSON STRUCTURE
 ═══════════════════════════════════════════════════════════════
 
 {
-  \"breed\": \"Exact breed name or 'X Mix' or 'Aspin' or 'Mixed Breed'\",
-  
-  \"confidence\": 0-100 (INTEGER - calibrated according to rules above),
-  
-  \"breed_type\": \"Purebred\" or \"Mixed Breed\" or \"Landrace\" or \"Designer Cross\",
-  
-  \"genetic_composition\": \"Pure [Breed]\" or \"[Breed1] x [Breed2] Mix\" or \"Multi-generational mix\" or \"Aspin (Philippine street dog)\",
-  
-  \"reasoning\": \"Write 3-5 detailed paragraphs explaining:
-    1. Your morphological findings
-    2. Why you selected this breed over others
-    3. What evidence supports your identification
-    4. What factors reduce certainty (if any)
-    5. How you calibrated confidence level\",
-  
   \"morphological_analysis\": {
-    \"head_type\": \"Classification + details\",
-    \"ear_type\": \"Type + description\",
-    \"coat_type\": \"Length, texture, density\",
-    \"body_build\": \"Build type + proportions\",
-    \"size_class\": \"Category + estimate\",
-    \"color_pattern\": \"Detailed description\",
-    \"distinctive_features\": \"Notable characteristics\"
+    \"skull_type\": \"mesocephalic/dolichocephalic/brachycephalic\",
+    \"ear_type\": \"detailed description\",
+    \"body_structure\": \"detailed description\",
+    \"coat_features\": \"detailed texture, length, density\",
+    \"color_genetics\": \"base color + pattern with genetic terms\",
+    \"tail_type\": \"detailed description\",
+    \"distinctive_features\": [\"feature 1\", \"feature 2\", \"feature 3\"],
+    \"size_category\": \"toy/small/medium/large/giant\",
+    \"specialized_adaptations\": \"any working dog features visible\"
   },
   
   \"candidate_breeds\": [
     {
-      \"breed\": \"Name\",
-      \"match_percentage\": 0-100,
-      \"supporting_features\": [\"feature1\", \"feature2\"],
-      \"contradicting_features\": [\"feature1\", \"feature2\"],
-      \"rarity\": \"Common/Uncommon/Rare/Very Rare\"
+      \"breed\": \"Breed Name\",
+      \"match_percentage\": 85,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
+    },
+    {
+      \"breed\": \"Breed Name 2\",
+      \"match_percentage\": 72,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\", \"feature 2\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
     }
   ],
   
+  \"breed\": \"FINAL BREED NAME or 'Breed A x Breed B mix' or 'Aspin' or 'Mixed Breed'\",
+  
+  \"confidence\": 87.5,
+  
+  \"reasoning\": \"Comprehensive 4-6 sentence explanation synthesizing all evidence. Start with: 'Based on comprehensive morphological analysis...' Include: (1) Key identifying features, (2) Why this breed over others, (3) Any contradictions explained, (4) Confidence justification. Be specific and technical.\",
+  
+  \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\" or \"regional_street_dog\",
+  
+  \"genetic_composition\": \"For mixes: '60% Breed A, 40% Breed B' or 'Primary: Breed A, Secondary: Breed B, Breed C' or 'Purebred' or 'Complex multi-generational'\",
+  
   \"alternative_possibilities\": [
-    {\"breed\": \"Second most likely breed\", \"confidence\": 0-100, \"reasoning\": \"Why this is possible\"},
-    {\"breed\": \"Third most likely\", \"confidence\": 0-100, \"reasoning\": \"Why this is possible\"}
+    {
+      \"breed\": \"Alternative 1\",
+      \"confidence\": 15.0,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    },
+    {
+      \"breed\": \"Alternative 2\",
+      \"confidence\": 8.5,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    }
   ],
   
   \"key_identifiers\": [
@@ -990,181 +1020,153 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY
 
 NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
 
-            Log::info('✓ Sending request to Gemini 2.5 Pro API with enhanced multi-stage prompt...');
+            Log::info('✓ Sending request to OpenAI API with enhanced multi-stage prompt...');
 
-            // ✅ FIXED: Using GuzzleHttp instead of Laravel Http facade
-            $client = new Client(['timeout' => 60]);
-
-            try {
-                $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={$apiKey}", [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'You are a world-class canine geneticist and morphologist specializing in rare breed identification and complex mixed-breed analysis. You have encyclopedic knowledge of 400+ breeds including regional landrace populations. Your analysis is systematic, evidence-based, and technically precise. You never guess - you analyze methodically. When uncertain, you provide honest low confidence scores to help users understand the identification may be incorrect.'
                     ],
-                    'json' => [
-                        'contents' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
                             [
-                                'parts' => [
-                                    [
-                                        'text' => $enhancedBreedPrompt
-                                    ],
-                                    [
-                                        'inline_data' => [
-                                            'mime_type' => $mimeType,
-                                            'data' => $imageData
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                'type' => 'text',
+                                'text' => $enhancedBreedPrompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                    'detail' => 'high'
+                                ],
+                            ],
                         ],
-                        'generationConfig' => [
-                            'temperature' => 0.2,
-                            'topK' => 40,
-                            'topP' => 0.95,
-                            'maxOutputTokens' => 8192,
-                            'responseMimeType' => 'application/json'
-                        ]
-                    ]
-                ]);
+                    ],
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 3000,
+                'temperature' => 0.2,
+            ]);
 
-                $statusCode = $response->getStatusCode();
-                $responseBody = $response->getBody()->getContents();
+            Log::info('✓ Received response from OpenAI API');
 
-                if ($statusCode !== 200) {
-                    Log::error('Gemini API Error', [
-                        'status' => $statusCode,
-                        'body' => $responseBody
-                    ]);
-                    return [
-                        'success' => false,
-                        'error' => 'Gemini API request failed: ' . $responseBody
-                    ];
-                }
+            $rawContent = $response->choices[0]->message->content ?? null;
+            Log::info('Raw API response: ' . substr($rawContent, 0, 1500) . '...');
 
-                $responseData = json_decode($responseBody, true);
-                Log::info('✓ Received response from Gemini API');
-
-                $rawContent = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? null;
-                Log::info('Raw API response: ' . substr($rawContent, 0, 1500) . '...');
-
-                if (empty($rawContent)) {
-                    throw new \Exception('Empty response from Gemini API');
-                }
-
-                // Clean JSON if needed
-                $rawContent = trim($rawContent);
-                $rawContent = preg_replace('/^```json\s*/i', '', $rawContent);
-                $rawContent = preg_replace('/\s*```$/i', '', $rawContent);
-
-                $apiResult = json_decode($rawContent, true);
-
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    Log::error('JSON decode error: ' . json_last_error_msg());
-                    throw new \Exception('Failed to decode JSON response');
-                }
-
-                if (!$apiResult || !isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
-                    Log::error('Invalid API response structure');
-                    Log::error('Response keys: ' . json_encode(array_keys($apiResult ?? [])));
-                    throw new \Exception('Missing required fields in API response');
-                }
-
-                // Use the ACTUAL confidence from the API - NO MODIFICATIONS
-                $actualConfidence = (float)$apiResult['confidence'];
-
-                Log::info('✓ ENHANCED API breed identification successful', [
-                    'breed' => $apiResult['breed'],
-                    'actual_confidence' => $actualConfidence,
-                    'breed_type' => $apiResult['breed_type'] ?? 'unknown',
-                    'genetic_composition' => $apiResult['genetic_composition'] ?? 'N/A',
-                    'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
-                    'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
-                    'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
-                ]);
-
-                // Build top predictions array with ONLY REAL BREEDS
-                $topPredictions = [];
-                $seenBreeds = []; // Track breeds to avoid duplicates
-
-                // Add primary breed first
-                $primaryBreed = $apiResult['breed'];
-                $topPredictions[] = [
-                    'breed' => $primaryBreed,
-                    'confidence' => round($actualConfidence, 2)
-                ];
-                $seenBreeds[] = strtolower(trim($primaryBreed));
-
-                // Add alternative possibilities (these have actual breed names and confidence scores)
-                if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
-                    foreach ($apiResult['alternative_possibilities'] as $alt) {
-                        if (isset($alt['breed']) && isset($alt['confidence'])) {
-                            $breedKey = strtolower(trim($alt['breed']));
-
-                            // Skip duplicates and only add if confidence > 0
-                            if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
-                                $topPredictions[] = [
-                                    'breed' => $alt['breed'],
-                                    'confidence' => round((float)$alt['confidence'], 2)
-                                ];
-                                $seenBreeds[] = $breedKey;
-                            }
-                        }
-                    }
-                }
-
-                // Add candidate breeds ONLY if they have meaningful confidence and aren't duplicates
-                if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
-                    foreach ($apiResult['candidate_breeds'] as $candidate) {
-                        if (isset($candidate['breed']) && count($topPredictions) < 5) {
-                            $breedKey = strtolower(trim($candidate['breed']));
-                            $confidence = (float)($candidate['match_percentage'] ?? $candidate['confidence'] ?? 0);
-
-                            // Only add if not duplicate and has reasonable confidence
-                            if (!in_array($breedKey, $seenBreeds) && $confidence > 0) {
-                                $topPredictions[] = [
-                                    'breed' => $candidate['breed'],
-                                    'confidence' => round($confidence, 2)
-                                ];
-                                $seenBreeds[] = $breedKey;
-                            }
-                        }
-                    }
-                }
-
-                // DO NOT fill with "Other Breeds" - only return real predictions
-                // Frontend will handle the display appropriately
-
-                Log::info('✓ Top predictions built', [
-                    'count' => count($topPredictions),
-                    'breeds' => array_column($topPredictions, 'breed')
-                ]);
-
-                return [
-                    'success' => true,
-                    'method' => 'api_enhanced',
-                    'breed' => $apiResult['breed'],
-                    'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
-                    'top_predictions' => $topPredictions, // Return only real predictions (no padding)
-                    'metadata' => [
-                        'reasoning' => $apiResult['reasoning'] ?? '',
-                        'key_identifiers' => $apiResult['key_identifiers'] ?? [],
-                        'breed_type' => $apiResult['breed_type'] ?? 'unknown',
-                        'genetic_composition' => $apiResult['genetic_composition'] ?? 'Unknown',
-                        'morphological_analysis' => $apiResult['morphological_analysis'] ?? [],
-                        'candidate_breeds' => $apiResult['candidate_breeds'] ?? [],
-                        'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
-                        'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
-                    ]
-                ];
-            } catch (RequestException $e) {
-                Log::error('✗ Gemini API request failed', [
-                    'error' => $e->getMessage(),
-                    'code' => $e->getCode()
-                ]);
-                return [
-                    'success' => false,
-                    'error' => 'API request failed: ' . $e->getMessage()
-                ];
+            if (empty($rawContent)) {
+                throw new \Exception('Empty response from OpenAI API');
             }
+
+            $apiResult = json_decode($rawContent, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('JSON decode error: ' . json_last_error_msg());
+                throw new \Exception('Failed to decode JSON response');
+            }
+
+            if (!$apiResult || !isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
+                Log::error('Invalid API response structure');
+                Log::error('Response keys: ' . json_encode(array_keys($apiResult ?? [])));
+                throw new \Exception('Missing required fields in API response');
+            }
+
+            // Use the ACTUAL confidence from the API - NO MODIFICATIONS
+            $actualConfidence = (float)$apiResult['confidence'];
+
+            Log::info('✓ ENHANCED API breed identification successful', [
+                'breed' => $apiResult['breed'],
+                'actual_confidence' => $actualConfidence,
+                'breed_type' => $apiResult['breed_type'] ?? 'unknown',
+                'genetic_composition' => $apiResult['genetic_composition'] ?? 'N/A',
+                'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
+                'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
+                'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
+            ]);
+
+            // Build top predictions array with ONLY REAL BREEDS
+            $topPredictions = [];
+            $seenBreeds = []; // Track breeds to avoid duplicates
+
+            // Add primary breed first
+            $primaryBreed = $apiResult['breed'];
+            $topPredictions[] = [
+                'breed' => $primaryBreed,
+                'confidence' => round($actualConfidence, 2)
+            ];
+            $seenBreeds[] = strtolower(trim($primaryBreed));
+
+            // Add alternative possibilities (these have actual breed names and confidence scores)
+            if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
+                foreach ($apiResult['alternative_possibilities'] as $alt) {
+                    if (isset($alt['breed']) && isset($alt['confidence'])) {
+                        $breedKey = strtolower(trim($alt['breed']));
+
+                        // Skip duplicates and only add if confidence > 0
+                        if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
+                            $topPredictions[] = [
+                                'breed' => $alt['breed'],
+                                'confidence' => round((float)$alt['confidence'], 2)
+                            ];
+                            $seenBreeds[] = $breedKey;
+                        }
+                    }
+                }
+            }
+
+            // Add candidate breeds ONLY if they have meaningful confidence and aren't duplicates
+            if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
+                foreach ($apiResult['candidate_breeds'] as $candidate) {
+                    if (isset($candidate['breed']) && count($topPredictions) < 5) {
+                        $breedKey = strtolower(trim($candidate['breed']));
+                        $confidence = (float)($candidate['match_percentage'] ?? $candidate['confidence'] ?? 0);
+
+                        // Only add if not duplicate and has reasonable confidence
+                        if (!in_array($breedKey, $seenBreeds) && $confidence > 0) {
+                            $topPredictions[] = [
+                                'breed' => $candidate['breed'],
+                                'confidence' => round($confidence, 2)
+                            ];
+                            $seenBreeds[] = $breedKey;
+                        }
+                    }
+                }
+            }
+
+            // DO NOT fill with "Other Breeds" - only return real predictions
+            // Frontend will handle the display appropriately
+
+            Log::info('✓ Top predictions built', [
+                'count' => count($topPredictions),
+                'breeds' => array_column($topPredictions, 'breed')
+            ]);
+
+            return [
+                'success' => true,
+                'method' => 'api_enhanced',
+                'breed' => $apiResult['breed'],
+                'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
+                'top_predictions' => $topPredictions, // Return only real predictions (no padding)
+                'metadata' => [
+                    'reasoning' => $apiResult['reasoning'] ?? '',
+                    'key_identifiers' => $apiResult['key_identifiers'] ?? [],
+                    'breed_type' => $apiResult['breed_type'] ?? 'unknown',
+                    'genetic_composition' => $apiResult['genetic_composition'] ?? 'Unknown',
+                    'morphological_analysis' => $apiResult['morphological_analysis'] ?? [],
+                    'candidate_breeds' => $apiResult['candidate_breeds'] ?? [],
+                    'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
+                    'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
+                ]
+            ];
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
+            Log::error('✗ OpenAI API Error: ' . $e->getMessage());
+            Log::error('Error code: ' . $e->getCode());
+            return [
+                'success' => false,
+                'error' => 'OpenAI API Error: ' . $e->getMessage()
+            ];
         } catch (\Exception $e) {
             Log::error('✗ Enhanced API breed identification failed: ' . $e->getMessage());
             Log::error('Error type: ' . get_class($e));
@@ -1287,66 +1289,33 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
 Be verbose and detailed. Output ONLY the JSON.";
 
-            $apiKey = env('GEMINI_API_KEY');
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You are a veterinary historian. Output only valid JSON. Be verbose and detailed.'],
+                    ['role' => 'user', 'content' => $combinedPrompt]
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 1500,
+                'temperature' => 0.3,
+            ]);
 
-            // ✅ FIXED: Using GuzzleHttp instead of Laravel Http facade
-            $client = new Client(['timeout' => 30]);
+            $content = $response->choices[0]->message->content;
+            $parsed = json_decode($content, true);
 
-            try {
-                $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                    ],
-                    'json' => [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    ['text' => $combinedPrompt]
-                                ]
-                            ]
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.3,
-                            'topK' => 40,
-                            'topP' => 0.95,
-                            'maxOutputTokens' => 2048,
-                            'responseMimeType' => 'application/json'
-                        ]
-                    ]
-                ]);
-
-                $statusCode = $response->getStatusCode();
-
-                if ($statusCode === 200) {
-                    $responseBody = $response->getBody()->getContents();
-                    $responseData = json_decode($responseBody, true);
-                    $content = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? '';
-
-                    // Clean JSON
-                    $content = trim($content);
-                    $content = preg_replace('/^```json\s*/i', '', $content);
-                    $content = preg_replace('/\s*```$/i', '', $content);
-
-                    $parsed = json_decode($content, true);
-
-                    if ($parsed) {
-                        $aiData['description'] = $parsed['description'] ?? '';
-                        $aiData['health_risks'] = $parsed['health_risks'] ?? [];
-                        $aiData['origin_history'] = $parsed['origin_data'] ?? [];
-                    }
-
-                    Log::info('✓ AI descriptions generated successfully');
-                }
-            } catch (RequestException $e) {
-                Log::error("AI generation request failed: " . $e->getMessage());
+            if ($parsed) {
+                $aiData['description'] = $parsed['description'] ?? '';
+                $aiData['health_risks'] = $parsed['health_risks'] ?? [];
+                $aiData['origin_history'] = $parsed['origin_data'] ?? [];
             }
+
+            Log::info('✓ AI descriptions generated successfully');
         } catch (\Exception $e) {
             Log::error("AI generation failed: " . $e->getMessage());
         }
 
         return $aiData;
     }
-
 
     /**
      * ==========================================
@@ -1385,59 +1354,22 @@ Be verbose and detailed. Output ONLY the JSON.";
 
 Be detailed and specific about colors and patterns.";
 
-            $apiKey = env('GEMINI_API_KEY');
-
-            // ✅ FIXED: Using GuzzleHttp instead of Laravel Http facade
-            $client = new Client(['timeout' => 20]);
-
-            try {
-                $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $visionPrompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => "data:{$mimeType};base64,{$imageData}"]],
                     ],
-                    'json' => [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    ['text' => $visionPrompt],
-                                    [
-                                        'inline_data' => [
-                                            'mime_type' => $mimeType,
-                                            'data' => $imageData
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.4,
-                            'topK' => 40,
-                            'topP' => 0.95,
-                            'maxOutputTokens' => 1024,
-                            'responseMimeType' => 'application/json'
-                        ]
-                    ]
-                ]);
+                ]],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 500,
+            ]);
 
-                $statusCode = $response->getStatusCode();
-
-                if ($statusCode === 200) {
-                    $responseBody = $response->getBody()->getContents();
-                    $responseData = json_decode($responseBody, true);
-                    $content = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? '';
-
-                    // Clean JSON
-                    $content = trim($content);
-                    $content = preg_replace('/^```json\s*/i', '', $content);
-                    $content = preg_replace('/\s*```$/i', '', $content);
-
-                    $features = json_decode($content, true);
-                    if ($features) {
-                        $dogFeatures = array_merge($dogFeatures, $features);
-                    }
-                }
-            } catch (RequestException $e) {
-                Log::error("Feature extraction request failed: " . $e->getMessage());
+            $features = json_decode($response->choices[0]->message->content, true);
+            if ($features) {
+                $dogFeatures = array_merge($dogFeatures, $features);
             }
         } catch (\Exception $e) {
             Log::error("Feature extraction failed: " . $e->getMessage());
@@ -1445,6 +1377,7 @@ Be detailed and specific about colors and patterns.";
 
         return $dogFeatures;
     }
+
     /**
      * ==========================================
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
@@ -1453,7 +1386,7 @@ Be detailed and specific about colors and patterns.";
     private function validateDogImage($imagePath): array
     {
         try {
-            Log::info('🔍 Starting dog validation with Gemini Vision', [
+            Log::info('🔍 Starting dog validation with OpenAI Vision', [
                 'image_path' => $imagePath
             ]);
 
@@ -1461,80 +1394,40 @@ Be detailed and specific about colors and patterns.";
             $imageData = base64_encode(file_get_contents($imagePath));
             $mimeType = mime_content_type($imagePath);
 
-            $apiKey = env('GEMINI_API_KEY');
-
-            // ✅ FIXED: Using GuzzleHttp instead of Laravel Http facade
-            $client = new Client(['timeout' => 20]);
-
-            try {
-                $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                    ],
-                    'json' => [
-                        'contents' => [
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
                             [
-                                'parts' => [
-                                    [
-                                        'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
-                                    ],
-                                    [
-                                        'inline_data' => [
-                                            'mime_type' => $mimeType,
-                                            'data' => $imageData
-                                        ]
-                                    ]
-                                ]
-                            ]
+                                'type' => 'text',
+                                'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                ],
+                            ],
                         ],
-                        'generationConfig' => [
-                            'temperature' => 0.3,
-                            'topK' => 40,
-                            'topP' => 0.95,
-                            'maxOutputTokens' => 10
-                        ]
-                    ]
-                ]);
+                    ],
+                ],
+                'max_tokens' => 10,
+            ]);
 
-                $statusCode = $response->getStatusCode();
-                $responseBody = $response->getBody()->getContents();
+            $answer = trim(strtoupper($response->choices[0]->message->content));
+            $isDog = str_contains($answer, 'YES');
 
-                if ($statusCode !== 200) {
-                    Log::error('Gemini validation API error', [
-                        'status' => $statusCode,
-                        'body' => $responseBody
-                    ]);
-                    // On error, allow the image through (fail-open approach)
-                    return [
-                        'is_dog' => true,
-                        'raw_response' => 'API Error'
-                    ];
-                }
+            Log::info('✓ OpenAI dog validation complete', [
+                'answer' => $answer,
+                'is_dog' => $isDog
+            ]);
 
-                $responseData = json_decode($responseBody, true);
-                $answer = trim(strtoupper($responseData['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-                $isDog = str_contains($answer, 'YES');
-
-                Log::info('✓ Gemini dog validation complete', [
-                    'answer' => $answer,
-                    'is_dog' => $isDog
-                ]);
-
-                return [
-                    'is_dog' => $isDog,
-                    'raw_response' => $answer
-                ];
-            } catch (RequestException $e) {
-                Log::error('❌ Dog validation request failed', [
-                    'error' => $e->getMessage()
-                ]);
-
-                // On error, allow the image through (fail-open approach)
-                return [
-                    'is_dog' => true,
-                    'raw_response' => 'Request Error'
-                ];
-            }
+            return [
+                'is_dog' => $isDog,
+                'raw_response' => $answer
+            ];
         } catch (\Exception $e) {
             Log::error('❌ Dog validation failed', [
                 'error' => $e->getMessage(),
@@ -1542,13 +1435,13 @@ Be detailed and specific about colors and patterns.";
             ]);
 
             // On error, allow the image through (fail-open approach)
+            // Change to ['is_dog' => false] for fail-closed behavior
             return [
                 'is_dog' => true,
-                'raw_response' => 'Exception Error'
+                'error' => $e->getMessage()
             ];
         }
     }
-
 
     /**
      * ==========================================

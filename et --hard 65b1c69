@@ -1,0 +1,43 @@
+[33m83619ba[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: back openai
+[33m7eb59f2[m HEAD@{1}: reset: moving to HEAD~2
+[33m65b1c69[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{2}: reset: moving to HEAD
+[33m65b1c69[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{3}: reset: moving to HEAD
+[33m65b1c69[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{4}: commit: try fix
+[33mee8dfb6[m HEAD@{5}: commit: used gemini api
+[33m7eb59f2[m HEAD@{6}: commit: jjjjj
+[33m04ca5f2[m HEAD@{7}: commit: fixed scan.tsx
+[33m32a54ca[m HEAD@{8}: commit: latest103
+[33m0a07ef3[m HEAD@{9}: commit: latest102
+[33m8867024[m HEAD@{10}: commit: latest101
+[33m5d98692[m HEAD@{11}: commit: latest10
+[33m08b6a6d[m HEAD@{12}: commit: gh
+[33m8582a33[m HEAD@{13}: commit: latest8
+[33m2bda76f[m HEAD@{14}: commit: fixed history render
+[33m01483e5[m HEAD@{15}: commit: added delete in history cards
+[33mfde1e6c[m HEAD@{16}: commit: fixed top brreds
+[33m9fd5918[m HEAD@{17}: commit: fix leaning
+[33m658f76e[m HEAD@{18}: commit: sddf
+[33m006673f[m HEAD@{19}: commit: g
+[33m167b2e3[m HEAD@{20}: commit: f
+[33m2c68e22[m HEAD@{21}: commit: fixes bugs
+[33ma00e7d1[m HEAD@{22}: commit: w
+[33md50d9d6[m HEAD@{23}: commit: fix image rendering
+[33ma64dade[m HEAD@{24}: commit: Switch to object storage for images
+[33mf2ea8fa[m HEAD@{25}: commit: moved simcontroller
+[33mdf302fb[m HEAD@{26}: commit: Fix folder capitalization for PSR-4 compliance
+[33m18900fc[m HEAD@{27}: commit: Remove duplicate personal_access_tokens migration
+[33m36d5a36[m HEAD@{28}: commit: latest6
+[33mef18707[m HEAD@{29}: commit: latest3.9
+[33macb20a3[m HEAD@{30}: commit: latest2.0
+[33m456a9f3[m HEAD@{31}: commit: all working
+[33mc4241fe[m HEAD@{32}: commit: working admin portal
+[33m098f19d[m HEAD@{33}: commit: latest
+[33md0d157c[m HEAD@{34}: reset: moving to HEAD~3
+[33m36bb67d[m HEAD@{35}: commit: Ignore large model file
+[33m3e49317[m HEAD@{36}: commit: lastest2
+[33m9b6e97e[m HEAD@{37}: commit: latest
+[33md0d157c[m HEAD@{38}: commit: finished UI of model portal
+[33m9ad9647[m HEAD@{39}: commit: added model portal(partial)
+[33m60cf450[m HEAD@{40}: commit: added scan results page, simulation and origin page
+[33m5493bc6[m HEAD@{41}: commit: added landing page and scan page
+[33m4a1dca9[m HEAD@{42}: commit (initial): Initial commit: PetBreedID Laravel + React application
