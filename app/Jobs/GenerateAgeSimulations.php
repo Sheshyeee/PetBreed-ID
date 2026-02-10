@@ -80,7 +80,7 @@ class GenerateAgeSimulations implements ShouldQueue
 
       Log::info("Ages: Current={$currentAgeYears}y, +1year={$age1YearLater}y, +3years={$age3YearsLater}y");
 
-      // Age descriptions for Gemini Imagen
+      // Age descriptions for image generation
       $getAgeDescription = function ($ageYears) {
         if ($ageYears < 2) {
           return "young puppy with bright clear eyes, glossy shiny coat, energetic posture, youthful facial features";
@@ -97,7 +97,6 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 1_years simulation ===");
 
-        // OPTIMIZED PROMPT FOR GEMINI IMAGEN (Nano Banana Pro)
         $prompt1Year = "Professional high-quality photograph of a {$this->breed} dog. Physical characteristics: {$coatColor} colored fur with {$coatPattern} pattern, {$coatLength} coat length, {$build} body build. Age appearance: {$getAgeDescription($age1YearLater)}. Portrait style photography, natural outdoor lighting, sharp focus, photorealistic, detailed texture, professional pet photography quality.";
 
         Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 150) . "...");
@@ -123,14 +122,13 @@ class GenerateAgeSimulations implements ShouldQueue
         $simulationData['error_1year'] = 'Image generation failed: ' . $e->getMessage();
       }
 
-      // Wait between API calls
+      // Wait between API calls to avoid rate limits
       sleep(3);
 
       // GENERATE 3-YEAR IMAGE
       try {
         Log::info("=== Generating 3_years simulation ===");
 
-        // OPTIMIZED PROMPT FOR GEMINI IMAGEN
         $prompt3Years = "Professional high-quality photograph of a {$this->breed} dog. Physical characteristics: {$coatColor} colored fur with {$coatPattern} pattern, {$coatLength} coat length, {$build} body build. Age appearance: {$getAgeDescription($age3YearsLater)}. Portrait style photography, natural outdoor lighting, sharp focus, photorealistic, detailed texture, professional pet photography quality.";
 
         Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 150) . "...");
@@ -170,7 +168,8 @@ class GenerateAgeSimulations implements ShouldQueue
         '1_years' => null,
         '3_years' => null,
         'status' => 'failed',
-        'error' => $e->getMessage()
+        'error' => $e->getMessage(),
+        'dog_features' => $this->dogFeatures
       ];
 
       Results::where('id', $this->resultId)->update([
@@ -180,7 +179,8 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * ✅ FIXED: Generate image using Gemini Nano Banana Pro (Image Generation Model)
+   * ✅ FIXED: Generate image using Gemini 2.5 Flash Image (Nano Banana)
+   * Uses the correct model: gemini-2.5-flash-image
    * Returns binary image data or null on failure
    */
   private function generateImageWithGemini(string $prompt): ?string
@@ -192,13 +192,13 @@ class GenerateAgeSimulations implements ShouldQueue
         throw new \Exception('GEMINI_API_KEY not configured');
       }
 
-      Log::info('Calling Gemini Nano Banana Pro for image generation...');
+      Log::info('Calling Gemini 2.5 Flash Image (Nano Banana) for image generation...');
 
-      // ✅ FIXED: Using GuzzleHttp instead of Laravel Http facade
       $client = new Client(['timeout' => 120]);
 
       try {
-        $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/nano-banana-pro-preview:generateContent?key={$apiKey}", [
+        // ✅ CORRECT MODEL: gemini-2.5-flash-image (not nano-banana-pro-preview)
+        $response = $client->request('POST', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={$apiKey}", [
           'headers' => [
             'Content-Type' => 'application/json',
           ],
@@ -212,7 +212,7 @@ class GenerateAgeSimulations implements ShouldQueue
             ],
             'generationConfig' => [
               'temperature' => 0.8,
-              'topK' => 40,
+              'topK' => 64,
               'topP' => 0.95,
               'maxOutputTokens' => 8192,
             ]
@@ -225,12 +225,17 @@ class GenerateAgeSimulations implements ShouldQueue
         if ($statusCode !== 200) {
           Log::error('Gemini API Error', [
             'status' => $statusCode,
-            'body' => $responseBody
+            'body' => substr($responseBody, 0, 500)
           ]);
-          throw new \Exception('Gemini API request failed: ' . $responseBody);
+          throw new \Exception('Gemini API request failed with status: ' . $statusCode);
         }
 
         $data = json_decode($responseBody, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+          Log::error('JSON decode error: ' . json_last_error_msg());
+          throw new \Exception('Invalid JSON response from Gemini API');
+        }
 
         Log::info('Gemini Response received', [
           'has_candidates' => isset($data['candidates']),
@@ -238,35 +243,38 @@ class GenerateAgeSimulations implements ShouldQueue
         ]);
 
         // Extract image data from response
-        // Gemini Imagen returns base64 encoded image in inlineData
+        // Gemini 2.5 Flash Image returns base64 encoded image in inlineData
         if (isset($data['candidates'][0]['content']['parts'][0]['inlineData']['data'])) {
           $base64Data = $data['candidates'][0]['content']['parts'][0]['inlineData']['data'];
           $imageData = base64_decode($base64Data);
 
+          if ($imageData === false) {
+            throw new \Exception('Failed to decode base64 image data');
+          }
+
           Log::info('✓ Image extracted from Gemini response', [
-            'data_size' => strlen($imageData)
+            'data_size' => strlen($imageData),
+            'mime_type' => $data['candidates'][0]['content']['parts'][0]['inlineData']['mimeType'] ?? 'unknown'
           ]);
 
           return $imageData;
         }
 
-        // Alternative: check if there's a text response with image URL
-        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-          $text = $data['candidates'][0]['content']['parts'][0]['text'];
+        // Check if there's an error in the response
+        if (isset($data['error'])) {
+          Log::error('Gemini API returned error', [
+            'error' => $data['error']
+          ]);
+          throw new \Exception('Gemini API error: ' . json_encode($data['error']));
+        }
 
-          // Check if text contains a base64 image
-          if (preg_match('/data:image\/[^;]+;base64,([^"]+)/', $text, $matches)) {
-            $imageData = base64_decode($matches[1]);
-            Log::info('✓ Image extracted from text response');
-            return $imageData;
-          }
-
-          // Check if it's a URL
-          if (filter_var($text, FILTER_VALIDATE_URL)) {
-            Log::info('✓ Downloading image from URL: ' . $text);
-            $imageData = file_get_contents($text);
-            return $imageData;
-          }
+        // Check for content filters or blocks
+        if (isset($data['candidates'][0]['finishReason']) && $data['candidates'][0]['finishReason'] !== 'STOP') {
+          Log::warning('Image generation blocked', [
+            'finish_reason' => $data['candidates'][0]['finishReason'],
+            'safety_ratings' => $data['candidates'][0]['safetyRatings'] ?? []
+          ]);
+          throw new \Exception('Image generation blocked: ' . $data['candidates'][0]['finishReason']);
         }
 
         Log::error('No image data found in Gemini response', [
@@ -274,9 +282,15 @@ class GenerateAgeSimulations implements ShouldQueue
         ]);
         throw new \Exception('No image data found in Gemini response');
       } catch (RequestException $e) {
+        $errorBody = '';
+        if ($e->hasResponse()) {
+          $errorBody = $e->getResponse()->getBody()->getContents();
+        }
+
         Log::error('Gemini API request failed', [
           'error' => $e->getMessage(),
-          'code' => $e->getCode()
+          'code' => $e->getCode(),
+          'response' => substr($errorBody, 0, 500)
         ]);
         throw new \Exception('Gemini image generation request failed: ' . $e->getMessage());
       }
