@@ -3,7 +3,7 @@ import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { Camera, CheckCircle2, CircleAlert, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, CircleAlert, XCircle, SwitchCamera } from 'lucide-react';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 interface PredictionResult {
@@ -20,6 +20,7 @@ interface SuccessFlash {
 
 interface ErrorFlash {
     message: string;
+    not_a_dog?: boolean;
 }
 
 interface PageProps {
@@ -34,6 +35,8 @@ interface PageProps {
 
 const Scan = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     const pageProps = usePage<PageProps>().props;
 
     const success = pageProps.flash?.success || pageProps.success;
@@ -47,6 +50,9 @@ const Scan = () => {
     const [showResults, setShowResults] = useState(false);
     const [fileInfo, setFileInfo] = useState<string>('');
     const [showLoading, setShowLoading] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
     useEffect(() => {
         if (success) {
@@ -57,6 +63,15 @@ const Scan = () => {
             setShowLoading(false);
         }
     }, [success, error]);
+
+    // Cleanup camera stream on unmount
+    useEffect(() => {
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [stream]);
 
     const validateImageFile = (file: File): string | null => {
         if (file.size > 10 * 1024 * 1024) {
@@ -85,52 +100,133 @@ const Scan = () => {
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            console.log('=== FILE SELECTED ===');
-            console.log('Name:', file.name);
-            console.log('Size:', file.size, 'bytes');
-            console.log('Type:', file.type);
-
-            const validationError = validateImageFile(file);
-            if (validationError) {
-                alert(validationError);
-                e.target.value = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = e.target?.result as string;
-                setPreview(result);
-
-                const img = new Image();
-                img.onload = () => {
-                    console.log('Image loaded successfully');
-                    console.log('Dimensions:', img.width, 'x', img.height);
-                    setFileInfo(
-                        `${file.name} (${(file.size / 1024).toFixed(1)}KB, ${img.width}x${img.height})`,
-                    );
-                };
-                img.onerror = () => {
-                    console.error('Failed to load image preview');
-                    setFileInfo(
-                        `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
-                    );
-                };
-                img.src = result;
-            };
-            reader.onerror = () => {
-                console.error('Failed to read file');
-                alert('Failed to read the file.');
-            };
-            reader.readAsDataURL(file);
-
-            setData('image', file);
-            setShowResults(false);
+            processImageFile(file);
         }
+    };
+
+    const processImageFile = (file: File) => {
+        console.log('=== FILE SELECTED ===');
+        console.log('Name:', file.name);
+        console.log('Size:', file.size, 'bytes');
+        console.log('Type:', file.type);
+
+        const validationError = validateImageFile(file);
+        if (validationError) {
+            alert(validationError);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            setPreview(result);
+
+            const img = new Image();
+            img.onload = () => {
+                console.log('Image loaded successfully');
+                console.log('Dimensions:', img.width, 'x', img.height);
+                setFileInfo(
+                    `${file.name} (${(file.size / 1024).toFixed(1)}KB, ${img.width}x${img.height})`,
+                );
+            };
+            img.onerror = () => {
+                console.error('Failed to load image preview');
+                setFileInfo(
+                    `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
+                );
+            };
+            img.src = result;
+        };
+        reader.onerror = () => {
+            console.error('Failed to read file');
+            alert('Failed to read the file.');
+        };
+        reader.readAsDataURL(file);
+
+        setData('image', file);
+        setShowResults(false);
+        stopCamera();
     };
 
     const triggerFileInput = (): void => {
         fileInputRef.current?.click();
+    };
+
+    const startCamera = async () => {
+        try {
+            // Stop any existing stream
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            };
+
+            const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = mediaStream;
+                videoRef.current.play();
+            }
+            
+            setStream(mediaStream);
+            setShowCamera(true);
+        } catch (err) {
+            console.error('Error accessing camera:', err);
+            alert('Unable to access camera. Please check permissions or use file upload instead.');
+        }
+    };
+
+    const stopCamera = () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
+        }
+        setShowCamera(false);
+    };
+
+    const switchCamera = async () => {
+        const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+        setFacingMode(newFacingMode);
+        
+        if (showCamera) {
+            // Restart camera with new facing mode
+            stopCamera();
+            setTimeout(() => {
+                startCamera();
+            }, 100);
+        }
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(video, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File(
+                            [blob], 
+                            `camera-capture-${Date.now()}.jpg`, 
+                            { type: 'image/jpeg' }
+                        );
+                        processImageFile(file);
+                    }
+                }, 'image/jpeg', 0.95);
+            }
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -170,6 +266,7 @@ const Scan = () => {
         setShowResults(false);
         setFileInfo('');
         setShowLoading(false);
+        stopCamera();
     };
 
     return (
@@ -185,11 +282,11 @@ const Scan = () => {
                     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex-1">
                             <h1 className="text-lg font-bold tracking-tight text-gray-900 sm:text-lg dark:text-white">
-                                Scan Your Pet
+                                Scan Your Dog
                             </h1>
                             <p className="mt-[-5px] text-sm text-gray-600 sm:text-sm dark:text-gray-400">
                                 Upload a photo or use your camera to identify
-                                your pet's breed with AI-powered analysis.
+                                your dog's breed with AI-powered analysis.
                             </p>
                         </div>
                         <Button
@@ -212,11 +309,19 @@ const Scan = () => {
                                     />
                                     <div className="flex-1">
                                         <p className="font-semibold text-red-900 dark:text-red-400">
-                                            Error
+                                            {error.not_a_dog ? 'Not a Dog Detected' : 'Error'}
                                         </p>
                                         <p className="mt-1 text-sm text-red-700 dark:text-red-300">
                                             {error.message}
                                         </p>
+                                        {error.not_a_dog && (
+                                            <Button
+                                                onClick={handleReset}
+                                                className="mt-4 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                                            >
+                                                Upload Another Image
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -304,7 +409,7 @@ const Scan = () => {
                     <Card className="mx-auto w-full max-w-4xl border-gray-200 bg-white p-1 shadow-md dark:border-gray-800 dark:bg-gray-900">
                         <form onSubmit={handleSubmit}>
                             <CardContent className="p-6 sm:p-8">
-                                {!preview ? (
+                                {!preview && !showCamera ? (
                                     <>
                                         <div
                                             onClick={triggerFileInput}
@@ -327,7 +432,7 @@ const Scan = () => {
                                                 </div>
 
                                                 <p className="mt-4 text-base font-medium text-gray-700 dark:text-gray-300">
-                                                    Drop your image here
+                                                    Drop your dog image here
                                                 </p>
                                                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                                                     or click to browse
@@ -337,6 +442,19 @@ const Scan = () => {
                                                     • Max 10 MB
                                                 </p>
                                             </div>
+                                        </div>
+
+                                        {/* Camera Button */}
+                                        <div className="mt-4 flex justify-center">
+                                            <Button
+                                                type="button"
+                                                onClick={startCamera}
+                                                variant="outline"
+                                                className="gap-2 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                            >
+                                                <Camera size={20} />
+                                                Use Camera
+                                            </Button>
                                         </div>
 
                                         {errors.image && (
@@ -361,7 +479,7 @@ const Scan = () => {
                                                     <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
                                                         <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
                                                         <span>
-                                                            Ensure your pet is
+                                                            Ensure your dog is
                                                             clearly visible in
                                                             the frame
                                                         </span>
@@ -377,7 +495,7 @@ const Scan = () => {
                                                     <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
                                                         <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
                                                         <span>
-                                                            Center your pet and
+                                                            Center your dog and
                                                             avoid cluttered
                                                             backgrounds
                                                         </span>
@@ -390,10 +508,60 @@ const Scan = () => {
                                                             accuracy
                                                         </span>
                                                     </li>
+                                                    <li className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400"></span>
+                                                        <span className="font-semibold">
+                                                            Only dog images are accepted
+                                                        </span>
+                                                    </li>
                                                 </ul>
                                             </CardContent>
                                         </Card>
                                     </>
+                                ) : showCamera ? (
+                                    <div>
+                                        <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                                            <video
+                                                ref={videoRef}
+                                                autoPlay
+                                                playsInline
+                                                className="mx-auto max-h-96 w-full object-contain"
+                                            />
+                                            <canvas
+                                                ref={canvasRef}
+                                                className="hidden"
+                                            />
+                                            
+                                            {/* Switch Camera Button */}
+                                            <button
+                                                type="button"
+                                                onClick={switchCamera}
+                                                className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white transition-all hover:bg-black/70"
+                                                title="Switch Camera"
+                                            >
+                                                <SwitchCamera size={24} />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                                            <Button
+                                                type="button"
+                                                onClick={capturePhoto}
+                                                className="w-full bg-blue-600 hover:bg-blue-700 sm:flex-1 dark:bg-blue-600 dark:hover:bg-blue-700"
+                                            >
+                                                <Camera size={20} className="mr-2" />
+                                                Capture Photo
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                className="w-full border-gray-300 bg-white hover:bg-gray-50 sm:w-auto sm:px-8 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                                variant="outline"
+                                                onClick={stopCamera}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div>
                                         <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
