@@ -21,22 +21,22 @@ class GenerateAgeSimulations implements ShouldQueue
 
   protected $resultId;
   protected $breed;
-  protected $imagePath; // CHANGED: Now stores image path instead of features
+  protected $imagePath;
 
   /**
-   * UPDATED CONSTRUCTOR: Now accepts image path instead of dog features
+   * Constructor: Now accepts image path
    */
   public function __construct($resultId, $breed, $imagePath)
   {
     $this->resultId = $resultId;
     $this->breed = $breed;
-    $this->imagePath = $imagePath; // CHANGED: Store image path
+    $this->imagePath = $imagePath;
   }
 
   public function handle()
   {
     try {
-      Log::info("=== GENERATING AGE SIMULATIONS ===");
+      Log::info("=== GENERATING AGE SIMULATIONS (IMAGE-TO-IMAGE) ===");
       Log::info("Result ID: {$this->resultId}, Breed: {$this->breed}");
 
       $result = Results::find($this->resultId);
@@ -46,8 +46,14 @@ class GenerateAgeSimulations implements ShouldQueue
         return;
       }
 
-      // EXTRACT DOG FEATURES HERE (moved from controller)
-      Log::info("→ Extracting dog features from image...");
+      // EXTRACT DOG FEATURES AND PREPARE ORIGINAL IMAGE
+      Log::info("→ Preparing original image for image-to-image generation...");
+      $imageData = $this->prepareOriginalImage($this->imagePath);
+
+      if (!$imageData) {
+        throw new \Exception("Failed to load original image");
+      }
+
       $dogFeatures = $this->extractDogFeatures($this->imagePath, $this->breed);
       Log::info("✓ Dog features extracted", $dogFeatures);
 
@@ -56,7 +62,7 @@ class GenerateAgeSimulations implements ShouldQueue
         '1_years' => null,
         '3_years' => null,
         'status' => 'generating',
-        'dog_features' => $dogFeatures // NOW we have the features
+        'dog_features' => $dogFeatures
       ];
 
       // Update status to generating IMMEDIATELY
@@ -64,11 +70,15 @@ class GenerateAgeSimulations implements ShouldQueue
       Log::info("✓ Status updated to 'generating'");
 
       // Extract features with defaults
-      $coatColor = isset($dogFeatures['coat_color']) ? $dogFeatures['coat_color'] : 'brown';
-      $coatPattern = isset($dogFeatures['coat_pattern']) ? $dogFeatures['coat_pattern'] : 'solid';
-      $coatLength = isset($dogFeatures['coat_length']) ? $dogFeatures['coat_length'] : 'medium';
-      $build = isset($dogFeatures['build']) ? $dogFeatures['build'] : 'medium';
-      $estimatedAge = isset($dogFeatures['estimated_age']) ? $dogFeatures['estimated_age'] : 'young adult';
+      $coatColor = $dogFeatures['coat_color'] ?? 'brown';
+      $coatPattern = $dogFeatures['coat_pattern'] ?? 'solid';
+      $coatLength = $dogFeatures['coat_length'] ?? 'medium';
+      $coatTexture = $dogFeatures['coat_texture'] ?? 'smooth';
+      $build = $dogFeatures['build'] ?? 'medium';
+      $estimatedAge = $dogFeatures['estimated_age'] ?? 'young adult';
+      $distinctiveMarkings = $dogFeatures['distinctive_markings'] ?? 'none';
+      $earType = $dogFeatures['ear_type'] ?? 'unknown';
+      $eyeColor = $dogFeatures['eye_color'] ?? 'brown';
 
       // Convert estimated age to numeric years
       $estimatedAgeLower = strtolower($estimatedAge);
@@ -99,35 +109,67 @@ class GenerateAgeSimulations implements ShouldQueue
 
       Log::info("Ages: Current={$currentAgeYears}y, +1year={$age1YearLater}y, +3years={$age3YearsLater}y");
 
-      // SIMPLIFIED, SAFER PROMPTS
-      $getSimpleAgeDescription = function ($ageYears) {
+      // DETAILED AGING DESCRIPTIONS
+      $getAgingChanges = function ($ageYears) use ($currentAgeYears, $coatColor, $distinctiveMarkings) {
+        $yearsOlder = $ageYears - $currentAgeYears;
+
+        $changes = [];
+
+        // Age-specific changes
         if ($ageYears < 2) {
-          return "youthful appearance, shiny coat, bright eyes";
+          $changes[] = "youthful, vibrant appearance";
+          $changes[] = "bright, clear eyes";
+          $changes[] = "glossy, shiny coat";
+          $changes[] = "energetic expression";
         } elseif ($ageYears < 5) {
-          return "adult appearance, healthy coat, alert expression";
+          $changes[] = "mature adult appearance";
+          $changes[] = "well-developed muscular build";
+          $changes[] = "healthy, lustrous coat";
+          $changes[] = "alert, confident expression";
         } elseif ($ageYears < 8) {
-          return "mature appearance, some gray around muzzle";
+          $changes[] = "mature appearance with subtle aging signs";
+          $changes[] = "slight gray/white hairs beginning around the muzzle";
+          $changes[] = "slightly less glossy coat texture";
+          $changes[] = "calm, wise expression";
+          $changes[] = "possible minor whitening around eyebrows";
         } else {
-          return "senior appearance, more gray fur, calm expression";
+          $changes[] = "distinguished senior appearance";
+          $changes[] = "noticeable gray/white fur around muzzle, face, and eyebrows";
+          $changes[] = "coat may be slightly duller or coarser";
+          $changes[] = "gentle, calm expression";
+          $changes[] = "possible whitening on chest and paws";
+          $changes[] = "eyes may appear slightly cloudier or wiser";
         }
+
+        return implode(', ', $changes);
       };
 
-      // GENERATE 1-YEAR IMAGE
+      // GENERATE 1-YEAR IMAGE (IMAGE-TO-IMAGE)
       try {
-        Log::info("=== Generating 1_years simulation ===");
+        Log::info("=== Generating 1_years simulation (IMAGE-TO-IMAGE) ===");
 
-        $prompt1Year = "A {$this->breed} dog portrait, {$coatColor} colored {$coatLength} fur with {$coatPattern} pattern, {$build} build, {$getSimpleAgeDescription($age1YearLater)}, professional pet photography, natural outdoor lighting";
+        // CRITICAL: Image-to-image prompt that references the original dog
+        $prompt1Year = "Transform this exact dog to show how it will look in {$age1YearLater} years old. "
+          . "PRESERVE: The dog's unique facial features, exact {$coatColor} coloring, {$coatPattern} pattern, "
+          . "{$distinctiveMarkings} markings, {$earType} ears, {$eyeColor} eyes, and overall appearance. "
+          . "CHANGE ONLY: Age the dog by exactly 1 year. Apply these aging changes: {$getAgingChanges($age1YearLater)}. "
+          . "The dog MUST remain recognizably the same individual dog, just {$age1YearLater} years old. "
+          . "Keep the same pose, lighting, and background style. Professional pet photography quality.";
 
-        Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 150) . "...");
+        Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 200) . "...");
 
-        // Call Gemini Nano Banana Pro API
-        $imageData = $this->generateImageWithGemini($prompt1Year);
+        // Call Gemini with IMAGE-TO-IMAGE (passing original image)
+        $imageOutput = $this->generateImageWithGemini(
+          $prompt1Year,
+          $imageData['base64'],
+          $imageData['mimeType']
+        );
 
-        if ($imageData) {
+        if ($imageOutput) {
           $simulationFilename = "simulation_1_years_" . time() . "_" . Str::random(6) . ".png";
           $simulationPath = "simulations/{$simulationFilename}";
 
-          Storage::disk('object-storage')->put($simulationPath, $imageData);
+          Storage::disk('object-storage')->put($simulationPath, $imageOutput);
           $simulationData['1_years'] = $simulationPath;
 
           // UPDATE DATABASE IMMEDIATELY
@@ -145,22 +187,32 @@ class GenerateAgeSimulations implements ShouldQueue
       // Wait between API calls
       sleep(3);
 
-      // GENERATE 3-YEAR IMAGE
+      // GENERATE 3-YEAR IMAGE (IMAGE-TO-IMAGE)
       try {
-        Log::info("=== Generating 3_years simulation ===");
+        Log::info("=== Generating 3_years simulation (IMAGE-TO-IMAGE) ===");
 
-        $prompt3Years = "A {$this->breed} dog portrait, {$coatColor} colored {$coatLength} fur with {$coatPattern} pattern, {$build} build, {$getSimpleAgeDescription($age3YearsLater)}, professional pet photography, natural outdoor lighting";
+        // CRITICAL: Image-to-image prompt for 3 years aging
+        $prompt3Years = "Transform this exact dog to show how it will look in {$age3YearsLater} years old. "
+          . "PRESERVE: The dog's unique facial features, exact {$coatColor} coloring, {$coatPattern} pattern, "
+          . "{$distinctiveMarkings} markings, {$earType} ears, {$eyeColor} eyes, and overall appearance. "
+          . "CHANGE ONLY: Age the dog by exactly 3 years. Apply these aging changes: {$getAgingChanges($age3YearsLater)}. "
+          . "The dog MUST remain recognizably the same individual dog, just {$age3YearsLater} years old. "
+          . "Keep the same pose, lighting, and background style. Professional pet photography quality.";
 
-        Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 150) . "...");
+        Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 200) . "...");
 
-        // Call Gemini Nano Banana Pro API
-        $imageData = $this->generateImageWithGemini($prompt3Years);
+        // Call Gemini with IMAGE-TO-IMAGE (passing original image)
+        $imageOutput = $this->generateImageWithGemini(
+          $prompt3Years,
+          $imageData['base64'],
+          $imageData['mimeType']
+        );
 
-        if ($imageData) {
+        if ($imageOutput) {
           $simulationFilename = "simulation_3_years_" . time() . "_" . Str::random(6) . ".png";
           $simulationPath = "simulations/{$simulationFilename}";
 
-          Storage::disk('object-storage')->put($simulationPath, $imageData);
+          Storage::disk('object-storage')->put($simulationPath, $imageOutput);
           $simulationData['3_years'] = $simulationPath;
 
           Log::info("✓ Generated 3_years: {$simulationPath}");
@@ -200,8 +252,53 @@ class GenerateAgeSimulations implements ShouldQueue
 
   /**
    * ==========================================
-   * NEW: Extract Dog Features using Gemini API
-   * MOVED FROM ScanResultController.php
+   * NEW: Prepare original image for image-to-image generation
+   * ==========================================
+   */
+  private function prepareOriginalImage($fullPath)
+  {
+    try {
+      // Download image from object storage
+      $imageContents = Storage::disk('object-storage')->get($fullPath);
+
+      if ($imageContents === false) {
+        throw new \Exception('Failed to download image from object storage');
+      }
+
+      // Create temporary file to get mime type
+      $tempPath = tempnam(sys_get_temp_dir(), 'orig_image_');
+      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+      $tempPathWithExt = $tempPath . '.' . $extension;
+      rename($tempPath, $tempPathWithExt);
+
+      file_put_contents($tempPathWithExt, $imageContents);
+
+      $imageData = base64_encode($imageContents);
+      $mimeType = mime_content_type($tempPathWithExt);
+
+      // Clean up temp file
+      if (file_exists($tempPathWithExt)) {
+        unlink($tempPathWithExt);
+      }
+
+      Log::info('✓ Original image prepared for image-to-image', [
+        'mime_type' => $mimeType,
+        'size_bytes' => strlen($imageContents)
+      ]);
+
+      return [
+        'base64' => $imageData,
+        'mimeType' => $mimeType
+      ];
+    } catch (\Exception $e) {
+      Log::error("Failed to prepare original image: " . $e->getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * ==========================================
+   * Extract Dog Features using Gemini API
    * ==========================================
    */
   private function extractDogFeatures($fullPath, $detectedBreed)
@@ -210,9 +307,12 @@ class GenerateAgeSimulations implements ShouldQueue
       'coat_color' => 'brown',
       'coat_pattern' => 'solid',
       'coat_length' => 'medium',
+      'coat_texture' => 'smooth',
       'estimated_age' => 'young adult',
       'build' => 'medium',
       'distinctive_markings' => 'none',
+      'ear_type' => 'unknown',
+      'eye_color' => 'brown',
     ];
 
     try {
@@ -312,9 +412,12 @@ Be detailed and specific about colors and patterns.";
   }
 
   /**
-   * Generate image using Gemini Nano Banana Pro 3 API
+   * ==========================================
+   * FIXED: Generate image using IMAGE-TO-IMAGE with Gemini
+   * This preserves the dog's appearance while aging it
+   * ==========================================
    */
-  private function generateImageWithGemini($prompt)
+  private function generateImageWithGemini($prompt, $originalImageBase64, $mimeType)
   {
     try {
       $apiKey = config('services.gemini.api_key');
@@ -330,23 +433,29 @@ Be detailed and specific about colors and patterns.";
       $modelName = "nano-banana-pro-preview";
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
-      Log::info("Calling Gemini Nano Banana Pro API...");
+      Log::info("Calling Gemini Nano Banana Pro API with IMAGE-TO-IMAGE...");
 
-      // Prepare request payload
+      // IMAGE-TO-IMAGE: Include the original image so the model can preserve the dog's appearance
       $payload = array(
         'contents' => array(
           array(
             'parts' => array(
               array(
                 'text' => $prompt
+              ),
+              array(
+                'inlineData' => array(
+                  'mimeType' => $mimeType,
+                  'data' => $originalImageBase64
+                )
               )
             )
           )
         ),
         'generationConfig' => array(
-          'temperature' => 0.9,
+          'temperature' => 0.6, // Lower temperature for more consistent aging
           'topK' => 40,
-          'topP' => 0.95,
+          'topP' => 0.90,
           'maxOutputTokens' => 8192
         )
       );
