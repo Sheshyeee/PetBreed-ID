@@ -264,11 +264,12 @@ class GenerateAgeSimulations implements ShouldQueue
     try {
       $imageContents = Storage::disk('object-storage')->get($imagePath);
 
-      if ($imageContents === false) {
-        Log::error("Failed to get image from object storage: {$imagePath}");
+      if ($imageContents === false || empty($imageContents)) {
+        Log::error("Failed to get image from object storage or image is empty: {$imagePath}");
         return null;
       }
 
+      Log::info("Original image loaded successfully. Size: " . strlen($imageContents) . " bytes");
       return base64_encode($imageContents);
     } catch (\Exception $e) {
       Log::error("Error getting original image: " . $e->getMessage());
@@ -278,6 +279,7 @@ class GenerateAgeSimulations implements ShouldQueue
 
   /**
    * Extract Dog Features using Gemini API
+   * FIXED: Handles empty files and MIME type detection issues
    */
   private function extractDogFeatures($fullPath, $detectedBreed)
   {
@@ -288,27 +290,68 @@ class GenerateAgeSimulations implements ShouldQueue
       'estimated_age' => 'young adult',
       'build' => 'medium',
       'distinctive_markings' => 'none',
+      'ear_type' => 'unknown',
     ];
 
     try {
+      // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
-      if ($imageContents === false) {
-        throw new \Exception('Failed to download image from object storage');
+      if ($imageContents === false || empty($imageContents)) {
+        throw new \Exception('Failed to download image from object storage or image is empty');
+      }
+
+      Log::info('✓ Image downloaded from object storage (' . strlen($imageContents) . ' bytes)');
+
+      // Create temp file with proper extension
+      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+      if (empty($extension)) {
+        $extension = 'jpg'; // default fallback
       }
 
       $tempPath = tempnam(sys_get_temp_dir(), 'feature_extract_');
-      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
       $tempPathWithExt = $tempPath . '.' . $extension;
-      rename($tempPath, $tempPathWithExt);
 
-      file_put_contents($tempPathWithExt, $imageContents);
+      // Remove the temp file without extension
+      if (file_exists($tempPath)) {
+        unlink($tempPath);
+      }
 
-      Log::info('✓ Image downloaded from object storage to temp file');
+      // Write image contents to temp file
+      $bytesWritten = file_put_contents($tempPathWithExt, $imageContents);
 
+      if ($bytesWritten === false || $bytesWritten === 0) {
+        throw new \Exception('Failed to write image to temp file');
+      }
+
+      // Verify file was written correctly
+      if (!file_exists($tempPathWithExt) || filesize($tempPathWithExt) === 0) {
+        throw new \Exception('Temp file is empty or was not created properly');
+      }
+
+      Log::info('✓ Image written to temp file: ' . $tempPathWithExt . ' (' . filesize($tempPathWithExt) . ' bytes)');
+
+      // Encode image to base64
       $imageData = base64_encode($imageContents);
-      $mimeType = mime_content_type($tempPathWithExt);
 
+      // Detect MIME type with fallback
+      $mimeType = @mime_content_type($tempPathWithExt);
+
+      // If MIME detection fails or returns invalid type, use extension-based fallback
+      if (!$mimeType || $mimeType === 'application/x-empty' || $mimeType === 'application/octet-stream') {
+        $mimeType = match (strtolower($extension)) {
+          'jpg', 'jpeg' => 'image/jpeg',
+          'png' => 'image/png',
+          'gif' => 'image/gif',
+          'webp' => 'image/webp',
+          default => 'image/jpeg'
+        };
+        Log::warning("MIME type detection failed or returned invalid type, using extension-based fallback: {$mimeType}");
+      }
+
+      Log::info("Image MIME type: {$mimeType}");
+
+      // Prepare vision prompt
       $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
 
 {
@@ -329,9 +372,14 @@ Be very detailed and specific about ALL visible features, colors, and patterns."
       $apiKey = config('services.gemini.api_key');
       if (empty($apiKey)) {
         Log::error('✗ Gemini API key not configured');
+        // Clean up temp file before returning
+        if (file_exists($tempPathWithExt)) {
+          unlink($tempPathWithExt);
+        }
         return $dogFeatures;
       }
 
+      // Call Gemini API
       $client = new \GuzzleHttp\Client();
       $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
         'json' => [
@@ -361,20 +409,45 @@ Be very detailed and specific about ALL visible features, colors, and patterns."
       $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
 
       if ($content) {
-        $features = json_decode($content, true);
-        if ($features) {
-          $dogFeatures = array_merge($dogFeatures, $features);
+        // Handle both string and array cases for content
+        if (is_string($content)) {
+          $features = json_decode($content, true);
+        } elseif (is_array($content)) {
+          $features = $content;
+        } else {
+          $features = null;
         }
+
+        if ($features && is_array($features)) {
+          $dogFeatures = array_merge($dogFeatures, $features);
+          Log::info('✓ Dog features extracted successfully from Gemini API');
+        } else {
+          Log::warning('Could not parse features from Gemini response');
+        }
+      } else {
+        Log::warning('No content returned from Gemini API');
       }
 
       // Clean up temp file
       if (file_exists($tempPathWithExt)) {
         unlink($tempPathWithExt);
+        Log::info('✓ Temp file cleaned up');
       }
-
-      Log::info('✓ Dog features extracted successfully');
+    } catch (\GuzzleHttp\Exception\ClientException $e) {
+      Log::error("Gemini API Client Error: " . $e->getMessage());
+      if ($e->hasResponse()) {
+        Log::error("Response: " . $e->getResponse()->getBody()->getContents());
+      }
+      // Clean up temp file on error
+      if (isset($tempPathWithExt) && file_exists($tempPathWithExt)) {
+        unlink($tempPathWithExt);
+      }
     } catch (\Exception $e) {
       Log::error("Feature extraction failed: " . $e->getMessage());
+      // Clean up temp file on error
+      if (isset($tempPathWithExt) && file_exists($tempPathWithExt)) {
+        unlink($tempPathWithExt);
+      }
     }
 
     return $dogFeatures;
