@@ -253,6 +253,7 @@ class GenerateAgeSimulations implements ShouldQueue
   /**
    * ==========================================
    * NEW: Prepare original image for image-to-image generation
+   * FIXED: Use finfo to detect MIME type from buffer instead of temp file
    * ==========================================
    */
   private function prepareOriginalImage($fullPath)
@@ -265,21 +266,24 @@ class GenerateAgeSimulations implements ShouldQueue
         throw new \Exception('Failed to download image from object storage');
       }
 
-      // Create temporary file to get mime type
-      $tempPath = tempnam(sys_get_temp_dir(), 'orig_image_');
-      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
-      $tempPathWithExt = $tempPath . '.' . $extension;
-      rename($tempPath, $tempPathWithExt);
+      // Get MIME type directly from file contents using finfo
+      $finfo = new \finfo(FILEINFO_MIME_TYPE);
+      $mimeType = $finfo->buffer($imageContents);
 
-      file_put_contents($tempPathWithExt, $imageContents);
+      // Fallback: determine MIME type from file extension if finfo fails
+      if (!$mimeType || $mimeType === 'application/x-empty') {
+        $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
+        $mimeType = match ($extension) {
+          'jpg', 'jpeg' => 'image/jpeg',
+          'png' => 'image/png',
+          'gif' => 'image/gif',
+          'webp' => 'image/webp',
+          default => 'image/jpeg', // Default fallback
+        };
+        Log::warning("MIME type detection failed, using extension-based fallback: {$mimeType}");
+      }
 
       $imageData = base64_encode($imageContents);
-      $mimeType = mime_content_type($tempPathWithExt);
-
-      // Clean up temp file
-      if (file_exists($tempPathWithExt)) {
-        unlink($tempPathWithExt);
-      }
 
       Log::info('✓ Original image prepared for image-to-image', [
         'mime_type' => $mimeType,
@@ -299,6 +303,7 @@ class GenerateAgeSimulations implements ShouldQueue
   /**
    * ==========================================
    * Extract Dog Features using Gemini API
+   * FIXED: Use finfo to detect MIME type from buffer
    * ==========================================
    */
   private function extractDogFeatures($fullPath, $detectedBreed)
@@ -316,28 +321,35 @@ class GenerateAgeSimulations implements ShouldQueue
     ];
 
     try {
-      // Download image from object storage to temp file
+      // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
       if ($imageContents === false) {
         throw new \Exception('Failed to download image from object storage');
       }
 
-      // Create temporary file
-      $tempPath = tempnam(sys_get_temp_dir(), 'feature_extract_');
-      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
-      $tempPathWithExt = $tempPath . '.' . $extension;
-      rename($tempPath, $tempPathWithExt);
-
-      file_put_contents($tempPathWithExt, $imageContents);
-
-      Log::info('✓ Image downloaded from object storage to temp file', [
-        'temp_path' => $tempPathWithExt,
+      Log::info('✓ Image downloaded from object storage', [
         'file_size' => strlen($imageContents)
       ]);
 
+      // Get MIME type directly from file contents using finfo
+      $finfo = new \finfo(FILEINFO_MIME_TYPE);
+      $mimeType = $finfo->buffer($imageContents);
+
+      // Fallback: determine MIME type from file extension if finfo fails
+      if (!$mimeType || $mimeType === 'application/x-empty') {
+        $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
+        $mimeType = match ($extension) {
+          'jpg', 'jpeg' => 'image/jpeg',
+          'png' => 'image/png',
+          'gif' => 'image/gif',
+          'webp' => 'image/webp',
+          default => 'image/jpeg', // Default fallback
+        };
+        Log::warning("MIME type detection failed for feature extraction, using extension-based fallback: {$mimeType}");
+      }
+
       $imageData = base64_encode($imageContents);
-      $mimeType = mime_content_type($tempPathWithExt);
 
       $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
 
@@ -396,11 +408,6 @@ Be detailed and specific about colors and patterns.";
         if ($features) {
           $dogFeatures = array_merge($dogFeatures, $features);
         }
-      }
-
-      // Clean up temp file
-      if (file_exists($tempPathWithExt)) {
-        unlink($tempPathWithExt);
       }
 
       Log::info('✓ Dog features extracted successfully with Gemini');
