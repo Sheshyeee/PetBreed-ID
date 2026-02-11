@@ -909,7 +909,7 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
             $client = new \GuzzleHttp\Client();
 
             // Use gemini-2.0-flash-exp for best performance and latest model
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
