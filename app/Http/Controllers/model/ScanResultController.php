@@ -671,11 +671,6 @@ class ScanResultController extends Controller
      * BREED IDENTIFICATION - DETAILED ANALYTICAL PROMPT
      * ==========================================
      */
-    /**
-     * ==========================================
-     * FIXED: BREED IDENTIFICATION WITH REALISTIC CONFIDENCE
-     * ==========================================
-     */
     private function identifyBreedWithAPI($imagePath)
     {
         Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
@@ -853,7 +848,6 @@ PHASE 4: MIXED BREED ANALYSIS (If Applicable)
 - Explain which features come from which parent
 - Assign contribution percentages (e.g., 60% Labrador, 40% Border Collie)
 - Consider F1, F2, or multi-generational mix
-- For mixed breeds, use ONLY ONE BREED NAME for the primary identification (the most dominant breed), NOT 'Breed A x Breed B'. Example: If 60% Labrador, 40% Border Collie, the breed should be 'Labrador Retriever', not 'Labrador x Border Collie mix'.
 
 **REGIONAL MIXED BREEDS:**
 - **Aspin/Asong Pinoy (Philippines):** Medium size, erect/semi-erect ears, short coat, athletic build, often tan/brown/black, curled or sickle tail, primitive features
@@ -863,91 +857,75 @@ PHASE 4: MIXED BREED ANALYSIS (If Applicable)
 - **European Landrace:** Regional variations, working dog ancestry
 
 ═══════════════════════════════════════════════════════════════
-PHASE 5: REALISTIC CONFIDENCE CALIBRATION
+PHASE 5: CONFIDENCE CALIBRATION
 ═══════════════════════════════════════════════════════════════
 
-**CRITICAL: BE HONEST ABOUT UNCERTAINTY. Assign confidence using REALISTIC, HONEST criteria:**
+Assign confidence using STRICT criteria:
 
-**80-95% - HIGHLY CONFIDENT (RARE - use sparingly):**
-- Multiple breed-specific unique traits clearly visible (e.g., Rhodesian Ridgeback ridge, Basenji curled tail)
-- ALL major features match strongly with NO contradictions
-- Photo quality excellent, clear view
-- Example: \"Unmistakable purebred with distinctive breed markers\"
-- **IMPORTANT: Never exceed 95% - there's always some uncertainty in visual identification**
+**95-100% - DEFINITIVE IDENTIFICATION:**
+- ALL major breed-specific features present
+- NO contradicting features
+- Breed-specific unique traits visible (e.g., Rhodesian Ridgeback ridge, Lundehund extra toes)
+- Photo quality excellent, multiple angles would confirm
+- Example: \"This is unmistakably a purebred Border Collie\"
 
-**65-79% - CONFIDENT:**
-- Most major features match well
-- 1-2 minor variations within breed standards
-- Good photo quality showing key features
-- Example: \"Strong evidence for purebred, features align well\"
+**85-94% - HIGHLY CONFIDENT:**
+- All major features match strongly
+- Minor variations within acceptable breed range
+- 1-2 features not fully visible but no contradictions
+- Example: \"Strong evidence for purebred Australian Shepherd\"
 
-**50-64% - MODERATE CONFIDENCE:**
-- Several features match but some inconsistencies present
+**75-84% - CONFIDENT:**
+- Most features match well
+- 2-3 minor deviations or unclear features
+- Could be purebred or very high-percentage mix
+- Example: \"Likely purebred German Shepherd, possibly working line\"
+
+**60-74% - MODERATE CONFIDENCE:**
+- Good feature match but some inconsistencies
 - Could be purebred with atypical features OR high-percentage mix
-- Photo angle or quality limits certainty
-- Example: \"Likely this breed, but some uncertainty due to [specific reason]\"
+- Example: \"Probable Golden Retriever mix or field-bred Golden Retriever\"
 
-**35-49% - LOW CONFIDENCE (Be honest when uncertain):**
+**45-59% - LOW CONFIDENCE:**
 - Multiple breed influences visible
-- Features suggest mix or cannot determine primary breed
-- Limited view of dog or photo quality issues
-- Example: \"Appears to be mixed breed with [breed] influences\"
+- Features suggest specific mix but other combinations possible
+- Example: \"Likely Husky x German Shepherd mix\"
 
-**Below 35% - VERY LOW CONFIDENCE:**
+**30-44% - VERY LOW CONFIDENCE:**
 - Multi-generational mix or complex ancestry
-- Puppy too young, photo too poor, extreme grooming
-- Can only identify general type
-- Example: \"Cannot make reliable identification, appears to be mixed breed\"
+- Can identify general type but not specific breeds
+- Example: \"Mixed breed with terrier and herding influences\"
 
-**CRITICAL RULES FOR CONFIDENCE:**
-1. **NEVER give 96-100%** - Visual identification always has uncertainty
-2. **Be HONEST about mixed breeds** - Don't force pure breed identification
-3. **Low confidence is BETTER than false confidence** - Help users understand uncertainty
-4. **Account for photo quality** - Poor angles/lighting should lower confidence
-5. **For mixed breeds, confidence should typically be 40-65%** unless very clear dominant breed
+**Below 30% - INSUFFICIENT:**
+- Photo quality too poor
+- Puppy too young to assess adult features
+- Extreme grooming obscuring features
+- Cannot make reliable identification
 
 ═══════════════════════════════════════════════════════════════
-PHASE 6: FINAL DETERMINATION & NAMING CONVENTIONS
+PHASE 6: FINAL DETERMINATION & REASONING
 ═══════════════════════════════════════════════════════════════
-
-**BREED NAMING RULES:**
-
-1. **For Pure Breeds:** Use official breed name only (e.g., \"German Shepherd\", \"Golden Retriever\")
-
-2. **For Mixed Breeds:** Use ONLY the DOMINANT breed name, NOT combination names
-   - ✓ CORRECT: \"Labrador Retriever\" (if 60% Lab, 40% other)
-   - ✗ WRONG: \"Labrador x Border Collie mix\"
-   - ✗ WRONG: \"Labrador/Border Collie\"
-   - ✗ WRONG: \"Lab-Collie mix\"
-   
-3. **Do NOT use punctuation or combination indicators:**
-   - ✗ No \"x\" or \"×\"
-   - ✗ No \"/\" or \"-\"
-   - ✗ No \"mix\" in breed name
-   - ✗ No parentheses like \"(mix)\"
-
-4. **Explanation goes in genetic_composition field, NOT breed name:**
-   - breed: \"Labrador Retriever\"
-   - genetic_composition: \"60% Labrador Retriever, 40% Border Collie\"
-
-5. **For Regional/Street Dogs:** Use single designation:
-   - \"Aspin\" (not \"Aspin mix\")
-   - \"Pariah Dog\" (not \"Indian Pariah x something\")
 
 **DECISION RULES:**
 
-1. **If confidence ≥70% for single breed → Identify as that purebred**
-2. **If confidence 50-69% with contradictions → Use dominant breed name, note mix in genetic_composition**
-3. **If multiple breeds score 50-65% → Use most dominant breed name**
-4. **If features from 3+ breeds → Use \"Mixed Breed\" and explain in genetic_composition**
+1. **If confidence ≥85% for single breed → Identify as that purebred**
+2. **If confidence 60-84% with contradictions → Consider high-percentage mix**
+3. **If multiple breeds score 60-75% → Likely F1 cross of top 2**
+4. **If features from 3+ breeds → Multi-generational mix**
 5. **If regional landrace features → Use specific designation (Aspin, Pariah, etc.)**
 6. **NEVER force-fit into common breed if rare breed matches better**
-7. **BE HONEST about uncertainty - low confidence (40-55%) is better than false high confidence**
+7. **NEVER misidentify regional dogs as standardized breeds**
+8. **BE HONEST about uncertainty - low confidence is better than false confidence**
 
 **RARE BREED PROTOCOL:**
-- If a rare breed scores ≥70%, IDENTIFY IT even if uncommon
+- If a rare breed scores ≥80%, IDENTIFY IT even if uncommon
 - Examples: Azawakh, Kai Ken, Norwegian Lundehund, Stabyhoun, Thai Ridgeback
 - Provide educational note about breed rarity
+
+**MIXED BREED PROTOCOL:**
+- Be specific: \"Labrador Retriever x Border Collie mix\" NOT just \"Mixed Breed\"
+- Explain reasoning: \"Shows Labrador head/coat with Border Collie build/tail\"
+- If 3+ breeds: \"Mixed breed with primarily Terrier and Hound ancestry\"
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT - STRICT JSON STRUCTURE
@@ -969,25 +947,25 @@ OUTPUT FORMAT - STRICT JSON STRUCTURE
   \"candidate_breeds\": [
     {
       \"breed\": \"Breed Name\",
-      \"match_percentage\": 75,
+      \"match_percentage\": 85,
       \"supporting_features\": [\"feature 1\", \"feature 2\"],
       \"contradicting_features\": [\"feature 1\"],
       \"rarity\": \"common/uncommon/rare/regional\"
     },
     {
       \"breed\": \"Breed Name 2\",
-      \"match_percentage\": 58,
+      \"match_percentage\": 72,
       \"supporting_features\": [\"feature 1\", \"feature 2\"],
       \"contradicting_features\": [\"feature 1\", \"feature 2\"],
       \"rarity\": \"common/uncommon/rare/regional\"
     }
   ],
   
-  \"breed\": \"SINGLE BREED NAME ONLY - NO 'x' OR 'mix' OR PUNCTUATION\",
+  \"breed\": \"FINAL BREED NAME or 'Breed A x Breed B mix' or 'Aspin' or 'Mixed Breed'\",
   
-  \"confidence\": 67.5,
+  \"confidence\": 87.5,
   
-  \"reasoning\": \"Comprehensive 4-6 sentence explanation synthesizing all evidence. Start with: 'Based on comprehensive morphological analysis...' Include: (1) Key identifying features, (2) Why this breed over others, (3) Any contradictions explained, (4) Confidence justification with specific uncertainty factors. Be honest about limitations.\",
+  \"reasoning\": \"Comprehensive 4-6 sentence explanation synthesizing all evidence. Start with: 'Based on comprehensive morphological analysis...' Include: (1) Key identifying features, (2) Why this breed over others, (3) Any contradictions explained, (4) Confidence justification. Be specific and technical.\",
   
   \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\" or \"regional_street_dog\",
   
@@ -995,13 +973,13 @@ OUTPUT FORMAT - STRICT JSON STRUCTURE
   
   \"alternative_possibilities\": [
     {
-      \"breed\": \"Alternative 1 - SINGLE NAME ONLY\",
-      \"confidence\": 12.0,
+      \"breed\": \"Alternative 1\",
+      \"confidence\": 15.0,
       \"reason\": \"Why this is possible but less likely - specific features\"
     },
     {
-      \"breed\": \"Alternative 2 - SINGLE NAME ONLY\",
-      \"confidence\": 6.5,
+      \"breed\": \"Alternative 2\",
+      \"confidence\": 8.5,
       \"reason\": \"Why this is possible but less likely - specific features\"
     }
   ],
@@ -1013,7 +991,7 @@ OUTPUT FORMAT - STRICT JSON STRUCTURE
   ],
   
   \"uncertainty_factors\": [
-    \"Any factors reducing confidence (age, photo angle, grooming, lighting, mixed breed indicators, etc.)\"
+    \"Any factors reducing confidence (age, photo angle, grooming, etc.)\"
   ],
   
   \"rare_breed_note\": \"If rare breed: 'This is a [Breed], a rare breed from [Region] known for [characteristics]' or null\"
@@ -1025,31 +1003,31 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY
 
 ✓ PRIORITIZE ACCURACY OVER FAMILIARITY - Rare breed that fits perfectly > Common breed that fits poorly
 ✓ BE HONEST ABOUT MIXED BREEDS - Don't force pure breed identification when features conflict
-✓ USE SINGLE BREED NAMES - No 'x', 'mix', or punctuation in breed field
-✓ BE HONEST ABOUT UNCERTAINTY - If unsure, give LOW confidence (40-60%) so users know the identification may be wrong
-✓ NEVER EXCEED 95% CONFIDENCE - Visual identification always has uncertainty
+✓ USE TECHNICAL TERMINOLOGY - Show your expertise with proper morphological terms
 ✓ PROVIDE EVIDENCE - Every conclusion must be backed by specific observable features
 ✓ CONSIDER REGIONAL VARIATIONS - Aspin, Pariah dogs, village dogs are VALID identifications
+✓ CALIBRATE CONFIDENCE PROPERLY - High confidence requires high certainty, not just a guess
 ✓ EXPLAIN CONTRADICTIONS - If features don't perfectly align, explain why in reasoning
-✓ For mixed breeds: Use dominant breed name in 'breed' field, explain mix in 'genetic_composition'
+✓ MULTI-STAGE THINKING - Don't jump to conclusions, work through the analysis phases
+✓ BE HONEST ABOUT UNCERTAINTY - If unsure, give LOW confidence (30-60%) so users know the identification may be wrong
 
-✗ DO NOT use 96-100% confidence - be realistic
-✗ DO NOT use 'x' or 'mix' in breed names
+✗ DO NOT default to common breeds when rare breeds match better
 ✗ DO NOT ignore contradicting evidence
 ✗ DO NOT give high confidence without strong supporting evidence
 ✗ DO NOT misidentify street dogs/landrace as standardized pure breeds
+✗ DO NOT overlook mixed breed possibilities when features conflict
 ✗ DO NOT artificially inflate confidence when uncertain
 
-NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION, INTELLECTUAL RIGOR, AND **HONEST CONFIDENCE SCORING**.";
+NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
 
-            Log::info('✓ Sending request to OpenAI API with enhanced realistic confidence prompt...');
+            Log::info('✓ Sending request to OpenAI API with enhanced multi-stage prompt...');
 
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o',
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are a world-class canine geneticist and morphologist specializing in rare breed identification and complex mixed-breed analysis. You have encyclopedic knowledge of 400+ breeds including regional landrace populations. Your analysis is systematic, evidence-based, and technically precise. You never guess - you analyze methodically. When uncertain, you provide honest low confidence scores (40-65%) to help users understand the identification may be incorrect. You NEVER give confidence above 95% as visual identification always has uncertainty. For mixed breeds, you use ONLY the dominant breed name without any punctuation, "x", or "mix" in the breed field.'
+                        'content' => 'You are a world-class canine geneticist and morphologist specializing in rare breed identification and complex mixed-breed analysis. You have encyclopedic knowledge of 400+ breeds including regional landrace populations. Your analysis is systematic, evidence-based, and technically precise. You never guess - you analyze methodically. When uncertain, you provide honest low confidence scores to help users understand the identification may be incorrect.'
                     ],
                     [
                         'role' => 'user',
@@ -1098,26 +1076,8 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION, INTELLECTUAL RIGOR, AND **HONEST C
             // Use the ACTUAL confidence from the API - NO MODIFICATIONS
             $actualConfidence = (float)$apiResult['confidence'];
 
-            // Clean breed name - remove any 'mix', 'x', or punctuation
-            $breedName = $apiResult['breed'];
-            $breedName = preg_replace('/\s*[x×]\s*/i', ' ', $breedName); // Remove x or ×
-            $breedName = preg_replace('/\s+mix\s*$/i', '', $breedName); // Remove trailing 'mix'
-            $breedName = preg_replace('/\s*\(.*?\)\s*/', '', $breedName); // Remove anything in parentheses
-            $breedName = trim($breedName);
-
-            // If it's still a combination (has multiple capital words that look like breeds), take the first one
-            if (preg_match('/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+[A-Z][a-z]+/', $breedName, $matches)) {
-                // This looks like "Labrador Retriever Border Collie" - take first breed
-                $words = explode(' ', $breedName);
-                if (count($words) > 2) {
-                    // Take first two words (e.g., "Labrador Retriever")
-                    $breedName = $words[0] . ' ' . $words[1];
-                }
-            }
-
             Log::info('✓ ENHANCED API breed identification successful', [
-                'original_breed' => $apiResult['breed'],
-                'cleaned_breed' => $breedName,
+                'breed' => $apiResult['breed'],
                 'actual_confidence' => $actualConfidence,
                 'breed_type' => $apiResult['breed_type'] ?? 'unknown',
                 'genetic_composition' => $apiResult['genetic_composition'] ?? 'N/A',
@@ -1126,34 +1086,28 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION, INTELLECTUAL RIGOR, AND **HONEST C
                 'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
             ]);
 
-            // Build top predictions array with ONLY REAL BREEDS (cleaned names)
+            // Build top predictions array with ONLY REAL BREEDS
             $topPredictions = [];
             $seenBreeds = []; // Track breeds to avoid duplicates
 
             // Add primary breed first
+            $primaryBreed = $apiResult['breed'];
             $topPredictions[] = [
-                'breed' => $breedName,
+                'breed' => $primaryBreed,
                 'confidence' => round($actualConfidence, 2)
             ];
-            $seenBreeds[] = strtolower(trim($breedName));
+            $seenBreeds[] = strtolower(trim($primaryBreed));
 
             // Add alternative possibilities (these have actual breed names and confidence scores)
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
-                        // Clean alternative breed names too
-                        $altBreed = $alt['breed'];
-                        $altBreed = preg_replace('/\s*[x×]\s*/i', ' ', $altBreed);
-                        $altBreed = preg_replace('/\s+mix\s*$/i', '', $altBreed);
-                        $altBreed = preg_replace('/\s*\(.*?\)\s*/', '', $altBreed);
-                        $altBreed = trim($altBreed);
-
-                        $breedKey = strtolower(trim($altBreed));
+                        $breedKey = strtolower(trim($alt['breed']));
 
                         // Skip duplicates and only add if confidence > 0
                         if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
                             $topPredictions[] = [
-                                'breed' => $altBreed,
+                                'breed' => $alt['breed'],
                                 'confidence' => round((float)$alt['confidence'], 2)
                             ];
                             $seenBreeds[] = $breedKey;
@@ -1166,20 +1120,13 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION, INTELLECTUAL RIGOR, AND **HONEST C
             if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
                 foreach ($apiResult['candidate_breeds'] as $candidate) {
                     if (isset($candidate['breed']) && count($topPredictions) < 5) {
-                        // Clean candidate breed names
-                        $candBreed = $candidate['breed'];
-                        $candBreed = preg_replace('/\s*[x×]\s*/i', ' ', $candBreed);
-                        $candBreed = preg_replace('/\s+mix\s*$/i', '', $candBreed);
-                        $candBreed = preg_replace('/\s*\(.*?\)\s*/', '', $candBreed);
-                        $candBreed = trim($candBreed);
-
-                        $breedKey = strtolower(trim($candBreed));
+                        $breedKey = strtolower(trim($candidate['breed']));
                         $confidence = (float)($candidate['match_percentage'] ?? $candidate['confidence'] ?? 0);
 
                         // Only add if not duplicate and has reasonable confidence
                         if (!in_array($breedKey, $seenBreeds) && $confidence > 0) {
                             $topPredictions[] = [
-                                'breed' => $candBreed,
+                                'breed' => $candidate['breed'],
                                 'confidence' => round($confidence, 2)
                             ];
                             $seenBreeds[] = $breedKey;
@@ -1199,7 +1146,7 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION, INTELLECTUAL RIGOR, AND **HONEST C
             return [
                 'success' => true,
                 'method' => 'api_enhanced',
-                'breed' => $breedName, // Use cleaned breed name
+                'breed' => $apiResult['breed'],
                 'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
                 'top_predictions' => $topPredictions, // Return only real predictions (no padding)
                 'metadata' => [
