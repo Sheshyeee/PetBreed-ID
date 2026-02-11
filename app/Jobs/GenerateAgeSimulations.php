@@ -17,7 +17,7 @@ class GenerateAgeSimulations implements ShouldQueue
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
   public $timeout = 300; // 5 minutes max
-  public $tries = 3; // Don't retry on failure
+  public $tries = 1; // Don't retry on failure
 
   protected $resultId;
   protected $breed;
@@ -136,7 +136,7 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       // Wait between API calls
-      sleep(10);
+      sleep(3);
 
       // GENERATE 3-YEAR IMAGE
       try {
@@ -212,7 +212,7 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       // Gemini Nano Banana Pro 3 endpoint
-      $modelName = "gemini-2.5-flash-image";
+      $modelName = "nano-banana-pro-preview";
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
       Log::info("Calling Gemini Nano Banana Pro API...");
