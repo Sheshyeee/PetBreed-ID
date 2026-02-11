@@ -260,7 +260,7 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     try {
       Log::info("Preparing original image from path: {$fullPath}");
-
+      
       // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
@@ -285,25 +285,25 @@ class GenerateAgeSimulations implements ShouldQueue
       $supportedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!in_array($mimeType, $supportedMimes)) {
         Log::warning("Unsupported image type {$mimeType}, converting to JPEG");
-
+        
         // Create image from string and convert to JPEG
         $img = imagecreatefromstring($imageContents);
         if ($img === false) {
           throw new \Exception("Failed to create image resource for conversion");
         }
-
+        
         ob_start();
         imagejpeg($img, null, 90);
         $imageContents = ob_get_clean();
         imagedestroy($img);
-
+        
         $mimeType = 'image/jpeg';
         Log::info("Converted to JPEG, new size: " . strlen($imageContents) . " bytes");
       }
 
       // Encode to base64 - ensuring no whitespace or newlines
       $imageData = base64_encode($imageContents);
-
+      
       // Validate base64 encoding
       if (empty($imageData)) {
         throw new \Exception('Base64 encoding failed - empty result');
@@ -349,7 +349,7 @@ class GenerateAgeSimulations implements ShouldQueue
 
     try {
       Log::info("Extracting features from path: {$fullPath}");
-
+      
       // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
@@ -369,29 +369,29 @@ class GenerateAgeSimulations implements ShouldQueue
 
       // Use the MIME type from getimagesizefromstring (most reliable)
       $mimeType = $imageInfo['mime'];
-
+      
       Log::info("Image validated for feature extraction: {$imageInfo[0]}x{$imageInfo[1]}, type: {$mimeType}");
 
       // Convert to supported format if needed
       $supportedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!in_array($mimeType, $supportedMimes)) {
         Log::warning("Unsupported image type {$mimeType} for feature extraction, converting to JPEG");
-
+        
         $img = imagecreatefromstring($imageContents);
         if ($img === false) {
           throw new \Exception("Failed to create image resource for conversion");
         }
-
+        
         ob_start();
         imagejpeg($img, null, 90);
         $imageContents = ob_get_clean();
         imagedestroy($img);
-
+        
         $mimeType = 'image/jpeg';
       }
 
       $imageData = base64_encode($imageContents);
-
+      
       if (empty($imageData)) {
         throw new \Exception('Base64 encoding failed for feature extraction');
       }

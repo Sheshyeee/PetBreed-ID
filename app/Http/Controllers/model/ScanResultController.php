@@ -1729,8 +1729,11 @@ Be verbose and detailed. Output ONLY the JSON.";
 
             // Only dispatch simulation job for NEW images (not exact matches)
             if (!$hasExactMatch) {
-                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $fullPath);
-                Log::info('✓ Simulation job dispatched for new image');
+                // CRITICAL FIX: Pass object storage path ($path), NOT temp file path ($fullPath)
+                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $path);
+                Log::info('✓ Simulation job dispatched for new image', [
+                    'storage_path' => $path
+                ]);
             } else {
                 Log::info('✓ Simulations cached from previous scan - no job dispatched');
             }
