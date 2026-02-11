@@ -17,7 +17,7 @@ class GenerateAgeSimulations implements ShouldQueue
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
   public $timeout = 300; // 5 minutes max
-  public $tries = 1; // Don't retry on failure
+  public $tries = 3; // Don't retry on failure
 
   protected $resultId;
   protected $breed;
@@ -136,7 +136,7 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       // Wait between API calls
-      sleep(3);
+      sleep(10);
 
       // GENERATE 3-YEAR IMAGE
       try {
