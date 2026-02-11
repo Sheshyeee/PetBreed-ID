@@ -1341,87 +1341,7 @@ Be verbose and detailed. Output ONLY the JSON.";
      * OPTIMIZED: Faster feature extraction with detailed prompt
      * ==========================================
      */
-    private function extractDogFeatures($fullPath, $detectedBreed)
-    {
-        $dogFeatures = [
-            'coat_color' => 'brown',
-            'coat_pattern' => 'solid',
-            'coat_length' => 'medium',
-            'estimated_age' => 'young adult',
-            'build' => 'medium',
-            'distinctive_markings' => 'none',
-        ];
 
-        try {
-            $imageData = base64_encode(file_get_contents($fullPath));
-            $mimeType = mime_content_type($fullPath);
-
-            $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
-
-{
-  \"coat_color\": \"primary color(s) - be specific (e.g., 'golden', 'black and tan', 'white with brown patches', 'brindle')\",
-  \"coat_pattern\": \"pattern type (solid, spotted, brindle, merle, parti-color, tuxedo, sable)\",
-  \"coat_length\": \"length (short, medium, long, curly)\",
-  \"coat_texture\": \"texture description (silky, wiry, fluffy, smooth)\",
-  \"estimated_age\": \"age range (puppy, young adult, adult, mature, senior) based on face, eyes, and coat\",
-  \"build\": \"body type (lean/athletic, stocky/muscular, compact, large/heavy)\",
-  \"distinctive_markings\": \"any unique features (facial markings, chest patches, eyebrow marks, ear color, tail characteristics)\",
-  \"ear_type\": \"ear shape (floppy, erect, semi-erect)\",
-  \"eye_color\": \"eye color if visible (brown, blue, amber, heterochromic)\",
-  \"size_estimate\": \"size category (toy, small, medium, large, giant)\"
-}
-
-Be detailed and specific about colors and patterns.";
-
-            // Use Gemini API instead of OpenAI
-            $apiKey = config('services.gemini.api_key');
-            if (empty($apiKey)) {
-                Log::error('✗ Gemini API key not configured');
-                return $dogFeatures;
-            }
-
-            $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
-                'json' => [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                [
-                                    'text' => $visionPrompt
-                                ],
-                                [
-                                    'inlineData' => [
-                                        'mimeType' => $mimeType,
-                                        'data' => $imageData
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ],
-                    'generationConfig' => [
-                        'maxOutputTokens' => 500,
-                        'responseMimeType' => 'application/json'
-                    ]
-                ]
-            ]);
-
-            $result = json_decode($response->getBody()->getContents(), true);
-            $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
-            if ($content) {
-                $features = json_decode($content, true);
-                if ($features) {
-                    $dogFeatures = array_merge($dogFeatures, $features);
-                }
-            }
-
-            Log::info('✓ Dog features extracted successfully with Gemini');
-        } catch (\Exception $e) {
-            Log::error("Feature extraction failed: " . $e->getMessage());
-        }
-
-        return $dogFeatures;
-    }
 
     /**
      * ==========================================
@@ -1765,15 +1685,15 @@ Be detailed and specific about colors and patterns.";
                 $topPredictions = $predictionResult['top_predictions'];
 
                 // Extract dog features and generate AI data
-                $dogFeatures = $this->extractDogFeatures($fullPath, $detectedBreed);
-                $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures);
+                // Generate AI data (no dog features needed here anymore)
+                $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
 
-                // Initialize simulation data for new scan
+                // Initialize simulation data for new scan (no dog_features - job will extract them)
                 $simulationData = [
                     '1_years' => null,
                     '3_years' => null,
                     'status' => 'pending',
-                    'dog_features' => $dogFeatures,
+                    'dog_features' => [], // Empty - job will populate this
                     'prediction_method' => $predictionMethod,
                     'is_exact_match' => false,
                     'has_admin_correction' => false,
@@ -1809,7 +1729,7 @@ Be detailed and specific about colors and patterns.";
 
             // Only dispatch simulation job for NEW images (not exact matches)
             if (!$hasExactMatch) {
-                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $dogFeatures);
+                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $fullPath);
                 Log::info('✓ Simulation job dispatched for new image');
             } else {
                 Log::info('✓ Simulations cached from previous scan - no job dispatched');
