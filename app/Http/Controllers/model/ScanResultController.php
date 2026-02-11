@@ -826,7 +826,7 @@ NOW ANALYZE THE DOG IN THIS IMAGE.";
             $client = new \GuzzleHttp\Client();
 
             // Use gemini-2.0-flash-thinking-exp for best reasoning and accuracy
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp-1219:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
