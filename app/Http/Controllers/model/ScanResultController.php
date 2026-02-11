@@ -676,6 +676,11 @@ class ScanResultController extends Controller
      * FIXED: BREED IDENTIFICATION WITH REALISTIC CONFIDENCE
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: BREED IDENTIFICATION WITH REALISTIC CONFIDENCE
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath)
     {
         Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
