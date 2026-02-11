@@ -259,35 +259,61 @@ class GenerateAgeSimulations implements ShouldQueue
   private function prepareOriginalImage($fullPath)
   {
     try {
+      Log::info("Preparing original image from path: {$fullPath}");
+
       // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
-      if ($imageContents === false) {
-        throw new \Exception('Failed to download image from object storage');
+      if ($imageContents === false || empty($imageContents)) {
+        throw new \Exception('Failed to download image from object storage or image is empty');
       }
 
-      // Get MIME type directly from file contents using finfo
-      $finfo = new \finfo(FILEINFO_MIME_TYPE);
-      $mimeType = $finfo->buffer($imageContents);
+      Log::info("Image downloaded, size: " . strlen($imageContents) . " bytes");
 
-      // Fallback: determine MIME type from file extension if finfo fails
-      if (!$mimeType || $mimeType === 'application/x-empty') {
-        $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
-        $mimeType = match ($extension) {
-          'jpg', 'jpeg' => 'image/jpeg',
-          'png' => 'image/png',
-          'gif' => 'image/gif',
-          'webp' => 'image/webp',
-          default => 'image/jpeg', // Default fallback
-        };
-        Log::warning("MIME type detection failed, using extension-based fallback: {$mimeType}");
+      // Validate it's actually an image by trying to create image resource
+      $imageInfo = @getimagesizefromstring($imageContents);
+      if ($imageInfo === false) {
+        throw new \Exception('Downloaded content is not a valid image');
       }
 
+      Log::info("Image validated: {$imageInfo[0]}x{$imageInfo[1]}, type: {$imageInfo['mime']}");
+
+      // Use the MIME type from getimagesizefromstring (most reliable)
+      $mimeType = $imageInfo['mime'];
+
+      // Convert to supported format if needed (Gemini supports JPEG, PNG, WebP, GIF)
+      $supportedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!in_array($mimeType, $supportedMimes)) {
+        Log::warning("Unsupported image type {$mimeType}, converting to JPEG");
+
+        // Create image from string and convert to JPEG
+        $img = imagecreatefromstring($imageContents);
+        if ($img === false) {
+          throw new \Exception("Failed to create image resource for conversion");
+        }
+
+        ob_start();
+        imagejpeg($img, null, 90);
+        $imageContents = ob_get_clean();
+        imagedestroy($img);
+
+        $mimeType = 'image/jpeg';
+        Log::info("Converted to JPEG, new size: " . strlen($imageContents) . " bytes");
+      }
+
+      // Encode to base64 - ensuring no whitespace or newlines
       $imageData = base64_encode($imageContents);
+
+      // Validate base64 encoding
+      if (empty($imageData)) {
+        throw new \Exception('Base64 encoding failed - empty result');
+      }
 
       Log::info('✓ Original image prepared for image-to-image', [
         'mime_type' => $mimeType,
-        'size_bytes' => strlen($imageContents)
+        'size_bytes' => strlen($imageContents),
+        'base64_length' => strlen($imageData),
+        'dimensions' => "{$imageInfo[0]}x{$imageInfo[1]}"
       ]);
 
       return [
@@ -296,6 +322,7 @@ class GenerateAgeSimulations implements ShouldQueue
       ];
     } catch (\Exception $e) {
       Log::error("Failed to prepare original image: " . $e->getMessage());
+      Log::error("Stack trace: " . $e->getTraceAsString());
       return null;
     }
   }
@@ -303,7 +330,7 @@ class GenerateAgeSimulations implements ShouldQueue
   /**
    * ==========================================
    * Extract Dog Features using Gemini API
-   * FIXED: Use finfo to detect MIME type from buffer
+   * FIXED: Use finfo to detect MIME type from buffer + validate image
    * ==========================================
    */
   private function extractDogFeatures($fullPath, $detectedBreed)
@@ -321,35 +348,53 @@ class GenerateAgeSimulations implements ShouldQueue
     ];
 
     try {
+      Log::info("Extracting features from path: {$fullPath}");
+
       // Download image from object storage
       $imageContents = Storage::disk('object-storage')->get($fullPath);
 
-      if ($imageContents === false) {
-        throw new \Exception('Failed to download image from object storage');
+      if ($imageContents === false || empty($imageContents)) {
+        throw new \Exception('Failed to download image from object storage or image is empty');
       }
 
       Log::info('✓ Image downloaded from object storage', [
         'file_size' => strlen($imageContents)
       ]);
 
-      // Get MIME type directly from file contents using finfo
-      $finfo = new \finfo(FILEINFO_MIME_TYPE);
-      $mimeType = $finfo->buffer($imageContents);
+      // Validate it's actually an image
+      $imageInfo = @getimagesizefromstring($imageContents);
+      if ($imageInfo === false) {
+        throw new \Exception('Downloaded content is not a valid image');
+      }
 
-      // Fallback: determine MIME type from file extension if finfo fails
-      if (!$mimeType || $mimeType === 'application/x-empty') {
-        $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
-        $mimeType = match ($extension) {
-          'jpg', 'jpeg' => 'image/jpeg',
-          'png' => 'image/png',
-          'gif' => 'image/gif',
-          'webp' => 'image/webp',
-          default => 'image/jpeg', // Default fallback
-        };
-        Log::warning("MIME type detection failed for feature extraction, using extension-based fallback: {$mimeType}");
+      // Use the MIME type from getimagesizefromstring (most reliable)
+      $mimeType = $imageInfo['mime'];
+
+      Log::info("Image validated for feature extraction: {$imageInfo[0]}x{$imageInfo[1]}, type: {$mimeType}");
+
+      // Convert to supported format if needed
+      $supportedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!in_array($mimeType, $supportedMimes)) {
+        Log::warning("Unsupported image type {$mimeType} for feature extraction, converting to JPEG");
+
+        $img = imagecreatefromstring($imageContents);
+        if ($img === false) {
+          throw new \Exception("Failed to create image resource for conversion");
+        }
+
+        ob_start();
+        imagejpeg($img, null, 90);
+        $imageContents = ob_get_clean();
+        imagedestroy($img);
+
+        $mimeType = 'image/jpeg';
       }
 
       $imageData = base64_encode($imageContents);
+
+      if (empty($imageData)) {
+        throw new \Exception('Base64 encoding failed for feature extraction');
+      }
 
       $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
 
@@ -413,6 +458,7 @@ Be detailed and specific about colors and patterns.";
       Log::info('✓ Dog features extracted successfully with Gemini');
     } catch (\Exception $e) {
       Log::error("Feature extraction failed: " . $e->getMessage());
+      Log::error("Stack trace: " . $e->getTraceAsString());
     }
 
     return $dogFeatures;
