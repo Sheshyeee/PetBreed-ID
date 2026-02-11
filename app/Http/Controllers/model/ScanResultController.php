@@ -676,11 +676,6 @@ class ScanResultController extends Controller
      * FIXED: BREED IDENTIFICATION WITH REALISTIC CONFIDENCE
      * ==========================================
      */
-    /**
-     * ==========================================
-     * FIXED: BREED IDENTIFICATION WITH REALISTIC CONFIDENCE
-     * ==========================================
-     */
     private function identifyBreedWithAPI($imagePath)
     {
         Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
@@ -1355,7 +1350,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             }
 
             $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
@@ -1428,7 +1423,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             }
 
             $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
