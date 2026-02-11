@@ -1355,7 +1355,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             }
 
             $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
@@ -1428,7 +1428,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             }
 
             $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
