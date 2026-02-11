@@ -671,35 +671,20 @@ class ScanResultController extends Controller
      * BREED IDENTIFICATION - DETAILED ANALYTICAL PROMPT
      * ==========================================
      */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - USING GEMINI PRO VISION
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - USING GEMINI 2.0 FLASH THINKING (FIXED)
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - USING GEMINI 2.5 PRO (FIXED & OPTIMIZED)
-     * ==========================================
-     */
     private function identifyBreedWithAPI($imagePath)
     {
-        Log::info('=== STARTING GEMINI API BREED IDENTIFICATION ===');
+        Log::info('=== STARTING ENHANCED API BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
 
-        $apiKey = config('services.gemini.api_key');
+        $apiKey = config('openai.api_key');
         if (empty($apiKey)) {
-            Log::error('✗ Gemini API key not configured in .env file');
+            Log::error('✗ OpenAI API key not configured in .env file');
             return [
                 'success' => false,
-                'error' => 'Gemini API key not configured'
+                'error' => 'OpenAI API key not configured'
             ];
         }
-        Log::info('✓ Gemini API key is configured');
+        Log::info('✓ OpenAI API key is configured');
 
         if (!file_exists($imagePath)) {
             Log::error('✗ Image file not found: ' . $imagePath);
@@ -715,155 +700,371 @@ class ScanResultController extends Controller
             $mimeType = mime_content_type($imagePath);
             Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType);
 
-            $prompt = "You are an expert dog breed identification specialist. Analyze this image and identify the dog's breed.
+            $enhancedBreedPrompt = "You are an elite canine geneticist and veterinary morphologist with expertise in identifying over 400 dog breeds, rare breeds, landrace populations, and complex mixed-breed combinations. Your analysis must be thorough, precise, and evidence-based.
 
-**ANALYSIS GUIDELINES:**
+═══════════════════════════════════════════════════════════════
+PHASE 1: SYSTEMATIC MORPHOLOGICAL ANALYSIS
+═══════════════════════════════════════════════════════════════
 
-Examine these key features:
-- Head/skull shape and muzzle length
-- Ear type (erect, floppy, semi-erect) and position
-- Body build and proportions
-- Coat type, length, and texture
-- Color and markings
-- Size estimation
-- Tail shape and carriage
-- Any distinctive breed-specific features
+Conduct a forensic-level examination of every visible feature:
 
-**CONFIDENCE SCORING - BE REALISTIC:**
+**CRANIAL & FACIAL STRUCTURE:**
+- Skull type: Dolichocephalic (long), Mesocephalic (medium), Brachycephalic (short)
+- Stop angle: Pronounced, moderate, minimal, absent
+- Muzzle ratio: Length vs skull length (1:1, 1:2, 2:3, etc.)
+- Muzzle shape: Tapered, blunt, square, pointed
+- Nose size and pigmentation
+- Jaw structure: Undershot, overshot, scissor bite indicators
+- Facial wrinkles or folds present
 
-- **85-100%**: Crystal clear breed-specific features, no doubt whatsoever (rare - only for textbook examples)
-- **70-84%**: Strong indicators present, very likely this breed
-- **55-69%**: Good match but some uncertainty (angle, lighting, or mixed features)
-- **40-54%**: Plausible guess but significant uncertainty
-- **25-39%**: Best estimate from limited information
-- **Below 25%**: Cannot reliably identify
+**EYE CHARACTERISTICS:**
+- Shape: Almond, round, oval, triangular
+- Size relative to head: Small, medium, large, prominent
+- Set: Deep-set, normal, protruding
+- Color if visible: Brown, amber, blue, green, heterochromia
+- Expression: Alert, gentle, intense, wise
 
-**IMPORTANT RULES:**
-1. If it's clearly a mixed breed, identify the DOMINANT/CLOSEST breed (e.g., \"Labrador Mix\" not \"Mixed Breed\")
-2. ALWAYS provide a valid, specific dog breed name - never say just \"Mixed Breed\" or \"Unknown\"
-3. Be honest with low confidence when unsure - don't inflate scores
-4. Consider that most real-world photos are NOT perfect breed examples
-5. Account for age (puppies are harder), grooming, angle, and image quality in your confidence
-6. Mixed breeds should typically get 45-65% confidence for the dominant breed
+**EAR MORPHOLOGY:**
+- Type: Prick/erect, semi-erect, button, rose, drop/pendant, bat
+- Set: High, medium, low on skull
+- Size: Small, medium, large relative to head
+- Leather thickness: Thin, medium, thick
+- Carriage: Forward, sideways, back
 
-**OUTPUT FORMAT (JSON only, no markdown):**
+**BODY ARCHITECTURE:**
+- Build: Compact, racy, cobby, rangy, sturdy, refined
+- Proportions: Square, slightly long, very long-backed
+- Chest: Deep, shallow, barrel, narrow
+- Topline: Level, sloping, roached
+- Loin: Short and strong, long, weak
+- Tuck-up: Pronounced (sighthound), moderate, minimal
+- Bone structure: Fine, medium, heavy
+- Muscle definition: Lean, athletic, heavily muscled, moderate
+
+**COAT ANALYSIS:**
+- Length: Hairless, very short, short, medium, long, very long
+- Texture: Smooth, wire/harsh, silky, woolly, corded, curly
+- Density: Single coat, double coat, triple coat
+- Pattern distribution: Uniform, feathering on legs/tail, ruff on neck
+- Undercoat presence: Yes/no
+
+**COLOR & PATTERN GENETICS:**
+- Base color: Solid (black, white, brown, red, cream, fawn, blue, etc.)
+- Pattern type: 
+  * Solid/self-colored
+  * Bicolor (specify distribution)
+  * Tricolor (specify colors and placement)
+  * Sable (hair banding)
+  * Brindle (tiger striping)
+  * Merle (mottled/dappled)
+  * Piebald/parti-color (white patches)
+  * Ticking/roan (colored dots on white)
+  * Saddle pattern
+  * Blanket pattern
+  * Points (darker on extremities)
+  * Mask (face darkening)
+- Specific markings: Blazes, collars, socks, patches, spectacles
+
+**TAIL CHARACTERISTICS:**
+- Set: High, medium, low
+- Carriage: Sickle, ring/curled, saber, flag, gay/upright, low
+- Shape: Straight, curved, kinked, bobbed, screw
+- Feathering: None, light, heavy, plumed
+
+**SIZE ESTIMATION:**
+- Weight class: Toy (<10 lbs), Small (10-25 lbs), Medium (25-50 lbs), Large (50-90 lbs), Giant (90+ lbs)
+- Height estimate: Under 10\", 10-15\", 15-20\", 20-25\", 25\"+ at shoulder
+- Body mass index: Slender, ideal, stocky, overweight
+
+**SPECIALIZED FEATURES:**
+- Dewclaws: Present/absent, single/double
+- Feet: Cat-like, hare-like, webbed
+- Gait indicators if visible: Stilted, fluid, bouncy
+- Specialized adaptations: Cold weather (thick coat, small ears), hot weather (large ears, short coat), water work (webbing), etc.
+
+═══════════════════════════════════════════════════════════════
+PHASE 2: BREED CANDIDATE IDENTIFICATION
+═══════════════════════════════════════════════════════════════
+
+Based on your morphological analysis, generate a list of 8-12 possible breed candidates:
+
+**PRIMARY CANDIDATES (3-4 breeds):**
+- List breeds that match 80%+ of observed features
+- Include both common and RARE breeds if features align
+- Do NOT exclude rare breeds just because they're uncommon
+
+**SECONDARY CANDIDATES (3-4 breeds):**
+- Breeds matching 60-79% of features
+- May have 1-2 significant differences
+
+**TERTIARY CANDIDATES (2-4 breeds):**
+- Breeds matching 40-59% of features
+- Useful for mixed breed analysis
+
+**MIXED BREED CONSIDERATIONS:**
+- Could this be a cross between any 2-3 candidates?
+- Are features inconsistent within a single breed standard?
+- Are there conflicting type characteristics (e.g., sighthound head + mastiff body)?
+
+═══════════════════════════════════════════════════════════════
+PHASE 3: DIFFERENTIAL DIAGNOSIS
+═══════════════════════════════════════════════════════════════
+
+For each PRIMARY candidate, perform detailed comparison:
+
+**For Each Candidate, Answer:**
+
+1. **SUPPORTING EVIDENCE** - What features MATCH this breed?
+   - List specific features that align with breed standard
+   - Include percentages (e.g., \"ear set matches 95%\")
+
+2. **CONTRADICTING EVIDENCE** - What features DON'T MATCH?
+   - List specific deviations from breed standard
+   - Assess if deviations are within acceptable variation or disqualifying
+
+3. **RARITY ASSESSMENT** - How common is this breed?
+   - FCI/AKC recognized: Common, Uncommon, Rare, Very Rare
+   - Regional breed: Specify region
+   - Landrace/Village dog: Specify population
+
+4. **CONFIDENCE MODIFIERS:**
+   - Age variation: Puppies/juveniles may not show full characteristics
+   - Grooming: Could grooming obscure/reveal features?
+   - Photo quality: Are features clearly visible?
+   - Atypical specimen: Could this be non-standard but still purebred?
+
+═══════════════════════════════════════════════════════════════
+PHASE 4: MIXED BREED ANALYSIS (If Applicable)
+═══════════════════════════════════════════════════════════════
+
+**CRITICAL MIXED BREED INDICATORS:**
+- Feature combinations from different breed groups (e.g., terrier head + retriever body)
+- Intermediate characteristics not standard to any breed
+- Simultaneous presence of conflicting traits
+- Lack of breed type consistency
+
+**IF MIXED BREED DETECTED:**
+- Identify most likely parent breeds (2-3 breeds)
+- Explain which features come from which parent
+- Assign contribution percentages (e.g., 60% Labrador, 40% Border Collie)
+- Consider F1, F2, or multi-generational mix
+
+**REGIONAL MIXED BREEDS:**
+- **Aspin/Asong Pinoy (Philippines):** Medium size, erect/semi-erect ears, short coat, athletic build, often tan/brown/black, curled or sickle tail, primitive features
+- **Indian Pariah Dog:** Similar to Basenji, erect ears, wedge head, curled tail, short coat, 15-20\" height
+- **African Village Dog:** Variable appearance, survival-adapted features
+- **Latin American Street Dog:** Mixed ancestry, often medium-sized, adaptable
+- **European Landrace:** Regional variations, working dog ancestry
+
+═══════════════════════════════════════════════════════════════
+PHASE 5: CONFIDENCE CALIBRATION
+═══════════════════════════════════════════════════════════════
+
+Assign confidence using STRICT criteria:
+
+**95-100% - DEFINITIVE IDENTIFICATION:**
+- ALL major breed-specific features present
+- NO contradicting features
+- Breed-specific unique traits visible (e.g., Rhodesian Ridgeback ridge, Lundehund extra toes)
+- Photo quality excellent, multiple angles would confirm
+- Example: \"This is unmistakably a purebred Border Collie\"
+
+**85-94% - HIGHLY CONFIDENT:**
+- All major features match strongly
+- Minor variations within acceptable breed range
+- 1-2 features not fully visible but no contradictions
+- Example: \"Strong evidence for purebred Australian Shepherd\"
+
+**75-84% - CONFIDENT:**
+- Most features match well
+- 2-3 minor deviations or unclear features
+- Could be purebred or very high-percentage mix
+- Example: \"Likely purebred German Shepherd, possibly working line\"
+
+**60-74% - MODERATE CONFIDENCE:**
+- Good feature match but some inconsistencies
+- Could be purebred with atypical features OR high-percentage mix
+- Example: \"Probable Golden Retriever mix or field-bred Golden Retriever\"
+
+**45-59% - LOW CONFIDENCE:**
+- Multiple breed influences visible
+- Features suggest specific mix but other combinations possible
+- Example: \"Likely Husky x German Shepherd mix\"
+
+**30-44% - VERY LOW CONFIDENCE:**
+- Multi-generational mix or complex ancestry
+- Can identify general type but not specific breeds
+- Example: \"Mixed breed with terrier and herding influences\"
+
+**Below 30% - INSUFFICIENT:**
+- Photo quality too poor
+- Puppy too young to assess adult features
+- Extreme grooming obscuring features
+- Cannot make reliable identification
+
+═══════════════════════════════════════════════════════════════
+PHASE 6: FINAL DETERMINATION & REASONING
+═══════════════════════════════════════════════════════════════
+
+**DECISION RULES:**
+
+1. **If confidence ≥85% for single breed → Identify as that purebred**
+2. **If confidence 60-84% with contradictions → Consider high-percentage mix**
+3. **If multiple breeds score 60-75% → Likely F1 cross of top 2**
+4. **If features from 3+ breeds → Multi-generational mix**
+5. **If regional landrace features → Use specific designation (Aspin, Pariah, etc.)**
+6. **NEVER force-fit into common breed if rare breed matches better**
+7. **NEVER misidentify regional dogs as standardized breeds**
+8. **BE HONEST about uncertainty - low confidence is better than false confidence**
+
+**RARE BREED PROTOCOL:**
+- If a rare breed scores ≥80%, IDENTIFY IT even if uncommon
+- Examples: Azawakh, Kai Ken, Norwegian Lundehund, Stabyhoun, Thai Ridgeback
+- Provide educational note about breed rarity
+
+**MIXED BREED PROTOCOL:**
+- Be specific: \"Labrador Retriever x Border Collie mix\" NOT just \"Mixed Breed\"
+- Explain reasoning: \"Shows Labrador head/coat with Border Collie build/tail\"
+- If 3+ breeds: \"Mixed breed with primarily Terrier and Hound ancestry\"
+
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT - STRICT JSON STRUCTURE
+═══════════════════════════════════════════════════════════════
 
 {
-  \"breed\": \"Specific Breed Name\" or \"Breed Name Mix\" (e.g., \"German Shepherd\", \"Labrador Mix\", \"Shiba Inu\"),
-  \"confidence\": 72.5,
-  \"breed_type\": \"purebred\" or \"mixed_breed\",
-  \"genetic_composition\": \"Purebred German Shepherd\" or \"Primarily Labrador with possible Pit Bull ancestry\" or \"Mixed ancestry, predominantly terrier-type\",
-  \"reasoning\": \"Concise 2-3 sentence explanation citing specific visible features. Example: 'The erect triangular ears, wedge-shaped head with pronounced stop, and black-tan saddle pattern are characteristic of German Shepherds. The athletic build and double coat further support this identification. Confidence is high due to multiple clear breed markers.'\",
-  \"key_identifiers\": [
-    \"First key visible feature\",
-    \"Second key feature\",
-    \"Third key feature\"
-  ],
-  \"alternative_possibilities\": [
+  \"morphological_analysis\": {
+    \"skull_type\": \"mesocephalic/dolichocephalic/brachycephalic\",
+    \"ear_type\": \"detailed description\",
+    \"body_structure\": \"detailed description\",
+    \"coat_features\": \"detailed texture, length, density\",
+    \"color_genetics\": \"base color + pattern with genetic terms\",
+    \"tail_type\": \"detailed description\",
+    \"distinctive_features\": [\"feature 1\", \"feature 2\", \"feature 3\"],
+    \"size_category\": \"toy/small/medium/large/giant\",
+    \"specialized_adaptations\": \"any working dog features visible\"
+  },
+  
+  \"candidate_breeds\": [
     {
-      \"breed\": \"Second most likely breed\",
-      \"confidence\": 58.0,
-      \"reasoning\": \"Brief explanation why this is possible\"
+      \"breed\": \"Breed Name\",
+      \"match_percentage\": 85,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
+    },
+    {
+      \"breed\": \"Breed Name 2\",
+      \"match_percentage\": 72,
+      \"supporting_features\": [\"feature 1\", \"feature 2\"],
+      \"contradicting_features\": [\"feature 1\", \"feature 2\"],
+      \"rarity\": \"common/uncommon/rare/regional\"
     }
   ],
+  
+  \"breed\": \"FINAL BREED NAME or 'Breed A x Breed B mix' or 'Aspin' or 'Mixed Breed'\",
+  
+  \"confidence\": 87.5,
+  
+  \"reasoning\": \"Comprehensive 4-6 sentence explanation synthesizing all evidence. Start with: 'Based on comprehensive morphological analysis...' Include: (1) Key identifying features, (2) Why this breed over others, (3) Any contradictions explained, (4) Confidence justification. Be specific and technical.\",
+  
+  \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\" or \"regional_street_dog\",
+  
+  \"genetic_composition\": \"For mixes: '60% Breed A, 40% Breed B' or 'Primary: Breed A, Secondary: Breed B, Breed C' or 'Purebred' or 'Complex multi-generational'\",
+  
+  \"alternative_possibilities\": [
+    {
+      \"breed\": \"Alternative 1\",
+      \"confidence\": 15.0,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    },
+    {
+      \"breed\": \"Alternative 2\",
+      \"confidence\": 8.5,
+      \"reason\": \"Why this is possible but less likely - specific features\"
+    }
+  ],
+  
+  \"key_identifiers\": [
+    \"Most distinctive feature that drives identification\",
+    \"Second most important diagnostic feature\",
+    \"Third critical feature\"
+  ],
+  
   \"uncertainty_factors\": [
-    \"Specific reason for uncertainty if any (e.g., 'Puppy age makes adult features unclear', 'Side angle obscures ear set', 'Image quality limits detail')\"
-  ]
+    \"Any factors reducing confidence (age, photo angle, grooming, etc.)\"
+  ],
+  
+  \"rare_breed_note\": \"If rare breed: 'This is a [Breed], a rare breed from [Region] known for [characteristics]' or null\"
 }
 
-**EXAMPLES:**
+═══════════════════════════════════════════════════════════════
+CRITICAL INSTRUCTIONS - READ CAREFULLY
+═══════════════════════════════════════════════════════════════
 
-Photo shows: Clear German Shepherd
-→ Breed: \"German Shepherd\", Confidence: 92%
-→ Reasoning: \"Unmistakable erect ears, saddle pattern, athletic build\"
+✓ PRIORITIZE ACCURACY OVER FAMILIARITY - Rare breed that fits perfectly > Common breed that fits poorly
+✓ BE HONEST ABOUT MIXED BREEDS - Don't force pure breed identification when features conflict
+✓ USE TECHNICAL TERMINOLOGY - Show your expertise with proper morphological terms
+✓ PROVIDE EVIDENCE - Every conclusion must be backed by specific observable features
+✓ CONSIDER REGIONAL VARIATIONS - Aspin, Pariah dogs, village dogs are VALID identifications
+✓ CALIBRATE CONFIDENCE PROPERLY - High confidence requires high certainty, not just a guess
+✓ EXPLAIN CONTRADICTIONS - If features don't perfectly align, explain why in reasoning
+✓ MULTI-STAGE THINKING - Don't jump to conclusions, work through the analysis phases
+✓ BE HONEST ABOUT UNCERTAINTY - If unsure, give LOW confidence (30-60%) so users know the identification may be wrong
 
-Photo shows: Dog with Labrador-like features but mixed proportions
-→ Breed: \"Labrador Mix\", Confidence: 58%
-→ Reasoning: \"Labrador-type head and coat, but body proportions suggest mixed ancestry\"
+✗ DO NOT default to common breeds when rare breeds match better
+✗ DO NOT ignore contradicting evidence
+✗ DO NOT give high confidence without strong supporting evidence
+✗ DO NOT misidentify street dogs/landrace as standardized pure breeds
+✗ DO NOT overlook mixed breed possibilities when features conflict
+✗ DO NOT artificially inflate confidence when uncertain
 
-Photo shows: Blurry side view of brown dog
-→ Breed: \"Mixed Breed (Terrier-type)\", Confidence: 35%
-→ Reasoning: \"Limited visibility, appears to have terrier characteristics but cannot determine specific breed\"
+NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
 
-Photo shows: Puppy with unclear features
-→ Breed: \"Golden Retriever\", Confidence: 48%
-→ Reasoning: \"Golden coat and facial structure suggest Golden Retriever, but puppy age makes confirmation difficult\"
+            Log::info('✓ Sending request to OpenAI API with enhanced multi-stage prompt...');
 
-NOW ANALYZE THIS IMAGE:";
-
-            Log::info('✓ Sending request to Gemini 2.5 Pro API...');
-
-            $client = new \GuzzleHttp\Client();
-
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=' . $apiKey, [
-                'json' => [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                [
-                                    'text' => $prompt
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'You are a world-class canine geneticist and morphologist specializing in rare breed identification and complex mixed-breed analysis. You have encyclopedic knowledge of 400+ breeds including regional landrace populations. Your analysis is systematic, evidence-based, and technically precise. You never guess - you analyze methodically. When uncertain, you provide honest low confidence scores to help users understand the identification may be incorrect.'
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => $enhancedBreedPrompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                    'detail' => 'high'
                                 ],
-                                [
-                                    'inlineData' => [
-                                        'mimeType' => $mimeType,
-                                        'data' => $imageData
-                                    ]
-                                ]
-                            ]
-                        ]
+                            ],
+                        ],
                     ],
-                    'generationConfig' => [
-                        'temperature' => 0.1,
-                        'topP' => 0.95,
-                        'topK' => 40,
-                        'maxOutputTokens' => 2048,
-                        'responseMimeType' => 'application/json'
-                    ],
-                    'safetySettings' => [
-                        [
-                            'category' => 'HARM_CATEGORY_HARASSMENT',
-                            'threshold' => 'BLOCK_NONE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_HATE_SPEECH',
-                            'threshold' => 'BLOCK_NONE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                            'threshold' => 'BLOCK_NONE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                            'threshold' => 'BLOCK_NONE'
-                        ]
-                    ]
                 ],
-                'timeout' => 45
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 3000,
+                'temperature' => 0.2,
             ]);
 
-            Log::info('✓ Received response from Gemini API');
+            Log::info('✓ Received response from OpenAI API');
 
-            $result = json_decode($response->getBody()->getContents(), true);
-
-            // Get the response text
-            $rawContent = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
-
-            Log::info('Raw API response: ' . substr($rawContent ?? 'NULL', 0, 1000) . '...');
+            $rawContent = $response->choices[0]->message->content ?? null;
+            Log::info('Raw API response: ' . substr($rawContent, 0, 1500) . '...');
 
             if (empty($rawContent)) {
-                throw new \Exception('Empty response from Gemini API');
+                throw new \Exception('Empty response from OpenAI API');
             }
-
-            // Clean the response - remove markdown code blocks if present
-            $rawContent = preg_replace('/```json\s*|\s*```/', '', $rawContent);
-            $rawContent = trim($rawContent);
 
             $apiResult = json_decode($rawContent, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('JSON decode error: ' . json_last_error_msg());
-                Log::error('Raw content: ' . $rawContent);
-                throw new \Exception('Failed to decode JSON response: ' . json_last_error_msg());
+                throw new \Exception('Failed to decode JSON response');
             }
 
             if (!$apiResult || !isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
@@ -872,26 +1073,24 @@ NOW ANALYZE THIS IMAGE:";
                 throw new \Exception('Missing required fields in API response');
             }
 
+            // Use the ACTUAL confidence from the API - NO MODIFICATIONS
             $actualConfidence = (float)$apiResult['confidence'];
 
-            // Validate confidence is realistic (cap at 95% for real-world photos)
-            if ($actualConfidence > 95.0) {
-                Log::warning('Confidence capped from ' . $actualConfidence . '% to 95%');
-                $actualConfidence = 95.0;
-            }
-
-            Log::info('✓ GEMINI API breed identification successful', [
+            Log::info('✓ ENHANCED API breed identification successful', [
                 'breed' => $apiResult['breed'],
-                'confidence' => $actualConfidence,
+                'actual_confidence' => $actualConfidence,
                 'breed_type' => $apiResult['breed_type'] ?? 'unknown',
-                'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 150)
+                'genetic_composition' => $apiResult['genetic_composition'] ?? 'N/A',
+                'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
+                'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
+                'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
             ]);
 
-            // Build top predictions
+            // Build top predictions array with ONLY REAL BREEDS
             $topPredictions = [];
-            $seenBreeds = [];
+            $seenBreeds = []; // Track breeds to avoid duplicates
 
-            // Add primary breed
+            // Add primary breed first
             $primaryBreed = $apiResult['breed'];
             $topPredictions[] = [
                 'breed' => $primaryBreed,
@@ -899,13 +1098,14 @@ NOW ANALYZE THIS IMAGE:";
             ];
             $seenBreeds[] = strtolower(trim($primaryBreed));
 
-            // Add alternatives if present
+            // Add alternative possibilities (these have actual breed names and confidence scores)
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
                         $breedKey = strtolower(trim($alt['breed']));
 
-                        if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0 && count($topPredictions) < 5) {
+                        // Skip duplicates and only add if confidence > 0
+                        if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
                             $topPredictions[] = [
                                 'breed' => $alt['breed'],
                                 'confidence' => round((float)$alt['confidence'], 2)
@@ -916,6 +1116,28 @@ NOW ANALYZE THIS IMAGE:";
                 }
             }
 
+            // Add candidate breeds ONLY if they have meaningful confidence and aren't duplicates
+            if (count($topPredictions) < 5 && isset($apiResult['candidate_breeds']) && is_array($apiResult['candidate_breeds'])) {
+                foreach ($apiResult['candidate_breeds'] as $candidate) {
+                    if (isset($candidate['breed']) && count($topPredictions) < 5) {
+                        $breedKey = strtolower(trim($candidate['breed']));
+                        $confidence = (float)($candidate['match_percentage'] ?? $candidate['confidence'] ?? 0);
+
+                        // Only add if not duplicate and has reasonable confidence
+                        if (!in_array($breedKey, $seenBreeds) && $confidence > 0) {
+                            $topPredictions[] = [
+                                'breed' => $candidate['breed'],
+                                'confidence' => round($confidence, 2)
+                            ];
+                            $seenBreeds[] = $breedKey;
+                        }
+                    }
+                }
+            }
+
+            // DO NOT fill with "Other Breeds" - only return real predictions
+            // Frontend will handle the display appropriately
+
             Log::info('✓ Top predictions built', [
                 'count' => count($topPredictions),
                 'breeds' => array_column($topPredictions, 'breed')
@@ -923,10 +1145,10 @@ NOW ANALYZE THIS IMAGE:";
 
             return [
                 'success' => true,
-                'method' => 'gemini_api',
+                'method' => 'api_enhanced',
                 'breed' => $apiResult['breed'],
-                'confidence' => round($actualConfidence, 2),
-                'top_predictions' => $topPredictions,
+                'confidence' => round($actualConfidence, 2), // Use actual API confidence - NO RANDOMIZATION
+                'top_predictions' => $topPredictions, // Return only real predictions (no padding)
                 'metadata' => [
                     'reasoning' => $apiResult['reasoning'] ?? '',
                     'key_identifiers' => $apiResult['key_identifiers'] ?? [],
@@ -938,18 +1160,15 @@ NOW ANALYZE THIS IMAGE:";
                     'rare_breed_note' => $apiResult['rare_breed_note'] ?? null,
                 ]
             ];
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            Log::error('✗ Gemini API Request Error: ' . $e->getMessage());
-            if ($e->hasResponse()) {
-                $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::error('Error response body: ' . $errorBody);
-            }
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
+            Log::error('✗ OpenAI API Error: ' . $e->getMessage());
+            Log::error('Error code: ' . $e->getCode());
             return [
                 'success' => false,
-                'error' => 'Gemini API Request Error: ' . $e->getMessage()
+                'error' => 'OpenAI API Error: ' . $e->getMessage()
             ];
         } catch (\Exception $e) {
-            Log::error('✗ Gemini API breed identification failed: ' . $e->getMessage());
+            Log::error('✗ Enhanced API breed identification failed: ' . $e->getMessage());
             Log::error('Error type: ' . get_class($e));
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
