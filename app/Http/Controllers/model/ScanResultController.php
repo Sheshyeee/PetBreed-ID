@@ -1289,27 +1289,46 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
 Be verbose and detailed. Output ONLY the JSON.";
 
-            $response = OpenAI::chat()->create([
-                'model' => 'gpt-4o-mini',
-                'messages' => [
-                    ['role' => 'system', 'content' => 'You are a veterinary historian. Output only valid JSON. Be verbose and detailed.'],
-                    ['role' => 'user', 'content' => $combinedPrompt]
-                ],
-                'response_format' => ['type' => 'json_object'],
-                'max_tokens' => 1500,
-                'temperature' => 0.3,
-            ]);
-
-            $content = $response->choices[0]->message->content;
-            $parsed = json_decode($content, true);
-
-            if ($parsed) {
-                $aiData['description'] = $parsed['description'] ?? '';
-                $aiData['health_risks'] = $parsed['health_risks'] ?? [];
-                $aiData['origin_history'] = $parsed['origin_data'] ?? [];
+            // Use Gemini API instead of OpenAI
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                Log::error('✗ Gemini API key not configured');
+                return $aiData;
             }
 
-            Log::info('✓ AI descriptions generated successfully');
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => "You are a veterinary historian. Output only valid JSON. Be verbose and detailed.\n\n" . $combinedPrompt
+                                ]
+                            ]
+                        ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.3,
+                        'maxOutputTokens' => 1500,
+                        'responseMimeType' => 'application/json'
+                    ]
+                ]
+            ]);
+
+            $result = json_decode($response->getBody()->getContents(), true);
+            $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+            if ($content) {
+                $parsed = json_decode($content, true);
+                if ($parsed) {
+                    $aiData['description'] = $parsed['description'] ?? '';
+                    $aiData['health_risks'] = $parsed['health_risks'] ?? [];
+                    $aiData['origin_history'] = $parsed['origin_data'] ?? [];
+                }
+            }
+
+            Log::info('✓ AI descriptions generated successfully with Gemini');
         } catch (\Exception $e) {
             Log::error("AI generation failed: " . $e->getMessage());
         }
@@ -1354,23 +1373,49 @@ Be verbose and detailed. Output ONLY the JSON.";
 
 Be detailed and specific about colors and patterns.";
 
-            $response = OpenAI::chat()->create([
-                'model' => 'gpt-4o-mini',
-                'messages' => [[
-                    'role' => 'user',
-                    'content' => [
-                        ['type' => 'text', 'text' => $visionPrompt],
-                        ['type' => 'image_url', 'image_url' => ['url' => "data:{$mimeType};base64,{$imageData}"]],
+            // Use Gemini API instead of OpenAI
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                Log::error('✗ Gemini API key not configured');
+                return $dogFeatures;
+            }
+
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => $visionPrompt
+                                ],
+                                [
+                                    'inlineData' => [
+                                        'mimeType' => $mimeType,
+                                        'data' => $imageData
+                                    ]
+                                ]
+                            ]
+                        ]
                     ],
-                ]],
-                'response_format' => ['type' => 'json_object'],
-                'max_tokens' => 500,
+                    'generationConfig' => [
+                        'maxOutputTokens' => 500,
+                        'responseMimeType' => 'application/json'
+                    ]
+                ]
             ]);
 
-            $features = json_decode($response->choices[0]->message->content, true);
-            if ($features) {
-                $dogFeatures = array_merge($dogFeatures, $features);
+            $result = json_decode($response->getBody()->getContents(), true);
+            $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+            if ($content) {
+                $features = json_decode($content, true);
+                if ($features) {
+                    $dogFeatures = array_merge($dogFeatures, $features);
+                }
             }
+
+            Log::info('✓ Dog features extracted successfully with Gemini');
         } catch (\Exception $e) {
             Log::error("Feature extraction failed: " . $e->getMessage());
         }
@@ -1383,10 +1428,10 @@ Be detailed and specific about colors and patterns.";
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
      * ==========================================
      */
-     private function validateDogImage($imagePath): array
+    private function validateDogImage($imagePath): array
     {
         try {
-            Log::info('🔍 Starting dog validation with OpenAI Vision', [
+            Log::info('🔍 Starting dog validation with Gemini Vision', [
                 'image_path' => $imagePath
             ]);
 
@@ -1394,32 +1439,45 @@ Be detailed and specific about colors and patterns.";
             $imageData = base64_encode(file_get_contents($imagePath));
             $mimeType = mime_content_type($imagePath);
 
-            $response = OpenAI::chat()->create([
-                'model' => 'gpt-4o-mini',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => [
-                            [
-                                'type' => 'text',
-                                'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
-                            ],
-                            [
-                                'type' => 'image_url',
-                                'image_url' => [
-                                    'url' => "data:{$mimeType};base64,{$imageData}",
+            // Use Gemini API instead of OpenAI
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                Log::error('✗ Gemini API key not configured');
+                return [
+                    'is_dog' => true,
+                    'error' => 'Gemini API key not configured'
+                ];
+            }
+
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
                                 ],
-                            ],
-                        ],
+                                [
+                                    'inlineData' => [
+                                        'mimeType' => $mimeType,
+                                        'data' => $imageData
+                                    ]
+                                ]
+                            ]
+                        ]
                     ],
-                ],
-                'max_tokens' => 10,
+                    'generationConfig' => [
+                        'maxOutputTokens' => 10
+                    ]
+                ]
             ]);
 
-            $answer = trim(strtoupper($response->choices[0]->message->content));
+            $result = json_decode($response->getBody()->getContents(), true);
+            $answer = trim(strtoupper($result['candidates'][0]['content']['parts'][0]['text'] ?? ''));
             $isDog = str_contains($answer, 'YES');
 
-            Log::info('✓ OpenAI dog validation complete', [
+            Log::info('✓ Gemini dog validation complete', [
                 'answer' => $answer,
                 'is_dog' => $isDog
             ]);
@@ -1435,7 +1493,6 @@ Be detailed and specific about colors and patterns.";
             ]);
 
             // On error, allow the image through (fail-open approach)
-            // Change to ['is_dog' => false] for fail-closed behavior
             return [
                 'is_dog' => true,
                 'error' => $e->getMessage()
