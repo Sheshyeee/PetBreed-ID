@@ -212,7 +212,7 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       // Gemini Nano Banana Pro 3 endpoint
-      $modelName = "nano-banana-pro-preview";
+      $modelName = "gemini-2.5-flash-image";
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
       Log::info("Calling Gemini Nano Banana Pro API...");
