@@ -218,7 +218,7 @@ class GenerateAgeSimulations implements ShouldQueue
       Log::info("Calling Gemini Nano Banana Pro API...");
       Log::info("Endpoint: {$endpoint}");
 
-      // Prepare request payload
+      // Prepare request payload - REMOVED responseMimeType
       $payload = array(
         'contents' => array(
           array(
@@ -233,8 +233,8 @@ class GenerateAgeSimulations implements ShouldQueue
           'temperature' => 0.9,
           'topK' => 40,
           'topP' => 0.95,
-          'maxOutputTokens' => 8192,
-          'responseMimeType' => 'image/png'
+          'maxOutputTokens' => 8192
+          // REMOVED: 'responseMimeType' => 'image/png'
         )
       );
 
@@ -278,6 +278,7 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       Log::info("Gemini API Response received successfully");
+      Log::info("Response structure: " . json_encode(array_keys($responseData)));
 
       // Extract image data from response
       // Nano Banana Pro returns image as inline data in parts
@@ -293,11 +294,11 @@ class GenerateAgeSimulations implements ShouldQueue
         // Remove any potential markdown code block markers
         $base64Image = preg_replace('/```[\w]*\n?/', '', $base64Image);
         $base64Image = trim($base64Image);
-        Log::info("✓ Image data extracted from text field");
+        Log::info("✓ Image data extracted from text field (length: " . strlen($base64Image) . ")");
         return base64_decode($base64Image);
       } else {
         Log::error("Unexpected Gemini response format");
-        Log::error("Response structure: " . json_encode($responseData));
+        Log::error("Full response: " . json_encode($responseData));
         throw new \Exception("Unexpected response format from Gemini API - no image data found");
       }
     } catch (\Exception $e) {
