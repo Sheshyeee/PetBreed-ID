@@ -21,13 +21,16 @@ class GenerateAgeSimulations implements ShouldQueue
 
   protected $resultId;
   protected $breed;
-  protected $dogFeatures;
+  protected $imagePath; // CHANGED: Now stores image path instead of features
 
-  public function __construct($resultId, $breed, array $dogFeatures = [])
+  /**
+   * UPDATED CONSTRUCTOR: Now accepts image path instead of dog features
+   */
+  public function __construct($resultId, $breed, $imagePath)
   {
     $this->resultId = $resultId;
     $this->breed = $breed;
-    $this->dogFeatures = $dogFeatures;
+    $this->imagePath = $imagePath; // CHANGED: Store image path
   }
 
   public function handle()
@@ -43,12 +46,17 @@ class GenerateAgeSimulations implements ShouldQueue
         return;
       }
 
+      // EXTRACT DOG FEATURES HERE (moved from controller)
+      Log::info("→ Extracting dog features from image...");
+      $dogFeatures = $this->extractDogFeatures($this->imagePath, $this->breed);
+      Log::info("✓ Dog features extracted", $dogFeatures);
+
       // Initialize simulation data
       $simulationData = [
         '1_years' => null,
         '3_years' => null,
         'status' => 'generating',
-        'dog_features' => $this->dogFeatures // PRESERVE FEATURES
+        'dog_features' => $dogFeatures // NOW we have the features
       ];
 
       // Update status to generating IMMEDIATELY
@@ -56,13 +64,13 @@ class GenerateAgeSimulations implements ShouldQueue
       Log::info("✓ Status updated to 'generating'");
 
       // Extract features with defaults
-      $coatColor = isset($this->dogFeatures['coat_color']) ? $this->dogFeatures['coat_color'] : 'brown';
-      $coatPattern = isset($this->dogFeatures['coat_pattern']) ? $this->dogFeatures['coat_pattern'] : 'solid';
-      $coatLength = isset($this->dogFeatures['coat_length']) ? $this->dogFeatures['coat_length'] : 'medium';
-      $build = isset($this->dogFeatures['build']) ? $this->dogFeatures['build'] : 'medium';
-      $estimatedAge = isset($this->dogFeatures['estimated_age']) ? $this->dogFeatures['estimated_age'] : 'young adult';
+      $coatColor = isset($dogFeatures['coat_color']) ? $dogFeatures['coat_color'] : 'brown';
+      $coatPattern = isset($dogFeatures['coat_pattern']) ? $dogFeatures['coat_pattern'] : 'solid';
+      $coatLength = isset($dogFeatures['coat_length']) ? $dogFeatures['coat_length'] : 'medium';
+      $build = isset($dogFeatures['build']) ? $dogFeatures['build'] : 'medium';
+      $estimatedAge = isset($dogFeatures['estimated_age']) ? $dogFeatures['estimated_age'] : 'young adult';
 
-      // Convert estimated age to numeric years (replacing match with switch)
+      // Convert estimated age to numeric years
       $estimatedAgeLower = strtolower($estimatedAge);
       switch ($estimatedAgeLower) {
         case 'puppy':
@@ -91,7 +99,7 @@ class GenerateAgeSimulations implements ShouldQueue
 
       Log::info("Ages: Current={$currentAgeYears}y, +1year={$age1YearLater}y, +3years={$age3YearsLater}y");
 
-      // SIMPLIFIED, SAFER PROMPTS (removed detailed aging descriptions that trigger safety)
+      // SIMPLIFIED, SAFER PROMPTS
       $getSimpleAgeDescription = function ($ageYears) {
         if ($ageYears < 2) {
           return "youthful appearance, shiny coat, bright eyes";
@@ -108,7 +116,6 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 1_years simulation ===");
 
-        // SAFER PROMPT - removed overly detailed descriptions
         $prompt1Year = "A {$this->breed} dog portrait, {$coatColor} colored {$coatLength} fur with {$coatPattern} pattern, {$build} build, {$getSimpleAgeDescription($age1YearLater)}, professional pet photography, natural outdoor lighting";
 
         Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 150) . "...");
@@ -142,7 +149,6 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 3_years simulation ===");
 
-        // SAFER PROMPT
         $prompt3Years = "A {$this->breed} dog portrait, {$coatColor} colored {$coatLength} fur with {$coatPattern} pattern, {$build} build, {$getSimpleAgeDescription($age3YearsLater)}, professional pet photography, natural outdoor lighting";
 
         Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 150) . "...");
@@ -193,11 +199,120 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
+   * ==========================================
+   * NEW: Extract Dog Features using Gemini API
+   * MOVED FROM ScanResultController.php
+   * ==========================================
+   */
+  private function extractDogFeatures($fullPath, $detectedBreed)
+  {
+    $dogFeatures = [
+      'coat_color' => 'brown',
+      'coat_pattern' => 'solid',
+      'coat_length' => 'medium',
+      'estimated_age' => 'young adult',
+      'build' => 'medium',
+      'distinctive_markings' => 'none',
+    ];
+
+    try {
+      // Download image from object storage to temp file
+      $imageContents = Storage::disk('object-storage')->get($fullPath);
+
+      if ($imageContents === false) {
+        throw new \Exception('Failed to download image from object storage');
+      }
+
+      // Create temporary file
+      $tempPath = tempnam(sys_get_temp_dir(), 'feature_extract_');
+      $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+      $tempPathWithExt = $tempPath . '.' . $extension;
+      rename($tempPath, $tempPathWithExt);
+
+      file_put_contents($tempPathWithExt, $imageContents);
+
+      Log::info('✓ Image downloaded from object storage to temp file', [
+        'temp_path' => $tempPathWithExt,
+        'file_size' => strlen($imageContents)
+      ]);
+
+      $imageData = base64_encode($imageContents);
+      $mimeType = mime_content_type($tempPathWithExt);
+
+      $visionPrompt = "Analyze this {$detectedBreed} dog image and provide ONLY a JSON response with these exact keys:
+
+{
+  \"coat_color\": \"primary color(s) - be specific (e.g., 'golden', 'black and tan', 'white with brown patches', 'brindle')\",
+  \"coat_pattern\": \"pattern type (solid, spotted, brindle, merle, parti-color, tuxedo, sable)\",
+  \"coat_length\": \"length (short, medium, long, curly)\",
+  \"coat_texture\": \"texture description (silky, wiry, fluffy, smooth)\",
+  \"estimated_age\": \"age range (puppy, young adult, adult, mature, senior) based on face, eyes, and coat\",
+  \"build\": \"body type (lean/athletic, stocky/muscular, compact, large/heavy)\",
+  \"distinctive_markings\": \"any unique features (facial markings, chest patches, eyebrow marks, ear color, tail characteristics)\",
+  \"ear_type\": \"ear shape (floppy, erect, semi-erect)\",
+  \"eye_color\": \"eye color if visible (brown, blue, amber, heterochromic)\",
+  \"size_estimate\": \"size category (toy, small, medium, large, giant)\"
+}
+
+Be detailed and specific about colors and patterns.";
+
+      // Use Gemini API
+      $apiKey = config('services.gemini.api_key');
+      if (empty($apiKey)) {
+        Log::error('✗ Gemini API key not configured');
+        return $dogFeatures;
+      }
+
+      $client = new \GuzzleHttp\Client();
+      $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+        'json' => [
+          'contents' => [
+            [
+              'parts' => [
+                [
+                  'text' => $visionPrompt
+                ],
+                [
+                  'inlineData' => [
+                    'mimeType' => $mimeType,
+                    'data' => $imageData
+                  ]
+                ]
+              ]
+            ]
+          ],
+          'generationConfig' => [
+            'maxOutputTokens' => 500,
+            'responseMimeType' => 'application/json'
+          ]
+        ]
+      ]);
+
+      $result = json_decode($response->getBody()->getContents(), true);
+      $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+      if ($content) {
+        $features = json_decode($content, true);
+        if ($features) {
+          $dogFeatures = array_merge($dogFeatures, $features);
+        }
+      }
+
+      // Clean up temp file
+      if (file_exists($tempPathWithExt)) {
+        unlink($tempPathWithExt);
+      }
+
+      Log::info('✓ Dog features extracted successfully with Gemini');
+    } catch (\Exception $e) {
+      Log::error("Feature extraction failed: " . $e->getMessage());
+    }
+
+    return $dogFeatures;
+  }
+
+  /**
    * Generate image using Gemini Nano Banana Pro 3 API
-   * Uses cURL for maximum compatibility
-   * 
-   * @param string $prompt
-   * @return string|null Binary image data
    */
   private function generateImageWithGemini($prompt)
   {
@@ -216,9 +331,8 @@ class GenerateAgeSimulations implements ShouldQueue
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
       Log::info("Calling Gemini Nano Banana Pro API...");
-      Log::info("Endpoint: {$endpoint}");
 
-      // Prepare request payload - REMOVED responseMimeType
+      // Prepare request payload
       $payload = array(
         'contents' => array(
           array(
@@ -234,7 +348,6 @@ class GenerateAgeSimulations implements ShouldQueue
           'topK' => 40,
           'topP' => 0.95,
           'maxOutputTokens' => 8192
-          // REMOVED: 'responseMimeType' => 'image/png'
         )
       );
 
@@ -273,25 +386,18 @@ class GenerateAgeSimulations implements ShouldQueue
 
       if (json_last_error() !== JSON_ERROR_NONE) {
         Log::error("JSON decode error: " . json_last_error_msg());
-        Log::error("Raw response: " . substr($responseBody, 0, 500));
         throw new \Exception("Failed to parse Gemini API response");
       }
 
       Log::info("Gemini API Response received successfully");
-      Log::info("Response structure: " . json_encode(array_keys($responseData)));
 
       // Extract image data from response
-      // Nano Banana Pro returns image as inline data in parts
       if (isset($responseData['candidates'][0]['content']['parts'][0]['inlineData']['data'])) {
         $base64Image = $responseData['candidates'][0]['content']['parts'][0]['inlineData']['data'];
         Log::info("✓ Image data extracted successfully (base64 length: " . strlen($base64Image) . ")");
         return base64_decode($base64Image);
-      }
-      // Alternative response format
-      elseif (isset($responseData['candidates'][0]['content']['parts'][0]['text'])) {
-        // Sometimes the base64 might be in text field
+      } elseif (isset($responseData['candidates'][0]['content']['parts'][0]['text'])) {
         $base64Image = $responseData['candidates'][0]['content']['parts'][0]['text'];
-        // Remove any potential markdown code block markers
         $base64Image = preg_replace('/```[\w]*\n?/', '', $base64Image);
         $base64Image = trim($base64Image);
         Log::info("✓ Image data extracted from text field (length: " . strlen($base64Image) . ")");
