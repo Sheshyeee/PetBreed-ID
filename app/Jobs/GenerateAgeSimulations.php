@@ -440,11 +440,11 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       // CRITICAL FIX: Use the CORRECT model that supports image generation
-      // gemini-2.0-flash-exp-imagen is Gemini's experimental image generation model
-      $modelName = "gemini-2.0-flash-exp-imagen";
+      // Using gemini-2.5-flash-image (Nano Banana) - supports image generation
+      $modelName = "gemini-2.5-flash-image";
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
-      Log::info("🎨 Calling Gemini Imagen API (model: {$modelName})...");
+      Log::info("🎨 Calling Gemini Image API (model: {$modelName})...");
 
       // TEXT-TO-IMAGE payload
       $payload = array(
