@@ -1229,6 +1229,11 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
      * OPTIMIZED: Generate AI descriptions with detailed prompts
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: Generate AI descriptions with better error handling
+     * ==========================================
+     */
     private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
     {
         $aiData = [
@@ -1238,26 +1243,27 @@ NOW ANALYZE THE IMAGE WITH MAXIMUM PRECISION AND INTELLECTUAL RIGOR.";
         ];
 
         if ($detectedBreed === 'Unknown') {
+            Log::info('⏭️ Skipping AI generation for Unknown breed');
             return $aiData;
         }
 
         try {
+            Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
+
             $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
 
-1. 'description': Write a  2 setence summary of the breed's identity and historical significance.
+1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
 
 2. 'health_risks': {
      'concerns': [
-       
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
        { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
      ],
      'screenings': [
        { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
-       { 'name': 'Exam Name', 'description': 'Detailed explanation.' },
-       
+       { 'name': 'Exam Name', 'description': 'Detailed explanation.' }
      ],
      'lifespan': 'e.g. 10-12',
      'care_tips': [
@@ -1289,14 +1295,21 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
 
 Be verbose and detailed. Output ONLY the JSON.";
 
-            // Use Gemini API instead of OpenAI
             $apiKey = config('services.gemini.api_key');
             if (empty($apiKey)) {
-                Log::error('✗ Gemini API key not configured');
+                Log::error('❌ Gemini API key not configured in services.gemini.api_key');
                 return $aiData;
             }
 
-            $client = new \GuzzleHttp\Client();
+            Log::info("📤 Sending request to Gemini API...");
+
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 30,
+                'connect_timeout' => 10
+            ]);
+
+            $startTime = microtime(true);
+
             $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
@@ -1310,32 +1323,105 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ],
                     'generationConfig' => [
                         'temperature' => 0.3,
-                        'maxOutputTokens' => 1500,
+                        'maxOutputTokens' => 2000, // Increased for more detailed content
                         'responseMimeType' => 'application/json'
                     ]
                 ]
             ]);
 
-            $result = json_decode($response->getBody()->getContents(), true);
-            $content = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            $duration = round(microtime(true) - $startTime, 2);
+            Log::info("📥 Gemini response received in {$duration}s");
 
-            if ($content) {
-                $parsed = json_decode($content, true);
-                if ($parsed) {
-                    $aiData['description'] = $parsed['description'] ?? '';
-                    $aiData['health_risks'] = $parsed['health_risks'] ?? [];
-                    $aiData['origin_history'] = $parsed['origin_data'] ?? [];
-                }
+            $responseBody = $response->getBody()->getContents();
+            $result = json_decode($responseBody, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('❌ Failed to parse Gemini response as JSON: ' . json_last_error_msg());
+                Log::error('Raw response: ' . substr($responseBody, 0, 500));
+                return $aiData;
             }
 
-            Log::info('✓ AI descriptions generated successfully with Gemini');
+            // Check if response has the expected structure
+            if (!isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+                Log::error('❌ Unexpected Gemini response structure');
+                Log::error('Response keys: ' . json_encode(array_keys($result)));
+
+                // Check for safety blocks
+                if (isset($result['candidates'][0]['finishReason'])) {
+                    Log::error('Finish reason: ' . $result['candidates'][0]['finishReason']);
+                }
+
+                return $aiData;
+            }
+
+            $content = $result['candidates'][0]['content']['parts'][0]['text'];
+
+            if (empty($content)) {
+                Log::error('❌ Gemini returned empty content');
+                return $aiData;
+            }
+
+            Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
+
+            // Parse the JSON content
+            $parsed = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('❌ Failed to parse Gemini content as JSON: ' . json_last_error_msg());
+                Log::error('Content preview: ' . substr($content, 0, 500));
+                return $aiData;
+            }
+
+            if (!$parsed) {
+                Log::error('❌ Gemini content parsed to null/false');
+                return $aiData;
+            }
+
+            // Extract and validate each field
+            if (isset($parsed['description'])) {
+                $aiData['description'] = $parsed['description'];
+                Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
+            } else {
+                Log::warning('⚠️ No description field in parsed data');
+            }
+
+            if (isset($parsed['health_risks'])) {
+                $aiData['health_risks'] = $parsed['health_risks'];
+                $concernsCount = count($parsed['health_risks']['concerns'] ?? []);
+                Log::info("✓ Health risks extracted: {$concernsCount} concerns");
+            } else {
+                Log::warning('⚠️ No health_risks field in parsed data');
+            }
+
+            if (isset($parsed['origin_data'])) {
+                $aiData['origin_history'] = $parsed['origin_data'];
+                $country = $parsed['origin_data']['country'] ?? 'Unknown';
+                Log::info("✓ Origin data extracted: {$country}");
+            } else {
+                Log::warning('⚠️ No origin_data field in parsed data');
+            }
+
+            Log::info('✅ AI descriptions generated successfully with Gemini', [
+                'breed' => $detectedBreed,
+                'has_description' => !empty($aiData['description']),
+                'has_health_risks' => !empty($aiData['health_risks']),
+                'has_origin' => !empty($aiData['origin_history'])
+            ]);
+
+            return $aiData;
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            Log::error("❌ Gemini API request failed: " . $e->getMessage());
+            if ($e->hasResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                Log::error("API Error Response: " . substr($errorBody, 0, 500));
+            }
+            return $aiData;
         } catch (\Exception $e) {
-            Log::error("AI generation failed: " . $e->getMessage());
+            Log::error("❌ AI generation failed: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            return $aiData;
         }
-
-        return $aiData;
     }
-
     /**
      * ==========================================
      * OPTIMIZED: Faster feature extraction with detailed prompt
