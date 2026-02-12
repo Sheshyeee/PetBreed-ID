@@ -439,9 +439,9 @@ class GenerateAgeSimulations implements ShouldQueue
         throw new \Exception("Gemini API key not configured");
       }
 
-      // CRITICAL FIX: Use the CORRECT model that supports image generation
-      // Using gemini-2.5-flash-image (Nano Banana) - supports image generation
-      $modelName = "gemini-2.5-flash-image";
+      // CRITICAL FIX: Use gemini-2.0-flash-exp-image-generation
+      // This is the ONLY Gemini model that generates images via generateContent
+      $modelName = "gemini-2.0-flash-exp-image-generation";
       $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
       Log::info("🎨 Calling Gemini Image API (model: {$modelName})...");
