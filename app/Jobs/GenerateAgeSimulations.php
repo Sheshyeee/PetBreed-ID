@@ -109,52 +109,57 @@ class GenerateAgeSimulations implements ShouldQueue
 
       Log::info("Ages: Current={$currentAgeYears}y, +1year={$age1YearLater}y, +3years={$age3YearsLater}y");
 
-      // DETAILED AGING DESCRIPTIONS
+      // DETAILED AGING DESCRIPTIONS - DRAMATIC AND VISIBLE
       $getAgingChanges = function ($ageYears) use ($currentAgeYears, $coatColor, $distinctiveMarkings) {
         $yearsOlder = $ageYears - $currentAgeYears;
 
         $changes = [];
 
-        // Age-specific changes
+        // Age-specific changes - MORE DRAMATIC AND VISIBLE
         if ($ageYears < 2) {
-          $changes[] = "youthful, vibrant appearance";
-          $changes[] = "bright, clear eyes";
-          $changes[] = "glossy, shiny coat";
-          $changes[] = "energetic expression";
+          $changes[] = "VERY youthful puppy-like appearance with soft features";
+          $changes[] = "extremely bright, crystal clear eyes full of energy";
+          $changes[] = "ultra glossy, silky shiny coat with maximum shine";
+          $changes[] = "playful, energetic, curious expression";
+          $changes[] = "smooth skin around eyes and muzzle with zero graying";
         } elseif ($ageYears < 5) {
-          $changes[] = "mature adult appearance";
-          $changes[] = "well-developed muscular build";
-          $changes[] = "healthy, lustrous coat";
-          $changes[] = "alert, confident expression";
+          $changes[] = "prime adult appearance with strong features";
+          $changes[] = "very well-developed muscular build";
+          $changes[] = "healthy, lustrous coat with good shine";
+          $changes[] = "alert, confident, focused expression";
+          $changes[] = "minimal to no graying anywhere on face or body";
         } elseif ($ageYears < 8) {
-          $changes[] = "mature appearance with subtle aging signs";
-          $changes[] = "slight gray/white hairs beginning around the muzzle";
-          $changes[] = "slightly less glossy coat texture";
-          $changes[] = "calm, wise expression";
-          $changes[] = "possible minor whitening around eyebrows";
+          $changes[] = "VISIBLE mature aging signs throughout face";
+          $changes[] = "CLEAR gray/white hairs spreading across the muzzle and chin";
+          $changes[] = "noticeably duller, less glossy coat texture";
+          $changes[] = "calm, mature, experienced expression";
+          $changes[] = "OBVIOUS whitening/graying around eyebrows and forehead";
+          $changes[] = "slight loosening of skin around eyes creating gentle wrinkles";
+          $changes[] = "beginning of white/gray patches on chest";
         } else {
-          $changes[] = "distinguished senior appearance";
-          $changes[] = "noticeable gray/white fur around muzzle, face, and eyebrows";
-          $changes[] = "coat may be slightly duller or coarser";
-          $changes[] = "gentle, calm expression";
-          $changes[] = "possible whitening on chest and paws";
-          $changes[] = "eyes may appear slightly cloudier or wiser";
+          $changes[] = "HEAVILY distinguished senior appearance with pronounced aging";
+          $changes[] = "EXTENSIVE gray/white fur covering entire muzzle, face, eyebrows, and forehead";
+          $changes[] = "coat significantly duller, coarser, with thin or patchy areas";
+          $changes[] = "gentle, wise, tired expression with drooping features";
+          $changes[] = "PROMINENT whitening spread across chest, paws, and legs";
+          $changes[] = "eyes appear noticeably cloudier with visible cataract-like appearance";
+          $changes[] = "sagging skin around jowls and under eyes";
+          $changes[] = "graying extending to ears and back";
         }
 
-        return implode(', ', $changes);
+        return implode('. ', $changes);
       };
 
       // GENERATE 1-YEAR IMAGE (IMAGE-TO-IMAGE)
       try {
         Log::info("=== Generating 1_years simulation (IMAGE-TO-IMAGE) ===");
 
-        // CRITICAL: Image-to-image prompt that references the original dog
-        $prompt1Year = "Transform this exact dog to show how it will look in {$age1YearLater} years old. "
-          . "PRESERVE: The dog's unique facial features, exact {$coatColor} coloring, {$coatPattern} pattern, "
-          . "{$distinctiveMarkings} markings, {$earType} ears, {$eyeColor} eyes, and overall appearance. "
-          . "CHANGE ONLY: Age the dog by exactly 1 year. Apply these aging changes: {$getAgingChanges($age1YearLater)}. "
-          . "The dog MUST remain recognizably the same individual dog, just {$age1YearLater} years old. "
-          . "Keep the same pose, lighting, and background style. Professional pet photography quality.";
+        // ENHANCED: More explicit aging prompt for 1 year transformation
+        $prompt1Year = "Age this exact dog to look {$age1YearLater} years old. "
+          . "KEEP IDENTICAL: facial structure, {$coatColor} base color, {$coatPattern} pattern, {$distinctiveMarkings}, {$earType} ears, pose, background. "
+          . "MUST SHOW AGING: {$getAgingChanges($age1YearLater)}. "
+          . "Make the aging changes VERY CLEAR and VISIBLE - add actual gray/white fur where specified, change coat shine level, adjust eye clarity, modify expression. "
+          . "The dog must look noticeably different in age while remaining the same individual. Realistic pet photography.";
 
         Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 200) . "...");
 
@@ -191,13 +196,12 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 3_years simulation (IMAGE-TO-IMAGE) ===");
 
-        // CRITICAL: Image-to-image prompt for 3 years aging
-        $prompt3Years = "Transform this exact dog to show how it will look in {$age3YearsLater} years old. "
-          . "PRESERVE: The dog's unique facial features, exact {$coatColor} coloring, {$coatPattern} pattern, "
-          . "{$distinctiveMarkings} markings, {$earType} ears, {$eyeColor} eyes, and overall appearance. "
-          . "CHANGE ONLY: Age the dog by exactly 3 years. Apply these aging changes: {$getAgingChanges($age3YearsLater)}. "
-          . "The dog MUST remain recognizably the same individual dog, just {$age3YearsLater} years old. "
-          . "Keep the same pose, lighting, and background style. Professional pet photography quality.";
+        // ENHANCED: More dramatic aging prompt for 3 years transformation
+        $prompt3Years = "Age this exact dog to look {$age3YearsLater} years old. "
+          . "KEEP IDENTICAL: facial structure, {$coatColor} base color, {$coatPattern} pattern, {$distinctiveMarkings}, {$earType} ears, pose, background. "
+          . "MUST SHOW DRAMATIC AGING: {$getAgingChanges($age3YearsLater)}. "
+          . "Make the aging transformation HIGHLY VISIBLE and PRONOUNCED - extensively gray/white the specified areas, significantly reduce coat shine, make eyes look aged, change facial expression to match age. "
+          . "The dog should look SIGNIFICANTLY older while remaining recognizably the same dog. Professional realistic pet photography.";
 
         Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 200) . "...");
 
