@@ -188,7 +188,16 @@ class GenerateAgeSimulations implements ShouldQueue
   private function createGenerationPromise($client, $prompt, $imageData)
   {
     $apiKey = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-    $modelName = "gemini-2.0-flash-exp"; // Faster model
+
+    // Try models in order of preference
+    // Configure your working model in .env as GEMINI_MODEL
+    $modelName = config('services.gemini.model') ?? env('GEMINI_MODEL', 'gemini-2.0-flash-thinking-exp-01-21');
+
+    // Available models (uncomment the one that works for you):
+    // - gemini-2.0-flash-thinking-exp-01-21 (current stable)
+    // - gemini-1.5-pro-latest (reliable, slower)
+    // - gemini-1.5-flash-latest (faster, good quality)
+
     $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
     $payload = [
