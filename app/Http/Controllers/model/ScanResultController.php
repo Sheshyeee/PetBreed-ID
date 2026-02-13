@@ -686,6 +686,11 @@ class ScanResultController extends Controller
      * BREED IDENTIFICATION - OPTIMIZED PROMPT
      * ==========================================
      */
+    /**
+     * ==========================================
+     * BREED IDENTIFICATION - FIXED FOR ACCURACY
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -730,76 +735,90 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType . ', Size: ' . strlen($imageContents) . ' bytes');
 
-            $optimizedPrompt = "Analyze this dog image and identify the breed with precision.
+            $optimizedPrompt = "You are an expert canine breed specialist. Analyze this dog image with extreme attention to BODY PROPORTIONS and distinctive breed features.
 
-ANALYSIS STEPS:
-1. Examine: Head shape, ears, eyes, muzzle, body build, coat (length/texture/color), tail, size
-2. Identify: Top breed matches based on physical features
-3. Consider: Purebred vs mixed breed indicators
-4. Assess: Confidence based on feature clarity and uniqueness
+CRITICAL ANALYSIS STEPS (in this exact order):
 
-KEY BREEDS TO RECOGNIZE:
-- Common: Labrador Retriever, German Shepherd, Golden Retriever, Bulldog, Beagle, Poodle, Rottweiler, Siberian Husky, etc.
-- Regional: Aspin (Philippines - medium, erect ears, athletic, short coat), Indian Pariah Dog, Thai Ridgeback
-- Rare: Azawakh, Norwegian Lundehund, Kai Ken, Stabyhoun
+1. BODY PROPORTIONS (MOST IMPORTANT - analyze first):
+   - Leg length relative to body (short/normal/long)
+   - Body length relative to height (long/square/compact)
+   - Overall body shape (rectangular/square/barrel-shaped)
+   
+   EXAMPLES OF DISTINCTIVE PROPORTIONS:
+   - Dachshund: EXTREMELY short legs + VERY long body (unmistakable)
+   - Basset Hound: Very short legs + long body + heavy bone structure
+   - Corgi: Short legs + long body + fox-like head
+   - American Bully: Normal leg length + stocky/muscular + wide chest
+   - Greyhound: Long legs + deep chest + slim build
+   - Bulldog: Short legs + wide stance + compact body
 
-CONFIDENCE RULES - CRITICAL:
-You MUST provide REALISTIC confidence scores that vary naturally for each image based on actual visual clarity and certainty.
+2. HEAD AND FACIAL FEATURES:
+   - Skull shape (broad/narrow/rounded/flat)
+   - Muzzle length (long/medium/short/pushed-in)
+   - Ear type (floppy/erect/semi-erect/rose)
+   - Eye shape and placement
+   
+3. COAT AND COLOR:
+   - Coat length and texture
+   - Color and pattern
+   
+4. SIZE ESTIMATION:
+   - Approximate weight class (toy/small/medium/large/giant)
 
-CONFIDENCE RANGES (use the ACTUAL score you assess, not fixed numbers):
-- 88-97%: Crystal clear purebred, all breed-specific features unmistakably visible, perfect lighting, front/side angle, adult dog
-- 78-87%: Strong breed match, most features clear but minor view angle limitations or slight feature variations
-- 65-77%: Good match but some features unclear (partial view, puppy, lighting issues, or minor mixed traits)
-- 50-64%: Probable breed but notable uncertainties (poor angle, young puppy, significant mixed features)
-- 35-49%: Multiple possibilities, several features unclear or conflicting
-- Below 35%: Very poor quality, extreme mix, or nearly impossible to identify
+BREED VERIFICATION CHECKLIST:
+Before selecting a breed, verify these key distinctions:
 
-IMPORTANT VARIANCE RULES:
-- Use decimal precision (e.g., 82.3%, 74.8%, 91.6%) - NEVER round numbers
-- Each image gets a UNIQUE score based on its actual quality and clarity
-- Clear purebred in good lighting = 88-97%
-- Same breed in poor lighting = 70-85%
-- Mixed breed or puppy = 50-75%
-- The confidence MUST match what you actually see in the image
+SHORT-LEGGED BREEDS - Check carefully:
+- Dachshund: VERY short legs + LONG body + long muzzle + long floppy ears
+- Basset Hound: Very short legs + long body + SHORT muzzle + very long ears + droopy eyes
+- Corgi (Pembroke/Cardigan): Short legs + long body + pointy ears + fox face
+- DO NOT confuse these with muscular breeds like American Bully!
 
-MIXED BREED PROTOCOL - CRITICAL:
-- If mixed breed detected → Output ONLY ONE dominant breed name that shows the strongest features
-- For regional street dogs → Use designation: Aspin, Indian Pariah Dog, etc.
-- NEVER use 'x', 'mix', parentheses, or any punctuation in breed name
-- Examples: NOT \"Labrador x Border Collie mix\" → USE \"Labrador Retriever\"
-- Examples: NOT \"Golden Retriever (mixed)\" → USE \"Golden Retriever\"
-- The breed field must contain ONLY the breed name, nothing else
+MUSCULAR/BULLY BREEDS - Check carefully:
+- American Bully: NORMAL leg length + very wide/stocky + broad head + SHORT muzzle
+- Pitbull: NORMAL leg length + athletic build + medium head + medium muzzle
+- Staffordshire Bull Terrier: NORMAL leg length + muscular + broad chest
+- DO NOT confuse these with short-legged breeds!
+
+CONFIDENCE RULES:
+- 88-97%: All defining features clearly visible and unmistakable
+- 78-87%: Strong match, most critical features clearly visible
+- 65-77%: Good match but some key features partially obscured
+- 50-64%: Probable breed but important features unclear
+- 35-49%: Multiple possibilities, conflicting features
+- Below 35%: Very poor quality or extreme mix
+
+CRITICAL REQUIREMENTS:
+- FIRST analyze body proportions - this is the PRIMARY identifier
+- If you see SHORT legs, immediately narrow to: Dachshund, Basset, Corgi, etc.
+- If you see NORMAL legs + stocky build, consider: Bully breeds, Bulldogs, etc.
+- NEVER confuse short-legged breeds with muscular breeds
+- Use decimal precision (e.g., 82.3%, 74.8%, 91.6%)
+- Each image gets UNIQUE confidence based on actual clarity
 
 OUTPUT JSON:
 {
   \"breed\": \"Single Breed Name Only\",
   \"confidence\": 82.7,
-  \"reasoning\": \"3-4 sentences explaining: key features observed, why this breed, any uncertainties, why this specific confidence score.\",
+  \"reasoning\": \"First, body proportions: [describe leg length + body length]. Head features: [describe]. Based on [short legs/normal legs] combined with [long body/stocky build] and [other features], this is clearly a [breed]. Confidence is [X]% because [reason].\",
   \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\",
-  \"key_identifiers\": [\"feature1\", \"feature2\", \"feature3\"],
+  \"key_identifiers\": [\"leg length: short/normal/long\", \"body shape: long/square/compact\", \"other distinctive feature\"],
   \"alternative_possibilities\": [
-    {\"breed\": \"Alternative Breed 1\", \"confidence\": 68.4, \"reason\": \"Brief note on why this is possible\"},
-    {\"breed\": \"Alternative Breed 2\", \"confidence\": 52.3, \"reason\": \"Brief note on similarities seen\"},
-    {\"breed\": \"Alternative Breed 3\", \"confidence\": 41.7, \"reason\": \"Brief note on why considered\"}
+    {\"breed\": \"Alternative Breed 1\", \"confidence\": 68.4, \"reason\": \"Why this could be possible\"},
+    {\"breed\": \"Alternative Breed 2\", \"confidence\": 52.3, \"reason\": \"Similarities seen\"},
+    {\"breed\": \"Alternative Breed 3\", \"confidence\": 41.7, \"reason\": \"Why considered\"}
   ],
   \"uncertainty_factors\": [\"factor1 if any\", \"factor2 if any\"]
 }
 
-CRITICAL REQUIREMENTS:
-- Primary confidence: Max 97%, use realistic decimals (e.g., 84.3, 91.8, 76.2)
-- Alternative breeds: Each must have DIFFERENT confidence scores with natural gaps (e.g., 82.7%, then 68.4%, then 52.3%)
-- NEVER use the same confidence score twice
-- Lower scores MUST be for genuinely different breeds (not variations of primary)
-- Confidence gaps should reflect actual visual distinction (10-20% gaps between alternatives)
-- If image is poor quality, ALL scores including primary should be lower (40-65% range)
-- Provide 3-4 alternative possibilities with progressively lower confidence scores";
+REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with other features.";
 
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o',
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are an expert veterinary morphologist specializing in dog breed identification. Provide honest, evidence-based assessments with realistic confidence scores that reflect actual uncertainty. Each image must receive a unique confidence score based on its actual visual quality - never use fixed percentages.'
+                        'content' => 'You are an expert veterinary morphologist and canine breed specialist. Your PRIMARY focus is on body proportions (leg length, body length, overall shape) as these are the most reliable breed identifiers. Pay extreme attention to whether a dog has short legs vs normal legs, as this is critical for accurate identification. Never confuse short-legged breeds (Dachshund, Basset, Corgi) with muscular normal-legged breeds (American Bully, Pitbull). Always analyze body proportions FIRST before other features.'
                     ],
                     [
                         'role' => 'user',
@@ -820,7 +839,7 @@ CRITICAL REQUIREMENTS:
                 ],
                 'response_format' => ['type' => 'json_object'],
                 'max_tokens' => 1500,
-                'temperature' => 0.5,  // INCREASED from 0.3 to add more natural variance
+                'temperature' => 0.3,
             ]);
 
             Log::info('✓ Received response from OpenAI API');
@@ -848,14 +867,14 @@ CRITICAL REQUIREMENTS:
             // Use the ACTUAL confidence from the API with natural variance
             $actualConfidence = (float)$apiResult['confidence'];
 
-            // Cap at 97% max (not 96%)
+            // Cap at 97% max
             if ($actualConfidence > 97) {
                 $actualConfidence = 97.0;
             }
 
             // Add micro-variance if API returns rounded numbers (keeps it realistic)
             if ($actualConfidence == floor($actualConfidence)) {
-                $actualConfidence += (mt_rand(1, 9) / 10);  // Adds 0.1 to 0.9
+                $actualConfidence += (mt_rand(1, 9) / 10);
             }
 
             Log::info('✓ API breed identification successful', [
@@ -867,13 +886,13 @@ CRITICAL REQUIREMENTS:
 
             // Build top predictions array with REALISTIC VARIANCE
             $topPredictions = [];
-            $seenBreeds = []; // Track breeds to avoid duplicates
+            $seenBreeds = [];
 
             // Add primary breed first
             $primaryBreed = $apiResult['breed'];
             $topPredictions[] = [
                 'breed' => $primaryBreed,
-                'confidence' => round($actualConfidence, 1)  // Round to 1 decimal for display
+                'confidence' => round($actualConfidence, 1)
             ];
             $seenBreeds[] = strtolower(trim($primaryBreed));
 
@@ -883,7 +902,6 @@ CRITICAL REQUIREMENTS:
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
                         $breedKey = strtolower(trim($alt['breed']));
 
-                        // Skip duplicates and only add if confidence > 0
                         if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
                             $altConfidence = (float)$alt['confidence'];
 
@@ -894,7 +912,7 @@ CRITICAL REQUIREMENTS:
 
                             // ENSURE alternatives are LOWER than primary
                             if ($altConfidence >= $actualConfidence) {
-                                $altConfidence = $actualConfidence - mt_rand(10, 25);  // 10-25% lower
+                                $altConfidence = $actualConfidence - mt_rand(10, 25);
                             }
 
                             // Add micro-variance if rounded
