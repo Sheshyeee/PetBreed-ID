@@ -80,10 +80,20 @@ class SimulationController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? [];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
+        // Build original image URL - handle both storage paths and full URLs
+        $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
+
+        Log::info('Preparing simulation view data', [
+            'scan_id' => $result->scan_id,
+            'raw_image_path' => $result->image,
+            'built_url' => $originalImageUrl,
+            'base_url' => $baseUrl
+        ]);
+
         return [
             'scan_id' => $result->scan_id,
             'breed' => $result->breed,
-            'original_image' => $baseUrl . '/' . $result->image,
+            'original_image' => $originalImageUrl,
             'simulations' => [
                 '1_years' => $this->buildFullUrl($simulationData['1_years'] ?? null, $baseUrl),
                 '3_years' => $this->buildFullUrl($simulationData['3_years'] ?? null, $baseUrl),
@@ -95,7 +105,43 @@ class SimulationController extends Controller
     }
 
     /**
-     * Build full URL from path
+     * Build proper image URL from path
+     */
+    private function buildImageUrl($path, $baseUrl)
+    {
+        if (!$path) {
+            Log::warning('buildImageUrl called with null/empty path');
+            return null;
+        }
+
+        // If already a full URL, return as-is
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            Log::info('Image path is already full URL', ['url' => $path]);
+            return $path;
+        }
+
+        // If it's an object storage path (contains 'uploads/' or 'simulations/')
+        if (str_contains($path, 'uploads/') || str_contains($path, 'simulations/')) {
+            $fullUrl = $baseUrl . '/' . $path;
+            Log::info('Building object storage URL', [
+                'path' => $path,
+                'base_url' => $baseUrl,
+                'full_url' => $fullUrl
+            ]);
+            return $fullUrl;
+        }
+
+        // Otherwise, assume it's a public storage path (for backward compatibility)
+        $assetUrl = asset('storage/' . $path);
+        Log::info('Building public storage URL', [
+            'path' => $path,
+            'asset_url' => $assetUrl
+        ]);
+        return $assetUrl;
+    }
+
+    /**
+     * Build full URL from path (for simulations)
      */
     private function buildFullUrl($path, $baseUrl)
     {
@@ -141,6 +187,51 @@ class SimulationController extends Controller
         } catch (\Exception $e) {
             Log::error('Regeneration error', ['error' => $e->getMessage()]);
             return response()->json(['error' => 'Failed to regenerate'], 500);
+        }
+    }
+
+    /**
+     * Check simulation status (for polling)
+     */
+    public function checkStatus(Request $request)
+    {
+        try {
+            $scanId = $request->input('scan_id');
+
+            if (!$scanId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No scan_id provided'
+                ], 400);
+            }
+
+            $result = Results::where('scan_id', $scanId)->firstOrFail();
+            $simulationData = json_decode($result->simulation_data, true) ?? [];
+            $baseUrl = config('filesystems.disks.object-storage.url');
+
+            // Build proper image URLs
+            $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
+
+            return response()->json([
+                'success' => true,
+                'status' => $simulationData['status'] ?? 'pending',
+                'original_image' => $originalImageUrl,
+                'simulations' => [
+                    '1_years' => $this->buildFullUrl($simulationData['1_years'] ?? null, $baseUrl),
+                    '3_years' => $this->buildFullUrl($simulationData['3_years'] ?? null, $baseUrl),
+                ],
+                'timestamp' => now()->timestamp
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Status check error', [
+                'error' => $e->getMessage(),
+                'scan_id' => $request->input('scan_id')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to fetch status'
+            ], 500);
         }
     }
 }
