@@ -1291,6 +1291,7 @@ Be verbose and detailed. Output ONLY the JSON.";
      * Preserves: Admin correction, exact match caching, learning mechanism, simulations
      * ==========================================
      */
+
     public function analyze(Request $request)
     {
         Log::info('=================================');
@@ -1298,6 +1299,7 @@ Be verbose and detailed. Output ONLY the JSON.";
         Log::info('=================================');
 
         $path = null;
+        $persistentTempPath = null; // Track temp file for cleanup
 
         try {
             $validated = $request->validate([
@@ -1368,16 +1370,48 @@ Be verbose and detailed. Output ONLY the JSON.";
             };
 
             $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $extension;
-            $tempPath = $image->getRealPath(); // Use uploaded temp file directly
-            $fullPath = $tempPath; // Use this for AI processing
 
             // ==========================================
-            // STEP 1: DOG VALIDATION (NEW)
+            // FIXED: Create PERSISTENT temp file that won't be garbage collected
+            // ==========================================
+            $tempPath = $image->getRealPath();
+            $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $extension;
+
+            // Copy to our controlled temp location
+            if (!copy($tempPath, $persistentTempPath)) {
+                throw new \Exception('Failed to create temporary image file');
+            }
+
+            // Register cleanup on shutdown (ensures file is deleted even if script crashes)
+            register_shutdown_function(function () use ($persistentTempPath) {
+                if (file_exists($persistentTempPath)) {
+                    @unlink($persistentTempPath);
+                    Log::info('✓ Temp file cleaned up on shutdown: ' . basename($persistentTempPath));
+                }
+            });
+
+            $fullPath = $persistentTempPath; // Use this for AI processing
+
+            Log::info('✓ Persistent temp file created: ' . $fullPath);
+
+            // ==========================================
+            // STEP 1: DOG VALIDATION
             // ==========================================
             Log::info('→ Starting dog validation...');
+
+            // Validate file exists before dog validation
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Image file was lost during processing');
+            }
+
             $dogValidation = $this->validateDogImage($fullPath);
 
             if (!$dogValidation['is_dog']) {
+                // Clean up temp file before returning
+                if (file_exists($persistentTempPath)) {
+                    @unlink($persistentTempPath);
+                }
+
                 Log::warning('⚠️ Image rejected - Not a dog', [
                     'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
                 ]);
@@ -1402,19 +1436,33 @@ Be verbose and detailed. Output ONLY the JSON.";
             // ==========================================
             // STEP 2: STORE IMAGE (only after dog validation passes)
             // ==========================================
-            $path = $image->storeAs('scans', $filename, 'object-storage');
 
-            // After storing to object storage
-            Storage::disk('object-storage')->put($path, file_get_contents($tempPath));
-            if (!file_exists($fullPath)) {
-                throw new \Exception('File was not saved properly');
+            // Validate file exists before storing
+            if (!file_exists($persistentTempPath)) {
+                throw new \Exception('Image file was lost before storage');
             }
 
-            Log::info('✓ Image saved to: ' . $fullPath);
+            $path = $image->storeAs('scans', $filename, 'object-storage');
+
+            // Verify file was uploaded successfully
+            Storage::disk('object-storage')->put($path, file_get_contents($persistentTempPath));
+
+            // Validate file exists after storage
+            if (!file_exists($persistentTempPath)) {
+                throw new \Exception('Image file was lost after storage');
+            }
+
+            Log::info('✓ Image saved to object storage: ' . $path);
 
             // ==========================================
             // STEP 3: CALCULATE IMAGE HASH
             // ==========================================
+
+            // Validate file exists before hashing
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Image file was lost before hash calculation');
+            }
+
             $imageHash = $this->calculateImageHash($fullPath);
             Log::info('✓ Image hash calculated: ' . $imageHash);
 
@@ -1522,22 +1570,44 @@ Be verbose and detailed. Output ONLY the JSON.";
                 ]);
             } else {
                 // NEW IMAGE - Run API-only breed identification
-                Log::info('→ New image - running API breed identification...');
+                Log::info('→ New image - running breed identification...');
+
+                // SAFETY CHECK: Validate file exists before API call
+                if (!file_exists($fullPath)) {
+                    throw new \Exception('Image file was lost before breed identification');
+                }
 
                 // FIXED: Pass local temp file path with isObjectStorage=false
                 $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
 
                 // NO ML FALLBACK - If API fails, return error to user
                 if (!$predictionResult['success']) {
-                    Log::error('✗ API prediction failed: ' . $predictionResult['error']);
-                    throw new \Exception('Breed identification failed: ' . $predictionResult['error'] . '. Please try again or contact support if the issue persists.');
+                    Log::error('✗ Breed identification failed: ' . $predictionResult['error']);
+
+                    // Map technical errors to user-friendly messages
+                    $errorMessage = $predictionResult['error'];
+                    $userMessage = 'Unable to identify the dog breed. Please try again.';
+
+                    if (str_contains($errorMessage, 'API key not configured')) {
+                        $userMessage = 'Service is temporarily unavailable. Please contact support.';
+                    } elseif (str_contains($errorMessage, 'quota') || str_contains($errorMessage, 'rate limit')) {
+                        $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
+                    } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'Connection')) {
+                        $userMessage = 'Network connection issue. Please check your internet and try again.';
+                    } elseif (str_contains($errorMessage, 'Image file not found')) {
+                        $userMessage = 'Failed to process the image. Please try uploading again.';
+                    } elseif (str_contains($errorMessage, 'Invalid image')) {
+                        $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+                    }
+
+                    throw new \Exception($userMessage);
                 }
 
                 $detectedBreed = $predictionResult['breed'];
                 $confidence = $predictionResult['confidence'];
                 $predictionMethod = $predictionResult['method'];
 
-                Log::info('✓ API prediction successful', [
+                Log::info('✓ Breed identification successful', [
                     'breed' => $detectedBreed,
                     'confidence' => $confidence,
                     'method' => $predictionMethod,
@@ -1600,6 +1670,12 @@ Be verbose and detailed. Output ONLY the JSON.";
                 Log::info('✓ Simulations cached from previous scan - no job dispatched');
             }
 
+            // Clean up persistent temp file (success case)
+            if (file_exists($persistentTempPath)) {
+                @unlink($persistentTempPath);
+                Log::info('✓ Temp file cleaned up after successful processing');
+            }
+
             $responseData = [
                 'scan_id' => $dbResult->scan_id,
                 'breed' => $dbResult->breed,
@@ -1618,7 +1694,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 return response()->json([
                     'success' => true,
                     'data' => $responseData,
-                    'message' => 'Analysis completed successfully using ' . strtoupper($predictionMethod)
+                    'message' => 'Analysis completed successfully'
                 ], 200);
             }
 
@@ -1628,19 +1704,46 @@ Be verbose and detailed. Output ONLY the JSON.";
             Log::error('Analyze Error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
+            // Clean up persistent temp file (error case)
+            if (isset($persistentTempPath) && file_exists($persistentTempPath)) {
+                @unlink($persistentTempPath);
+                Log::info('✓ Temp file cleaned up after error');
+            }
+
+            // Clean up object storage if upload succeeded
             if ($path && Storage::disk('object-storage')->exists($path)) {
                 Storage::disk('object-storage')->delete($path);
+                Log::info('✓ Object storage file cleaned up after error');
+            }
+
+            // User-friendly error messages (no mention of OpenAI/API)
+            $userMessage = 'An unexpected error occurred. Please try again.';
+
+            if (str_contains($e->getMessage(), 'Service is temporarily unavailable')) {
+                $userMessage = 'Service is temporarily unavailable. Please contact support.';
+            } elseif (str_contains($e->getMessage(), 'temporarily busy')) {
+                $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
+            } elseif (str_contains($e->getMessage(), 'Network connection issue')) {
+                $userMessage = 'Network connection issue. Please check your internet and try again.';
+            } elseif (str_contains($e->getMessage(), 'Failed to process the image')) {
+                $userMessage = 'Failed to process the uploaded image. Please try uploading again.';
+            } elseif (str_contains($e->getMessage(), 'image appears to be corrupted')) {
+                $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+            } elseif (str_contains($e->getMessage(), 'Unable to identify')) {
+                $userMessage = 'Unable to identify the dog breed. Please try again with a clearer photo.';
+            } elseif (str_contains($e->getMessage(), 'Image file was lost')) {
+                $userMessage = 'Image processing failed. Please try uploading again.';
             }
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Analysis failed: ' . $e->getMessage()
+                    'message' => $userMessage
                 ], 500);
             }
 
             return redirect()->back()->with('error', [
-                'message' => 'An unexpected error occurred. Please try again.',
+                'message' => $userMessage,
             ]);
         }
     }
