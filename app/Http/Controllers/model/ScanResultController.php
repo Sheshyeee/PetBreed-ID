@@ -691,10 +691,16 @@ class ScanResultController extends Controller
      * BREED IDENTIFICATION - FIXED FOR ACCURACY
      * ==========================================
      */
-    private function identifyBreedWithAPI($imagePath)
+    /**
+     * ==========================================
+     * FIXED: BREED IDENTIFICATION - Handle both local and object storage paths
+     * ==========================================
+     */
+    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
+        Log::info('Is object storage: ' . ($isObjectStorage ? 'YES' : 'NO'));
 
         $apiKey = config('openai.api_key');
         if (empty($apiKey)) {
@@ -706,22 +712,34 @@ class ScanResultController extends Controller
         }
         Log::info('✓ OpenAI API key is configured');
 
-        // FIXED: Check if image exists in object storage
-        if (!Storage::disk('object-storage')->exists($imagePath)) {
-            Log::error('✗ Image file not found in object storage: ' . $imagePath);
-            return [
-                'success' => false,
-                'error' => 'Image file not found'
-            ];
-        }
-        Log::info('✓ Image file exists in object storage');
-
         try {
-            // FIXED: Load image from object storage, not local filesystem
-            $imageContents = Storage::disk('object-storage')->get($imagePath);
+            // FIXED: Load image based on storage type
+            if ($isObjectStorage) {
+                // Image is in object storage
+                if (!Storage::disk('object-storage')->exists($imagePath)) {
+                    Log::error('✗ Image file not found in object storage: ' . $imagePath);
+                    return [
+                        'success' => false,
+                        'error' => 'Image file not found in object storage'
+                    ];
+                }
+                $imageContents = Storage::disk('object-storage')->get($imagePath);
+                Log::info('✓ Image loaded from object storage');
+            } else {
+                // Image is a local temp file
+                if (!file_exists($imagePath)) {
+                    Log::error('✗ Image file not found locally: ' . $imagePath);
+                    return [
+                        'success' => false,
+                        'error' => 'Image file not found locally'
+                    ];
+                }
+                $imageContents = file_get_contents($imagePath);
+                Log::info('✓ Image loaded from local filesystem');
+            }
 
             if ($imageContents === false || empty($imageContents)) {
-                throw new \Exception('Failed to load image from object storage');
+                throw new \Exception('Failed to load image data');
             }
 
             // Get MIME type from image data
