@@ -112,40 +112,44 @@ class GenerateAgeSimulations implements ShouldQueue
       // Store breed in local variable for use in closures
       $breed = $this->breed;
 
-      // NATURAL HEALTHY AGING - Well-cared for dog showing breed-appropriate age
+      // BREED-SPECIFIC REALISTIC AGING - INTENSE AND VISIBLE TRANSFORMATION
       $getAgingChanges = function ($ageYears) use ($currentAgeYears, $breed) {
         $yearsOlder = $ageYears - $currentAgeYears;
 
         $changes = [];
 
-        // Age-specific changes - NATURAL HEALTHY AGING for well-cared dog
+        // Age-specific changes - INTENSE VISIBLE TRANSFORMATION
         if ($ageYears < 2) {
-          $changes[] = "youthful {$breed} with bright, sparkling eyes full of puppy energy";
-          $changes[] = "coat at peak youthful condition - naturally glossy and vibrant for this breed";
-          $changes[] = "tight facial features with smooth skin, no signs of aging";
-          $changes[] = "energetic, playful, alert expression typical of young {$breed}";
-          $changes[] = "face shows youthful vitality and liveliness";
+          $changes[] = "extremely youthful puppy appearance with very bright, wide, sparkling eyes radiating pure energy";
+          $changes[] = "coat at absolute peak shine - glossy, vibrant, full, and perfectly healthy";
+          $changes[] = "perfectly tight skin with zero wrinkles, sagging, or loose areas anywhere";
+          $changes[] = "highly energetic, playful, alert expression with perked features";
+          $changes[] = "face looks fresh, smooth, and youthful";
         } elseif ($ageYears < 5) {
-          $changes[] = "prime adult {$breed} in excellent health and condition";
-          $changes[] = "coat well-groomed and healthy with natural adult luster";
-          $changes[] = "eyes bright and alert with mature confidence";
-          $changes[] = "strong, confident expression showing adult maturity";
-          $changes[] = "well-maintained appearance of healthy adult dog";
+          $changes[] = "strong prime adult {$breed} with fully developed features and athletic build";
+          $changes[] = "coat still very healthy with good shine but not puppy-level glossy";
+          $changes[] = "eyes bright and alert but more mature, less sparkly than puppy";
+          $changes[] = "confident, focused expression with well-defined facial muscles";
+          $changes[] = "slight maturity visible in face compared to puppy stage";
         } elseif ($ageYears < 8) {
-          $changes[] = "mature {$breed} showing natural middle-age - still well-groomed and healthy but visibly older";
-          $changes[] = "coat clean and brushed but naturally less vibrant than youth - slight reduction in natural shine as typical for aging {$breed}";
-          $changes[] = "eyes still bright but developing the softer, gentler look of maturity - slight natural cloudiness beginning";
-          $changes[] = "facial features gently relaxed showing maturity - natural slight softening around eyes and muzzle";
-          $changes[] = "calm, wise, settled expression of a mature well-loved dog";
-          $changes[] = "overall appearance of well-cared-for middle-aged {$breed} - healthy but clearly not young anymore";
+          $changes[] = "CLEARLY AGED mature {$breed} - face shows OBVIOUS aging compared to young adult";
+          $changes[] = "coat NOTICEABLY duller, rougher texture, losing shine significantly, appears somewhat dry or coarse";
+          $changes[] = "eyes developing VISIBLE cloudiness or haziness, losing the bright clarity, appearing tired or softer";
+          $changes[] = "VISIBLE skin loosening especially around jowls, under eyes, and mouth area creating gentle sagging";
+          $changes[] = "facial expression much calmer, tired, less energetic - shows clear maturity and weariness";
+          $changes[] = "coat appears thinner in places, less full and voluminous than prime years";
+          $changes[] = "overall face has weathered, lived-in appearance - clearly not a young dog anymore";
+          $changes[] = "body looks less toned, slightly heavier or saggier posture";
         } else {
-          $changes[] = "senior {$breed} showing distinguished age while clearly well-loved and properly cared for";
-          $changes[] = "coat clean and groomed but showing natural senior changes - reduced luster, slightly coarser texture typical of elderly {$breed}";
-          $changes[] = "eyes developing natural senior cloudiness but still clear enough to show awareness - gentle aged expression";
-          $changes[] = "face showing natural senior features - gentle sagging around jowls and eyes that comes with age in {$breed}";
-          $changes[] = "dignified, gentle, calm expression of a well-loved senior dog";
-          $changes[] = "body still healthy-looking but naturally less toned than prime years";
-          $changes[] = "overall appearance of cherished elderly {$breed} - showing age gracefully while obviously well-maintained";
+          $changes[] = "HEAVILY AGED senior {$breed} with DRAMATICALLY visible aging throughout entire appearance";
+          $changes[] = "coat SEVERELY dulled - rough, coarse, thin, patchy, completely lost youthful shine and health";
+          $changes[] = "eyes VERY cloudy and hazy with cataract-like milky appearance, looking tired and aged";
+          $changes[] = "PRONOUNCED facial sagging - jowls drooping significantly, loose skin under eyes and around mouth";
+          $changes[] = "facial features deeply relaxed and droopy, showing extreme tiredness and age";
+          $changes[] = "coat thinning extensively revealing more skin, possible bald patches or sparse areas";
+          $changes[] = "entire face has heavily weathered, worn appearance of a very old dog";
+          $changes[] = "body appears significantly less muscular, sagging posture, low energy stance";
+          $changes[] = "overall appearance screams 'senior dog' - unmistakably old and aged";
         }
 
         return implode('. ', $changes);
@@ -155,17 +159,17 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 1_years simulation (IMAGE-TO-IMAGE) ===");
 
-        // NATURAL HEALTHY AGING: Show how well-cared dog naturally ages 1 year
-        $prompt1Year = "Transform this {$breed} dog to show natural healthy aging to {$age1YearLater} years old - this is a WELL-CARED FOR, LOVED dog showing normal age progression. "
+        // INTENSE AGING TRANSFORMATION: Show dramatic 1-year aging
+        $prompt1Year = "Transform this {$breed} dog to show DRAMATIC VISIBLE AGING to {$age1YearLater} years old. This must look NOTICEABLY OLDER. "
           . "PRESERVE COMPLETELY: The dog's unique identity, facial structure, exact coat colors and patterns ({$coatColor} {$coatPattern}), "
           . "distinctive markings ({$distinctiveMarkings}), ear shape ({$earType}), same pose and background. "
-          . "NATURAL AGING for well-maintained {$breed}: {$getAgingChanges($age1YearLater)}. "
-          . "IMPORTANT: The dog must look HEALTHY and WELL-GROOMED - this is a loved pet with good care. Show natural aging signs: "
-          . "slightly less glossy coat (but still clean and brushed), eyes beginning to soften in brightness (but still clear), "
-          . "facial expression more mature and calm (but content), very slight natural softening of facial features. "
-          . "The dog should look noticeably older BUT still healthy, happy, and well-cared for - aging gracefully, not declining. "
-          . "Do NOT make the dog look neglected, haggard, sick, or poorly maintained. Show natural breed-appropriate aging for a loved family pet. "
-          . "Professional pet photography of healthy, well-cared-for {$breed} at {$age1YearLater} years old.";
+          . "APPLY THESE INTENSE AGING CHANGES for a {$breed}: {$getAgingChanges($age1YearLater)}. "
+          . "CRITICAL AGING EFFECTS TO APPLY: Significantly reduce coat shine and gloss - make it look duller, rougher, less healthy. "
+          . "Make eyes appear cloudier, less bright, more tired. Add visible skin loosening around face - slight sagging jowls and under eyes. "
+          . "Change facial expression to look older, calmer, more tired, less energetic. Reduce muscle definition. "
+          . "The transformation MUST be OBVIOUS when compared side-by-side with original - viewers should immediately see this dog is older. "
+          . "Do NOT add gray/white fur unless natural for {$breed}. Focus on: duller coat, cloudier eyes, sagging skin, tired expression. "
+          . "Professional realistic pet photography showing clear age progression.";
 
         Log::info("Prompt 1-year: " . substr($prompt1Year, 0, 200) . "...");
 
@@ -202,18 +206,18 @@ class GenerateAgeSimulations implements ShouldQueue
       try {
         Log::info("=== Generating 3_years simulation (IMAGE-TO-IMAGE) ===");
 
-        // NATURAL HEALTHY SENIOR AGING: Show how well-cared senior dog looks at 3 years older
-        $prompt3Years = "Transform this {$breed} dog to show natural healthy senior aging to {$age3YearsLater} years old - this is a WELL-CARED FOR, CHERISHED senior dog showing normal age progression. "
+        // EXTREME AGING TRANSFORMATION: Show very dramatic 3-year aging
+        $prompt3Years = "Transform this {$breed} dog to show EXTREME DRAMATIC AGING to {$age3YearsLater} years old. This must look SIGNIFICANTLY OLDER - a MAJOR transformation. "
           . "PRESERVE COMPLETELY: The dog's unique identity, facial structure, exact coat colors and patterns ({$coatColor} {$coatPattern}), "
           . "distinctive markings ({$distinctiveMarkings}), ear shape ({$earType}), same pose and background. "
-          . "NATURAL SENIOR AGING for well-maintained {$breed}: {$getAgingChanges($age3YearsLater)}. "
-          . "IMPORTANT: The dog must look HEALTHY and WELL-CARED FOR despite age - this is a beloved senior pet receiving excellent care. Show natural senior aging: "
-          . "coat clean and groomed but naturally less lustrous (still brushed and maintained), eyes developing gentle cloudiness typical of age (but still aware and alert), "
-          . "natural gentle sagging around face that comes with senior years (but face clean and groomed), calm dignified expression of senior dog (content and peaceful). "
-          . "The dog should look CLEARLY OLDER and SENIOR BUT still healthy, loved, well-groomed, and content - aging gracefully with dignity. "
-          . "Do NOT make the dog look neglected, haggard, sick, dying, or poorly maintained. Show natural breed-appropriate senior aging for a cherished family pet. "
-          . "This is how a well-loved {$breed} looks at {$age3YearsLater} years with proper care - distinguished and senior but healthy and happy. "
-          . "Professional pet photography of healthy, well-cared-for senior {$breed} at {$age3YearsLater} years old.";
+          . "APPLY THESE EXTREME AGING CHANGES for a {$breed}: {$getAgingChanges($age3YearsLater)}. "
+          . "CRITICAL INTENSE AGING EFFECTS: Make coat HEAVILY dulled - rough, coarse, thin, patchy, completely lost shine. "
+          . "Make eyes VERY cloudy and hazy with visible cataract-like milkiness. Add PRONOUNCED facial sagging - drooping jowls, loose skin under eyes and mouth. "
+          . "Expression must look tired, weary, aged - NOT energetic. Face should appear weathered and worn. Reduce muscle tone significantly. "
+          . "Thin out the coat visibly, show patches or sparse areas. Make the overall appearance scream 'old senior dog'. "
+          . "The transformation MUST be EXTREME and UNMISTAKABLE - side-by-side with original should show shocking age difference. "
+          . "Do NOT add gray/white fur unless natural for {$breed}. Focus on: severely dulled rough coat, very cloudy eyes, heavy facial sagging, exhausted expression, thin patchy fur. "
+          . "Professional realistic pet photography showing severe age progression - this dog is clearly MUCH older.";
 
         Log::info("Prompt 3-year: " . substr($prompt3Years, 0, 200) . "...");
 
