@@ -10,33 +10,22 @@ use Illuminate\Support\Facades\Cache;
 
 class SimulationStatusController extends Controller
 {
-    /**
-     * Get simulation status with smart caching
-     */
     public function getStatus(Request $request)
     {
         try {
             $scanId = $request->input('scan_id') ?? session('last_scan_id');
-
-            if (!$scanId) {
-                return $this->errorResponse('No scan_id provided', 404);
-            }
+            if (!$scanId) return $this->errorResponse('No scan_id', 404);
 
             $cacheKey = "sim_status_{$scanId}";
             $responseData = Cache::get($cacheKey);
 
             if (!$responseData) {
                 $result = Results::where('scan_id', $scanId)->first();
-
-                if (!$result) {
-                    return $this->errorResponse('Scan not found', 404);
-                }
+                if (!$result) return $this->errorResponse('Scan not found', 404);
 
                 $responseData = $this->buildResponse($result, $scanId);
 
-                // Adaptive caching based on status
-                $status = $responseData['status'];
-                $cacheTTL = match ($status) {
+                $cacheTTL = match ($responseData['status']) {
                     'complete' => 300,
                     'failed' => 60,
                     default => 3
@@ -49,102 +38,64 @@ class SimulationStatusController extends Controller
                 ->header('Cache-Control', 'no-store, no-cache, must-revalidate')
                 ->header('Pragma', 'no-cache');
         } catch (\Exception $e) {
-            Log::error('Simulation status error', [
-                'error' => $e->getMessage()
-            ]);
-
-            return $this->errorResponse('Internal server error', 500);
+            Log::error('API status error', ['error' => $e->getMessage()]);
+            return $this->errorResponse('Server error', 500);
         }
     }
 
-    /**
-     * Build response - FIXED to match ResultController pattern
-     */
     private function buildResponse($result, $scanId)
     {
-        $simulationData = json_decode($result->simulation_data, true);
+        $simulationData = json_decode($result->simulation_data, true) ?? ['1_years' => null, '3_years' => null, 'status' => 'pending'];
+        $baseUrl = config('filesystems.disks.object-storage.url');
 
-        if (!is_array($simulationData)) {
-            $simulationData = [
-                '1_years' => null,
-                '3_years' => null,
-                'status' => 'pending',
-            ];
+        if (!$result->image) {
+            Log::error('❌ API: NO IMAGE', ['scan_id' => $scanId, 'result' => $result->toArray()]);
         }
 
-        $baseUrl = config('filesystems.disks.object-storage.url');
-        $status = $simulationData['status'] ?? 'pending';
+        $originalImageUrl = $result->image ? ($baseUrl . '/' . $result->image) : null;
 
-        // CRITICAL: Build original image URL EXACTLY like ResultController
-        $originalImageUrl = $baseUrl . '/' . $result->image;
-
-        $simulations = [
-            '1_years' => $this->buildImageUrl($simulationData['1_years'] ?? null, $baseUrl),
-            '3_years' => $this->buildImageUrl($simulationData['3_years'] ?? null, $baseUrl),
-        ];
-
-        Log::info('🖼️ API Response Image URLs', [
+        Log::info('🖼️ API Response', [
             'scan_id' => $scanId,
-            'result_image_path' => $result->image,
-            'original_url' => $originalImageUrl,
-            'base_url' => $baseUrl,
+            'image' => $result->image,
+            'url' => $originalImageUrl,
+            'null?' => $originalImageUrl === null ? 'YES!' : 'NO'
         ]);
 
         return [
-            'status' => $status,
-            'simulations' => $simulations,
+            'status' => $simulationData['status'] ?? 'pending',
+            'simulations' => [
+                '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
+                '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
+            ],
             'original_image' => $originalImageUrl,
             'breed' => $result->breed,
             'scan_id' => $scanId,
             'timestamp' => now()->timestamp,
-            'progress' => $this->calculateProgress($simulations),
+            'progress' => $this->calculateProgress($simulationData),
             'breed_profile' => $simulationData['breed_profile'] ?? null,
         ];
     }
 
-    /**
-     * Build image URL
-     */
-    private function buildImageUrl($path, $baseUrl)
+    private function buildUrl($path, $baseUrl)
     {
-        if (!$path) {
-            return null;
-        }
-
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
-        }
-
+        if (!$path) return null;
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
         return $baseUrl . '/' . $path;
     }
 
-    /**
-     * Calculate progress
-     */
-    private function calculateProgress($simulations)
+    private function calculateProgress($data)
     {
         $completed = 0;
-        if ($simulations['1_years']) $completed++;
-        if ($simulations['3_years']) $completed++;
-
-        return [
-            'completed' => $completed,
-            'total' => 2,
-            'percentage' => ($completed / 2) * 100
-        ];
+        if ($data['1_years'] ?? null) $completed++;
+        if ($data['3_years'] ?? null) $completed++;
+        return ['completed' => $completed, 'total' => 2, 'percentage' => ($completed / 2) * 100];
     }
 
-    /**
-     * Error response
-     */
     private function errorResponse($message, $code)
     {
         return response()->json([
             'status' => 'failed',
-            'simulations' => [
-                '1_years' => null,
-                '3_years' => null,
-            ],
+            'simulations' => ['1_years' => null, '3_years' => null],
             'message' => $message
         ], $code);
     }
