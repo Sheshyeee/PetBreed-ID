@@ -702,6 +702,11 @@ class ScanResultController extends Controller
      * No ML fallback - OpenAI API handles all breeds
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -784,31 +789,41 @@ Terrier: Jack Russell, Fox Terrier, Yorkshire Terrier, Bull Terrier
 Working: Rottweiler, Doberman, Great Dane, Mastiff, Saint Bernard
 Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
 
-**CONFIDENCE SCORING:**
-- 90-97%: Unmistakable breed-specific features clearly visible
-- 80-89%: Strong match, most defining features present
-- 70-79%: Good match, some features partially visible
-- 60-69%: Probable match, some uncertainty
-- 50-59%: Multiple possibilities, conflicting features
-- 40-49%: Uncertain, need more clarity
-- Below 40%: Very uncertain or extreme mixed breed
+**REALISTIC CONFIDENCE SCORING - BE HONEST:**
+- 92-97%: Crystal clear purebred with multiple unmistakable features, perfect lighting, clear view
+- 85-91%: Strong purebred match, most defining features clearly visible
+- 75-84%: Good match with key features visible but some minor ambiguity
+- 65-74%: Probable match, several key features present but lighting/angle not ideal
+- 55-64%: Likely match but significant uncertainty due to mixed features or poor image quality
+- 45-54%: Multiple breed possibilities, conflicting features or very mixed breed
+- 35-44%: High uncertainty, severe image quality issues, or extreme mix
+- Below 35%: Cannot confidently identify (use 35% as minimum)
 
 **CRITICAL RULES:**
+- BE REALISTIC - most real-world photos are NOT perfect purebreds with ideal lighting
+- LOWER confidence for: poor image quality, unclear angles, mixed breed features, unusual coloring
+- NEVER default to high confidence just because you can name a breed
+- Mixed breeds should typically be 45-70% confidence range
+- Only give 90%+ for textbook examples of the breed
 - NEVER confuse short-legged breeds with normal-legged breeds
 - Check body proportions FIRST before breed selection
-- For mixed breeds, identify the MOST DOMINANT breed first
-- Use precise decimal confidence (e.g., 87.3%, not 87%)
-- Be honest about uncertainty - lower confidence if unclear
+- Use precise decimal confidence (e.g., 67.4%, not 67% or 70%)
+
+**FOR ALTERNATIVE BREEDS:**
+- If primary confidence is 85%+, alternatives should be much lower (30-50% range)
+- If primary confidence is 60-75%, alternatives can be closer (45-60% range)
+- If primary confidence is below 60%, alternatives should be similar (within 10-15%)
+- Alternatives must reflect genuine possibilities based on visible features
 
 **OUTPUT (JSON only, no extra text):**
 {
   \"breed\": \"Exact Breed Name\",
-  \"confidence\": 87.3,
-  \"reasoning\": \"Body: [describe proportions]. Head: [describe]. Distinctive: [key features]. This matches [breed] because [specific reasons].\",
+  \"confidence\": 67.4,
+  \"reasoning\": \"Body: [describe proportions]. Head: [describe]. Image quality: [clear/unclear/poor lighting/etc]. This matches [breed] because [specific reasons]. Confidence is [high/moderate/low] because [explain uncertainty if any].\",
   \"key_identifiers\": [\"leg length: short\", \"body: long\", \"ears: floppy\"],
   \"alternative_possibilities\": [
-    {\"breed\": \"Alternative 1\", \"confidence\": 65.2, \"reason\": \"Similar feature but differs in [X]\"},
-    {\"breed\": \"Alternative 2\", \"confidence\": 48.7, \"reason\": \"Could be possible if [Y]\"}
+    {\"breed\": \"Alternative 1\", \"confidence\": 48.2, \"reason\": \"Similar feature but differs in [X]\"},
+    {\"breed\": \"Alternative 2\", \"confidence\": 35.6, \"reason\": \"Could be possible if [Y]\"}
   ]
 }";
 
@@ -818,7 +833,7 @@ Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are an expert veterinary breed identifier. Analyze body proportions first (leg length, body length, build) as the primary identifier, then verify with facial features and coat. Be accurate and honest about confidence levels. Output only valid JSON.'
+                        'content' => 'You are an expert veterinary breed identifier. Be REALISTIC and HONEST about confidence levels - most real-world photos are not perfect. Analyze body proportions first (leg length, body length, build), then facial features. Consider image quality, lighting, and angle in your confidence score. Mixed breeds or unclear images should have lower confidence. Output only valid JSON.'
                     ],
                     [
                         'role' => 'user',
@@ -835,8 +850,8 @@ Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
                     ],
                 ],
                 'response_format' => ['type' => 'json_object'],
-                'max_tokens' => 1000, // Reduced from 1500 for faster response
-                'temperature' => 0.2,  // Lower = more consistent
+                'max_tokens' => 1000,
+                'temperature' => 0.3,  // Slightly higher for more natural variance
             ]);
 
             Log::info('✓ OpenAI API response received');
@@ -859,31 +874,40 @@ Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
                 throw new \Exception('Invalid API response structure');
             }
 
-            // Process confidence
-            $actualConfidence = (float)$apiResult['confidence'];
+            // Process confidence with realistic variance
+            $rawConfidence = (float)$apiResult['confidence'];
 
-            // Cap at 97% max
+            // Apply max cap at 97%
+            if ($rawConfidence > 97) {
+                $rawConfidence = 97.0;
+            }
+
+            // Apply minimum of 35%
+            if ($rawConfidence < 35) {
+                $rawConfidence = 35.0;
+            }
+
+            // Add natural micro-variance to avoid static numbers
+            // This creates unique values for each scan even of similar breeds
+            $microVariance = (mt_rand(-15, 15) / 10); // -1.5 to +1.5
+            $actualConfidence = $rawConfidence + $microVariance;
+
+            // Re-apply bounds after variance
             if ($actualConfidence > 97) {
                 $actualConfidence = 97.0;
             }
-
-            // Ensure minimum confidence of 35%
             if ($actualConfidence < 35) {
                 $actualConfidence = 35.0;
             }
 
-            // Add micro-variance if rounded
-            if ($actualConfidence == floor($actualConfidence)) {
-                $actualConfidence += (mt_rand(1, 9) / 10);
-            }
-
             Log::info('✓ API breed identification successful', [
                 'breed' => $apiResult['breed'],
-                'confidence' => $actualConfidence,
+                'raw_confidence' => $rawConfidence,
+                'final_confidence' => $actualConfidence,
                 'reasoning' => substr($apiResult['reasoning'] ?? '', 0, 150)
             ]);
 
-            // Build top predictions
+            // Build top predictions with realistic variance
             $topPredictions = [];
             $seenBreeds = [];
 
@@ -895,30 +919,56 @@ Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
             ];
             $seenBreeds[] = strtolower(trim($primaryBreed));
 
-            // Add alternatives
+            // Process alternatives with realistic confidence distribution
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
                         $breedKey = strtolower(trim($alt['breed']));
 
                         if (!in_array($breedKey, $seenBreeds)) {
-                            $altConfidence = (float)$alt['confidence'];
+                            $altRawConfidence = (float)$alt['confidence'];
 
-                            // Cap and ensure it's lower than primary
-                            if ($altConfidence > 97) $altConfidence = 97.0;
-                            if ($altConfidence >= $actualConfidence) {
-                                $altConfidence = $actualConfidence - mt_rand(10, 20);
+                            // Cap at 97%
+                            if ($altRawConfidence > 97) {
+                                $altRawConfidence = 97.0;
                             }
 
-                            // Add micro-variance
-                            if ($altConfidence == floor($altConfidence)) {
-                                $altConfidence += (mt_rand(1, 9) / 10);
+                            // Ensure alternative is lower than primary
+                            if ($altRawConfidence >= $actualConfidence) {
+                                // Calculate realistic gap based on primary confidence
+                                if ($actualConfidence >= 85) {
+                                    // High confidence primary = large gap to alternatives
+                                    $altRawConfidence = $actualConfidence - mt_rand(25, 45);
+                                } elseif ($actualConfidence >= 70) {
+                                    // Medium confidence = medium gap
+                                    $altRawConfidence = $actualConfidence - mt_rand(15, 25);
+                                } else {
+                                    // Low confidence = smaller gap (competing possibilities)
+                                    $altRawConfidence = $actualConfidence - mt_rand(5, 15);
+                                }
                             }
 
-                            if ($altConfidence >= 30) {
+                            // Add micro-variance to alternatives too
+                            $altMicroVariance = (mt_rand(-12, 12) / 10); // -1.2 to +1.2
+                            $finalAltConfidence = $altRawConfidence + $altMicroVariance;
+
+                            // Apply bounds
+                            if ($finalAltConfidence > 97) {
+                                $finalAltConfidence = 97.0;
+                            }
+                            if ($finalAltConfidence < 30) {
+                                $finalAltConfidence = 30.0;
+                            }
+
+                            // Ensure it's still lower than primary
+                            if ($finalAltConfidence >= $actualConfidence) {
+                                $finalAltConfidence = $actualConfidence - mt_rand(8, 15);
+                            }
+
+                            if ($finalAltConfidence >= 30) {
                                 $topPredictions[] = [
                                     'breed' => $alt['breed'],
-                                    'confidence' => round($altConfidence, 1)
+                                    'confidence' => round($finalAltConfidence, 1)
                                 ];
                                 $seenBreeds[] = $breedKey;
                             }
