@@ -38,17 +38,37 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
     const MAX_POLLING_ATTEMPTS = 120;
 
+    // FIXED: Proper image URL handling
     const getImageUrl = useCallback((path: string | null): string => {
-        if (!path) return '/dogpic.jpg';
+        if (!path) {
+            console.log('⚠️ No path provided, using default');
+            return '/dogpic.jpg';
+        }
+
+        // If it's already a full URL (from object storage), use it directly
         if (path.startsWith('http://') || path.startsWith('https://')) {
+            console.log('✅ Using full URL:', path);
             return path;
         }
+
+        // If it's a relative path, prepend storage URL
+        console.log('🔗 Converting relative path to storage URL:', path);
         return `/storage/${path}`;
     }, []);
 
     const hasSimulations = Boolean(
         simulations && (simulations['1_years'] || simulations['3_years']),
     );
+
+    // Debug logging
+    useEffect(() => {
+        console.log('🖼️ Image URLs:', {
+            originalImage: currentOriginalImage,
+            originalImageUrl: getImageUrl(currentOriginalImage),
+            simulations_1yr: simulations['1_years'],
+            simulations_3yr: simulations['3_years'],
+        });
+    }, [currentOriginalImage, simulations, getImageUrl]);
 
     useEffect(() => {
         if (!isPolling || pollingAttempts >= MAX_POLLING_ATTEMPTS) {
@@ -67,7 +87,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         const poll = async () => {
             try {
                 const timestamp = Date.now();
-                // CRITICAL FIX: Pass scan_id as query parameter
                 const response = await axios.get(
                     `/api/simulation-status?scan_id=${scan_id}&t=${timestamp}`,
                     {
@@ -82,17 +101,19 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
                 const data = response.data;
 
-                console.log('📥 Response:', {
+                console.log('📥 Poll Response:', {
                     status: data.status,
                     has_1: Boolean(data.simulations['1_years']),
                     has_3: Boolean(data.simulations['3_years']),
+                    original_image: data.original_image,
                     timestamp: data.timestamp,
                 });
 
                 const dataChanged =
                     data.status !== status ||
                     data.simulations['1_years'] !== simulations['1_years'] ||
-                    data.simulations['3_years'] !== simulations['3_years'];
+                    data.simulations['3_years'] !== simulations['3_years'] ||
+                    data.original_image !== currentOriginalImage;
 
                 if (dataChanged) {
                     console.log('✨ DATA CHANGED - Updating state');
@@ -102,13 +123,18 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                         '3_years': data.simulations['3_years'],
                     });
 
+                    // Update original image if provided
                     if (data.original_image) {
+                        console.log(
+                            '🖼️ Updating original image:',
+                            data.original_image,
+                        );
                         setCurrentOriginalImage(data.original_image);
                     }
 
                     setLastUpdate(Date.now());
                 } else {
-                    console.log('⏸️ No changes');
+                    console.log('⏸️ No changes detected');
                 }
 
                 setPollingAttempts((prev) => prev + 1);
@@ -134,15 +160,14 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
         return () => {
             clearInterval(pollInterval);
         };
-    }, [isPolling, pollingAttempts, status, simulations, scan_id]);
-
-    useEffect(() => {
-        console.log('🎨 Simulations state:', {
-            has_1: Boolean(simulations['1_years']),
-            has_3: Boolean(simulations['3_years']),
-            urls: simulations,
-        });
-    }, [simulations]);
+    }, [
+        isPolling,
+        pollingAttempts,
+        status,
+        simulations,
+        scan_id,
+        currentOriginalImage,
+    ]);
 
     return (
         <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
@@ -190,7 +215,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                     </p>
                                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                                         Creating age progression images. This
-                                        takes 20-40 seconds.
+                                        takes 40-60 seconds.
                                     </p>
                                     <p className="mt-1 text-xs text-gray-500">
                                         Check {pollingAttempts}/
@@ -264,10 +289,19 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
-                                                        key={`orig-${currentOriginalImage}`}
+                                                        key={`orig-${lastUpdate}-${currentOriginalImage}`}
                                                         onError={(e) => {
+                                                            console.error(
+                                                                '❌ Image load failed:',
+                                                                currentOriginalImage,
+                                                            );
                                                             e.currentTarget.src =
                                                                 '/dogpic.jpg';
+                                                        }}
+                                                        onLoad={() => {
+                                                            console.log(
+                                                                '✅ Original image loaded successfully',
+                                                            );
                                                         }}
                                                     />
                                                 </div>
@@ -289,10 +323,18 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 1 year"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
-                                                            key={`1yr-${simulations['1_years']}`}
+                                                            key={`1yr-${lastUpdate}-${simulations['1_years']}`}
                                                             onError={(e) => {
+                                                                console.error(
+                                                                    '❌ 1-year image load failed',
+                                                                );
                                                                 e.currentTarget.src =
                                                                     '/dogpic.jpg';
+                                                            }}
+                                                            onLoad={() => {
+                                                                console.log(
+                                                                    '✅ 1-year image loaded',
+                                                                );
                                                             }}
                                                         />
                                                     ) : (
@@ -331,8 +373,12 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                         )}
                                                         alt="Current appearance"
                                                         className="aspect-square w-full rounded-2xl object-cover shadow-lg"
-                                                        key={`orig2-${currentOriginalImage}`}
+                                                        key={`orig2-${lastUpdate}-${currentOriginalImage}`}
                                                         onError={(e) => {
+                                                            console.error(
+                                                                '❌ Image load failed:',
+                                                                currentOriginalImage,
+                                                            );
                                                             e.currentTarget.src =
                                                                 '/dogpic.jpg';
                                                         }}
@@ -356,10 +402,18 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             )}
                                                             alt="Appearance in 3 years"
                                                             className="aspect-square w-full rounded-2xl object-cover shadow-lg"
-                                                            key={`3yr-${simulations['3_years']}`}
+                                                            key={`3yr-${lastUpdate}-${simulations['3_years']}`}
                                                             onError={(e) => {
+                                                                console.error(
+                                                                    '❌ 3-year image load failed',
+                                                                );
                                                                 e.currentTarget.src =
                                                                     '/dogpic.jpg';
+                                                            }}
+                                                            onLoad={() => {
+                                                                console.log(
+                                                                    '✅ 3-year image loaded',
+                                                                );
                                                             }}
                                                         />
                                                     ) : (
