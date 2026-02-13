@@ -11,117 +11,127 @@ use Illuminate\Support\Facades\Cache;
 class SimulationStatusController extends Controller
 {
     /**
-     * Get the current simulation status
-     * SIMPLE OPTIMIZATION: Just add 5-second cache to reduce DB load
+     * Get simulation status with smart caching
+     * Uses shorter cache for generating, longer for complete
      */
     public function getStatus(Request $request)
     {
         try {
             $scanId = $request->input('scan_id') ?? session('last_scan_id');
 
-            Log::info("=== SIMULATION STATUS API CALLED ===");
-            Log::info("Request scan_id: " . ($request->input('scan_id') ?? 'NULL'));
-            Log::info("Session scan_id: " . (session('last_scan_id') ?? 'NULL'));
-            Log::info("Using scan_id: " . ($scanId ?? 'NULL'));
-
             if (!$scanId) {
-                Log::warning("No scan_id in request or session");
-                return response()->json([
-                    'status' => 'failed',
-                    'simulations' => [
-                        '1_years' => null,
-                        '3_years' => null,
-                    ],
-                    'message' => 'No scan_id provided'
-                ], 404);
+                return $this->errorResponse('No scan_id provided', 404);
             }
 
-            // OPTIMIZATION: Cache the result for 5 seconds to reduce DB queries
-            // This helps when frontend is polling every 2 seconds
-            $cacheKey = "simulation_status_{$scanId}";
+            // Smart cache strategy: shorter TTL while generating, longer when complete
+            $cacheKey = "sim_status_{$scanId}";
 
-            $responseData = Cache::remember($cacheKey, 5, function () use ($scanId) {
+            $responseData = Cache::get($cacheKey);
+
+            if (!$responseData) {
                 $result = Results::where('scan_id', $scanId)->first();
 
                 if (!$result) {
-                    return null; // Will be handled below
+                    return $this->errorResponse('Scan not found', 404);
                 }
 
-                // Decode simulation data
-                $simulationData = json_decode($result->simulation_data, true);
+                $responseData = $this->buildResponse($result, $scanId);
 
-                Log::info("Raw simulation_data from DB: " . $result->simulation_data);
+                // Adaptive caching
+                $status = $responseData['status'];
+                $cacheTTL = match ($status) {
+                    'complete' => 300, // 5 minutes for completed
+                    'failed' => 60,    // 1 minute for failed
+                    default => 3       // 3 seconds while generating
+                };
 
-                // Ensure proper structure
-                if (!$simulationData || !is_array($simulationData)) {
-                    Log::warning("Invalid simulation_data, using defaults");
-                    $simulationData = [
-                        '1_years' => null,
-                        '3_years' => null,
-                        'status' => 'pending',
-                    ];
-                }
-
-                // Build base URL from object storage
-                $baseUrl = config('filesystems.disks.object-storage.url');
-
-                // Extract status and simulations WITH FULL URLS
-                $status = $simulationData['status'] ?? 'pending';
-                $simulations = [
-                    '1_years' => $simulationData['1_years']
-                        ? $baseUrl . '/' . $simulationData['1_years']
-                        : null,
-                    '3_years' => $simulationData['3_years']
-                        ? $baseUrl . '/' . $simulationData['3_years']
-                        : null,
-                ];
-
-                // Also include original image with full URL
-                $originalImage = $baseUrl . '/' . $result->image;
-
-                Log::info("✓ Returning status: {$status}");
-                Log::info("✓ 1_years: " . ($simulations['1_years'] ? 'EXISTS' : 'NULL'));
-                Log::info("✓ 3_years: " . ($simulations['3_years'] ? 'EXISTS' : 'NULL'));
-
-                return [
-                    'status' => $status,
-                    'simulations' => $simulations,
-                    'original_image' => $originalImage,
-                    'scan_id' => $scanId,
-                    'timestamp' => now()->timestamp,
-                    'has_1_year' => !is_null($simulations['1_years']),
-                    'has_3_years' => !is_null($simulations['3_years']),
-                ];
-            });
-
-            if (!$responseData) {
-                Log::error("Result not found for scan_id: {$scanId}");
-                return response()->json([
-                    'status' => 'failed',
-                    'simulations' => [
-                        '1_years' => null,
-                        '3_years' => null,
-                    ],
-                    'message' => 'Scan not found'
-                ], 404);
+                Cache::put($cacheKey, $responseData, $cacheTTL);
             }
 
             return response()->json($responseData)
-                ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-                ->header('Pragma', 'no-cache')
-                ->header('Expires', '0');
+                ->header('Cache-Control', 'no-store, no-cache, must-revalidate')
+                ->header('Pragma', 'no-cache');
         } catch (\Exception $e) {
-            Log::error('Simulation status API error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('Simulation status error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-            return response()->json([
-                'status' => 'failed',
-                'simulations' => [
-                    '1_years' => null,
-                    '3_years' => null,
-                ],
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->errorResponse('Internal server error', 500);
         }
+    }
+
+    /**
+     * Build response data from result
+     */
+    private function buildResponse($result, $scanId)
+    {
+        $simulationData = json_decode($result->simulation_data, true);
+
+        if (!is_array($simulationData)) {
+            $simulationData = [
+                '1_years' => null,
+                '3_years' => null,
+                'status' => 'pending',
+            ];
+        }
+
+        $baseUrl = config('filesystems.disks.object-storage.url');
+        $status = $simulationData['status'] ?? 'pending';
+
+        $simulations = [
+            '1_years' => $this->buildImageUrl($simulationData['1_years'] ?? null, $baseUrl),
+            '3_years' => $this->buildImageUrl($simulationData['3_years'] ?? null, $baseUrl),
+        ];
+
+        return [
+            'status' => $status,
+            'simulations' => $simulations,
+            'original_image' => $baseUrl . '/' . $result->image,
+            'breed' => $result->breed,
+            'scan_id' => $scanId,
+            'timestamp' => now()->timestamp,
+            'progress' => $this->calculateProgress($simulations),
+            'breed_profile' => $simulationData['breed_profile'] ?? null,
+        ];
+    }
+
+    /**
+     * Build full image URL
+     */
+    private function buildImageUrl($path, $baseUrl)
+    {
+        return $path ? $baseUrl . '/' . $path : null;
+    }
+
+    /**
+     * Calculate generation progress
+     */
+    private function calculateProgress($simulations)
+    {
+        $completed = 0;
+        if ($simulations['1_years']) $completed++;
+        if ($simulations['3_years']) $completed++;
+
+        return [
+            'completed' => $completed,
+            'total' => 2,
+            'percentage' => ($completed / 2) * 100
+        ];
+    }
+
+    /**
+     * Error response helper
+     */
+    private function errorResponse($message, $code)
+    {
+        return response()->json([
+            'status' => 'failed',
+            'simulations' => [
+                '1_years' => null,
+                '3_years' => null,
+            ],
+            'message' => $message
+        ], $code);
     }
 }
