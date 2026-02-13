@@ -676,6 +676,11 @@ class ScanResultController extends Controller
      * BREED IDENTIFICATION - OPTIMIZED PROMPT
      * ==========================================
      */
+    /**
+     * ==========================================
+     * BREED IDENTIFICATION - OPTIMIZED PROMPT
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -691,19 +696,34 @@ class ScanResultController extends Controller
         }
         Log::info('✓ OpenAI API key is configured');
 
-        if (!file_exists($imagePath)) {
-            Log::error('✗ Image file not found: ' . $imagePath);
+        // FIXED: Check if image exists in object storage
+        if (!Storage::disk('object-storage')->exists($imagePath)) {
+            Log::error('✗ Image file not found in object storage: ' . $imagePath);
             return [
                 'success' => false,
                 'error' => 'Image file not found'
             ];
         }
-        Log::info('✓ Image file exists');
+        Log::info('✓ Image file exists in object storage');
 
         try {
-            $imageData = base64_encode(file_get_contents($imagePath));
-            $mimeType = mime_content_type($imagePath);
-            Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType);
+            // FIXED: Load image from object storage, not local filesystem
+            $imageContents = Storage::disk('object-storage')->get($imagePath);
+
+            if ($imageContents === false || empty($imageContents)) {
+                throw new \Exception('Failed to load image from object storage');
+            }
+
+            // Get MIME type from image data
+            $imageInfo = @getimagesizefromstring($imageContents);
+            if ($imageInfo === false) {
+                throw new \Exception('Invalid image file');
+            }
+
+            $mimeType = $imageInfo['mime'];
+            $imageData = base64_encode($imageContents);
+
+            Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType . ', Size: ' . strlen($imageContents) . ' bytes');
 
             $optimizedPrompt = "Analyze this dog image and identify the breed with precision.
 
