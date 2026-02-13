@@ -19,7 +19,7 @@ class GenerateAgeSimulations implements ShouldQueue
 {
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-  public $timeout = 180;
+  public $timeout = 150;  // ⚡ Reduced from 180
   public $tries = 2;
 
   protected $resultId;
@@ -38,7 +38,7 @@ class GenerateAgeSimulations implements ShouldQueue
     $startTime = microtime(true);
 
     try {
-      Log::info("=== DRAMATIC AGE SIMULATIONS (ULTRA-FAST + BREED-AWARE) ===");
+      Log::info("=== ULTRA-FAST GUARANTEED TRANSFORMATIONS ===");
       Log::info("Result ID: {$this->resultId}, Breed: {$this->breed}");
 
       $result = Results::find($this->resultId);
@@ -47,41 +47,29 @@ class GenerateAgeSimulations implements ShouldQueue
         return;
       }
 
-      // ⚡ OPTIMIZATION 1: Prepare and resize image
       $imageData = $this->prepareOriginalImage($this->imagePath);
       if (!$imageData) {
         throw new \Exception("Failed to load original image");
       }
 
-      // ⚡ OPTIMIZATION 2: Get breed-specific growth data
-      $breedData = $this->getBreedCharacteristics($this->breed);
-      Log::info("✓ Breed characteristics loaded", $breedData);
+      $breedSize = $this->getBreedSize($this->breed);
+      Log::info("✓ Breed size: {$breedSize}");
 
       $simulationData = [
         '1_years' => null,
         '3_years' => null,
         'status' => 'generating',
-        'dog_features' => $breedData
+        'dog_features' => ['breed_size' => $breedSize]
       ];
 
       $result->update(['simulation_data' => json_encode($simulationData)]);
 
-      // Calculate ages based on current appearance
-      $currentAgeYears = $breedData['estimated_age_years'];
-      $age1YearLater = $currentAgeYears + 1;
-      $age3YearsLater = $currentAgeYears + 3;
+      // ⚡ COMPACT prompts for SPEED
+      $prompt1Year = $this->buildCompactPrompt($this->breed, 1, $breedSize);
+      $prompt3Years = $this->buildCompactPrompt($this->breed, 3, $breedSize);
 
-      Log::info("Ages: Current={$currentAgeYears}y, +1={$age1YearLater}y, +3={$age3YearsLater}y");
+      Log::info("=== PARALLEL ULTRA-FAST generation ===");
 
-      $breed = $this->breed;
-
-      // ⚡ OPTIMIZED PROMPTS - Shorter but DRAMATICALLY descriptive
-      $prompt1Year = $this->buildDramaticPrompt($breed, $currentAgeYears, $age1YearLater, $breedData);
-      $prompt3Years = $this->buildDramaticPrompt($breed, $currentAgeYears, $age3YearsLater, $breedData);
-
-      Log::info("=== PARALLEL generation starting ===");
-
-      // ⚡ PARALLEL EXECUTION
       $promises = [
         '1_year' => $this->generateImageAsync($prompt1Year, $imageData),
         '3_years' => $this->generateImageAsync($prompt3Years, $imageData)
@@ -89,36 +77,35 @@ class GenerateAgeSimulations implements ShouldQueue
 
       $results = Promise\Utils::settle($promises)->wait();
 
-      // Process 1-year
+      // Process results
       if ($results['1_year']['state'] === 'fulfilled') {
         try {
           $imageOutput = $results['1_year']['value'];
           $simulationPath = $this->saveSimulationWebP($imageOutput, '1_years');
           $simulationData['1_years'] = $simulationPath;
           $result->update(['simulation_data' => json_encode($simulationData)]);
-          Log::info("✓ 1-year generated: {$simulationPath}");
+          Log::info("✓ 1-year: {$simulationPath}");
         } catch (\Exception $e) {
           Log::error("Save 1-year failed: " . $e->getMessage());
           $simulationData['error_1year'] = $e->getMessage();
         }
       } else {
-        Log::error("1-year generation failed: " . $results['1_year']['reason']->getMessage());
+        Log::error("1-year failed: " . $results['1_year']['reason']->getMessage());
         $simulationData['error_1year'] = $results['1_year']['reason']->getMessage();
       }
 
-      // Process 3-year
       if ($results['3_years']['state'] === 'fulfilled') {
         try {
           $imageOutput = $results['3_years']['value'];
           $simulationPath = $this->saveSimulationWebP($imageOutput, '3_years');
           $simulationData['3_years'] = $simulationPath;
-          Log::info("✓ 3-year generated: {$simulationPath}");
+          Log::info("✓ 3-year: {$simulationPath}");
         } catch (\Exception $e) {
           Log::error("Save 3-year failed: " . $e->getMessage());
           $simulationData['error_3year'] = $e->getMessage();
         }
       } else {
-        Log::error("3-year generation failed: " . $results['3_years']['reason']->getMessage());
+        Log::error("3-year failed: " . $results['3_years']['reason']->getMessage());
         $simulationData['error_3year'] = $results['3_years']['reason']->getMessage();
       }
 
@@ -126,7 +113,7 @@ class GenerateAgeSimulations implements ShouldQueue
       $result->update(['simulation_data' => json_encode($simulationData)]);
 
       $elapsed = round(microtime(true) - $startTime, 2);
-      Log::info("✓ COMPLETED in {$elapsed}s - 1yr=" . ($simulationData['1_years'] ? 'YES' : 'NO') . ", 3yr=" . ($simulationData['3_years'] ? 'YES' : 'NO'));
+      Log::info("✓ DONE in {$elapsed}s");
     } catch (\Exception $e) {
       Log::error("Job FAILED: " . $e->getMessage());
       Results::where('id', $this->resultId)->update([
@@ -141,157 +128,68 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * ⚡ BREED-AWARE: Get characteristics for dramatic transformations
+   * ⚡ FAST: Simple breed size detection
    */
-  private function getBreedCharacteristics($breed)
+  private function getBreedSize($breed)
   {
     $breedLower = strtolower($breed);
 
-    // Determine size category and growth potential
-    $giantBreeds = ['great dane', 'mastiff', 'saint bernard', 'newfoundland', 'leonberger', 'irish wolfhound'];
-    $largeBreeds = ['german shepherd', 'golden retriever', 'labrador', 'rottweiler', 'doberman', 'boxer'];
-    $mediumBreeds = ['beagle', 'bulldog', 'cocker spaniel', 'border collie', 'australian shepherd', 'husky', 'aspin'];
-    $smallBreeds = ['chihuahua', 'pomeranian', 'yorkshire terrier', 'shih tzu', 'pug', 'dachshund', 'maltese'];
-
-    $isGiant = false;
-    $isLarge = false;
-    $isMedium = false;
-    $isSmall = false;
-
-    foreach ($giantBreeds as $giant) {
-      if (stripos($breedLower, $giant) !== false) {
-        $isGiant = true;
-        break;
-      }
+    // Quick pattern matching
+    if (preg_match('/(great dane|mastiff|saint bernard|newfoundland|wolfhound|leonberger|bernese)/i', $breedLower)) {
+      return 'giant';
+    }
+    if (preg_match('/(shepherd|retriever|labrador|rottweiler|doberman|boxer|husky|malamute|akita)/i', $breedLower)) {
+      return 'large';
+    }
+    if (preg_match('/(chihuahua|pomeranian|yorkshire|shih tzu|pug|maltese|toy)/i', $breedLower)) {
+      return 'small';
     }
 
-    if (!$isGiant) {
-      foreach ($largeBreeds as $large) {
-        if (stripos($breedLower, $large) !== false) {
-          $isLarge = true;
-          break;
-        }
-      }
-    }
-
-    if (!$isGiant && !$isLarge) {
-      foreach ($mediumBreeds as $medium) {
-        if (stripos($breedLower, $medium) !== false) {
-          $isMedium = true;
-          break;
-        }
-      }
-    }
-
-    if (!$isGiant && !$isLarge && !$isMedium) {
-      foreach ($smallBreeds as $small) {
-        if (stripos($breedLower, $small) !== false) {
-          $isSmall = true;
-          break;
-        }
-      }
-    }
-
-    // Default to medium if not categorized
-    if (!$isGiant && !$isLarge && !$isMedium && !$isSmall) {
-      $isMedium = true;
-    }
-
-    return [
-      'size_category' => $isGiant ? 'giant' : ($isLarge ? 'large' : ($isMedium ? 'medium' : 'small')),
-      'can_grow_tall' => $isGiant || $isLarge,
-      'estimated_age_years' => 2, // Default young adult
-      'growth_stage' => 'growing',
-    ];
+    return 'medium';
   }
 
   /**
-   * ⚡ DRAMATIC PROMPT BUILDER - Breed-aware transformations
+   * ⚡ ULTRA-COMPACT PROMPT - Guaranteed visible changes, minimal words
    */
-  private function buildDramaticPrompt($breed, $currentAge, $targetAge, $breedData)
+  private function buildCompactPrompt($breed, $yearsAhead, $breedSize)
   {
-    $ageDiff = $targetAge - $currentAge;
-    $sizeCategory = $breedData['size_category'];
-    $canGrowTall = $breedData['can_grow_tall'];
+    if ($yearsAhead === 1) {
+      // 1 YEAR - Moderate but CLEAR changes
+      $changes = [
+        "20% gray muzzle hairs",
+        "eyes 20% duller, slight haze",
+        "coat 25% less shiny, rougher",
+        "subtle jowl loosening",
+        "calmer expression"
+      ];
 
-    // CRITICAL: Determine if this is a puppy-to-adult transformation
-    $isPuppyToAdult = ($currentAge < 1.5 && $targetAge >= 1.5);
-
-    $transformations = [];
-
-    // ============================================
-    // PUPPY TO ADULT TRANSFORMATION (MOST DRAMATIC)
-    // ============================================
-    if ($isPuppyToAdult) {
-      $transformations[] = "TRANSFORM this puppy into a FULLY GROWN ADULT {$breed}";
-
-      if ($canGrowTall) {
-        $transformations[] = "MASSIVE size increase - dog must be SIGNIFICANTLY TALLER and LONGER, appearing 2-3x larger in frame";
-        $transformations[] = "body stretches vertically and horizontally - legs become MUCH LONGER and thicker";
-        $transformations[] = "head enlarges dramatically, muzzle extends and widens significantly";
-      } else {
-        $transformations[] = "body fills out substantially - appears MUCH stockier and muscular";
-        $transformations[] = "compact frame becomes solid and dense, filling out proportionally";
+      if ($breedSize === 'giant' || $breedSize === 'large') {
+        $changes[] = "if puppy: 35% larger body";
       }
+    } else {
+      // 3 YEARS - EXTREME dramatic changes
+      $changes = [
+        "50% gray/white muzzle REQUIRED",
+        "eyes cloudy/milky aged look",
+        "coat dull, thin, rough texture",
+        "VISIBLE jowl/face sagging",
+        "gray patches: eyebrows, ears, chest",
+        "less muscle tone, weight shift",
+        "tired senior demeanor"
+      ];
 
-      $transformations[] = "puppy fat completely replaced by defined adult muscle structure";
-      $transformations[] = "facial features mature - eyes smaller relative to head, ears fully developed";
-      $transformations[] = "coat texture changes from soft puppy fur to adult coat (thicker, coarser)";
-      $transformations[] = "paws grow proportionally larger and more robust";
-      $transformations[] = "expression shifts from innocent puppy to confident adult dog";
-      $transformations[] = "overall stance changes from wobbly puppy to stable, powerful adult posture";
-    }
-    // ============================================
-    // ADULT TO MATURE/SENIOR (AGING VISIBLE)
-    // ============================================
-    else if ($targetAge >= 6) {
-      $transformations[] = "AGE this {$breed} to {$targetAge} years - VISIBLE AGING REQUIRED";
-
-      if ($targetAge >= 9) {
-        // SENIOR DOG - EXTREME AGING
-        $transformations[] = "coat SEVERELY dulled and grayed - rough texture, thinning patches visible";
-        $transformations[] = "eyes VERY cloudy with milky cataract appearance - tired, aged look";
-        $transformations[] = "PRONOUNCED facial sagging - jowls droop heavily, loose skin under eyes and chin";
-        $transformations[] = "muzzle shows SIGNIFICANT graying (50-70% white/gray hairs)";
-        $transformations[] = "body appears less muscular, slight weight gain or loss, sagging posture";
-        $transformations[] = "overall weathered, senior dog appearance - unmistakably OLD";
-      } else {
-        // MATURE DOG - MODERATE AGING
-        $transformations[] = "coat noticeably duller, losing youthful shine and gloss";
-        $transformations[] = "eyes developing slight cloudiness, less bright and sparkly";
-        $transformations[] = "visible skin loosening around face, especially jowls and under eyes";
-        $transformations[] = "some gray hairs appearing on muzzle (20-40% gray)";
-        $transformations[] = "facial expression calmer, more tired, less energetic than young adult";
-        $transformations[] = "coat slightly thinner in places, body less toned";
+      if ($breedSize === 'small') {
+        $changes[] = "accelerated aging signs";
       }
     }
-    // ============================================
-    // YOUNG ADULT TO PRIME (SUBTLE MATURATION)
-    // ============================================
-    else {
-      $transformations[] = "MATURE this {$breed} to {$targetAge} years - subtle adult development";
 
-      if ($canGrowTall && $currentAge < 2) {
-        $transformations[] = "slight final growth - body becomes MORE MUSCULAR and FULLER";
-        $transformations[] = "chest deepens and broadens, legs more defined and powerful";
-      }
+    $changesList = implode(". ", $changes);
 
-      $transformations[] = "face becomes more mature and defined, jaw more pronounced";
-      $transformations[] = "coat fully developed to adult texture and density";
-      $transformations[] = "expression confident and alert, less playful than young dog";
-      $transformations[] = "overall athletic prime physique - peak physical condition";
-    }
-
-    // Build final prompt (COMPACT for speed)
-    $prompt = implode('. ', $transformations);
-    $prompt .= ". PRESERVE: exact breed identity, coat color/pattern, distinctive markings, background, lighting. ";
-    $prompt .= "OUTPUT: Photorealistic pet photo, same angle and pose.";
-
-    return $prompt;
+    return "Age {$breed} +{$yearsAhead}yr. MUST CHANGE: {$changesList}. KEEP: breed, color, markings, pose, background. Photorealistic.";
   }
 
   /**
-   * ⚡ OPTIMIZED: Async generation with FASTER settings
+   * ⚡ MAXIMUM SPEED generation settings
    */
   private function generateImageAsync($prompt, $imageData)
   {
@@ -304,8 +202,8 @@ class GenerateAgeSimulations implements ShouldQueue
     $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
     $client = new Client([
-      'timeout' => 85,  // ⚡ Reduced from 90
-      'connect_timeout' => 4,  // ⚡ Reduced from 5
+      'timeout' => 75,  // ⚡ Reduced from 90
+      'connect_timeout' => 3,  // ⚡ Reduced from 5
     ]);
 
     $payload = [
@@ -323,9 +221,9 @@ class GenerateAgeSimulations implements ShouldQueue
         ]
       ],
       'generationConfig' => [
-        'temperature' => 0.4,  // ⚡ Lower for consistency and speed
-        'topK' => 25,          // ⚡ Reduced for speed
-        'topP' => 0.8,         // ⚡ Reduced for speed
+        'temperature' => 0.65,  // ⚡ Balanced: creativity + speed
+        'topK' => 35,
+        'topP' => 0.9,
         'maxOutputTokens' => 8192
       ]
     ];
@@ -348,7 +246,7 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * ⚡ OPTIMIZED: Prepare image with aggressive resizing for speed
+   * ⚡ AGGRESSIVE optimization for speed
    */
   private function prepareOriginalImage($fullPath)
   {
@@ -366,16 +264,17 @@ class GenerateAgeSimulations implements ShouldQueue
       $width = $imageInfo[0];
       $height = $imageInfo[1];
 
-      // ⚡ AGGRESSIVE RESIZE for maximum speed (1536px max instead of 1920px)
-      if ($width > 1536 || $height > 1536) {
-        Log::info("Resizing {$width}x{$height} to max 1536px");
-        $imageContents = $this->resizeImage($imageContents, 1536, 1536);
+      // ⚡ AGGRESSIVE resize for maximum speed
+      $maxSize = 1280;  // ⚡ Reduced from 1536
+      if ($width > $maxSize || $height > $maxSize) {
+        Log::info("Resizing {$width}x{$height} to {$maxSize}px");
+        $imageContents = $this->resizeImage($imageContents, $maxSize, $maxSize);
       }
 
-      // ⚡ Convert to JPEG with slightly lower quality for speed
+      // ⚡ Lower quality JPEG for faster upload
       $img = imagecreatefromstring($imageContents);
       ob_start();
-      imagejpeg($img, null, 82);  // ⚡ Reduced from 85 to 82
+      imagejpeg($img, null, 78);  // ⚡ Reduced from 85
       $imageContents = ob_get_clean();
       imagedestroy($img);
 
@@ -390,7 +289,7 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * ⚡ Resize helper
+   * ⚡ Fast resize
    */
   private function resizeImage($imageContents, $maxWidth, $maxHeight)
   {
@@ -406,7 +305,7 @@ class GenerateAgeSimulations implements ShouldQueue
     imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
     ob_start();
-    imagejpeg($resized, null, 82);  // ⚡ Reduced quality for speed
+    imagejpeg($resized, null, 78);  // ⚡ Lower quality
     $output = ob_get_clean();
 
     imagedestroy($image);
@@ -416,14 +315,14 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * ⚡ OPTIMIZED: Save as WebP with optimized compression
+   * ⚡ Fast WebP save
    */
   private function saveSimulationWebP($imageOutput, $type)
   {
     $img = imagecreatefromstring($imageOutput);
 
     ob_start();
-    imagewebp($img, null, 82);  // ⚡ Reduced from 85 to 82 for speed
+    imagewebp($img, null, 78);  // ⚡ Reduced from 85
     $webpData = ob_get_clean();
     imagedestroy($img);
 
