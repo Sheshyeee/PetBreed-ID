@@ -222,18 +222,6 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     </div>
                 </div>
 
-                {/* Debug info - remove in production */}
-                <div className="mt-4 rounded-lg bg-gray-100 p-4 font-mono text-xs dark:bg-gray-800">
-                    <div className="mb-2 font-bold">Debug Info:</div>
-                    <div>Scan ID: {scan_id}</div>
-                    <div>Status: {status}</div>
-                    <div>
-                        Original Image URL: {currentOriginalImage || 'null'}
-                    </div>
-                    <div>1 Year URL: {simulations['1_years'] || 'null'}</div>
-                    <div>3 Years URL: {simulations['3_years'] || 'null'}</div>
-                </div>
-
                 <Card className="mt-4 bg-orange-50 p-4 outline-1 outline-orange-200 sm:p-6 sm:pl-8 dark:bg-orange-950 dark:outline-orange-800">
                     <p className="text-xs sm:text-sm">
                         <span className="font-bold text-orange-900 dark:text-orange-400">
