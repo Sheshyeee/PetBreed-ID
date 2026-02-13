@@ -12,7 +12,6 @@ class SimulationController extends Controller
 {
     /**
      * Display age simulation view
-     * Triggers async generation if not already started
      */
     public function index()
     {
@@ -26,7 +25,6 @@ class SimulationController extends Controller
 
             $result = Results::where('scan_id', $scanId)->firstOrFail();
 
-            // Trigger generation if not started
             $this->ensureSimulationStarted($result);
 
             $viewData = $this->prepareViewData($result);
@@ -51,9 +49,8 @@ class SimulationController extends Controller
         $simulationData = json_decode($result->simulation_data, true);
         $status = $simulationData['status'] ?? null;
 
-        // Only dispatch if not already generating or complete
         if (!in_array($status, ['generating', 'complete'])) {
-            Log::info("Dispatching simulation job for {$result->scan_id}");
+            Log::info("🚀 Dispatching world-class transformation for {$result->scan_id}");
 
             GenerateAgeSimulations::dispatch(
                 $result->id,
@@ -61,7 +58,6 @@ class SimulationController extends Controller
                 $result->image
             )->onQueue('simulations');
 
-            // Update status immediately
             $result->update([
                 'simulation_data' => json_encode([
                     'status' => 'queued',
@@ -80,15 +76,7 @@ class SimulationController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? [];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        // Build original image URL - handle both storage paths and full URLs
         $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
-
-        Log::info('Preparing simulation view data', [
-            'scan_id' => $result->scan_id,
-            'raw_image_path' => $result->image,
-            'built_url' => $originalImageUrl,
-            'base_url' => $baseUrl
-        ]);
 
         return [
             'scan_id' => $result->scan_id,
@@ -105,43 +93,27 @@ class SimulationController extends Controller
     }
 
     /**
-     * Build proper image URL from path
+     * Build image URL from path
      */
     private function buildImageUrl($path, $baseUrl)
     {
         if (!$path) {
-            Log::warning('buildImageUrl called with null/empty path');
             return null;
         }
 
-        // If already a full URL, return as-is
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            Log::info('Image path is already full URL', ['url' => $path]);
             return $path;
         }
 
-        // If it's an object storage path (contains 'uploads/' or 'simulations/')
         if (str_contains($path, 'uploads/') || str_contains($path, 'simulations/')) {
-            $fullUrl = $baseUrl . '/' . $path;
-            Log::info('Building object storage URL', [
-                'path' => $path,
-                'base_url' => $baseUrl,
-                'full_url' => $fullUrl
-            ]);
-            return $fullUrl;
+            return $baseUrl . '/' . $path;
         }
 
-        // Otherwise, assume it's a public storage path (for backward compatibility)
-        $assetUrl = asset('storage/' . $path);
-        Log::info('Building public storage URL', [
-            'path' => $path,
-            'asset_url' => $assetUrl
-        ]);
-        return $assetUrl;
+        return asset('storage/' . $path);
     }
 
     /**
-     * Build full URL from path (for simulations)
+     * Build full URL from path
      */
     private function buildFullUrl($path, $baseUrl)
     {
@@ -149,7 +121,7 @@ class SimulationController extends Controller
     }
 
     /**
-     * Force regenerate simulations (optional endpoint)
+     * Force regenerate simulations
      */
     public function regenerate(Request $request)
     {
@@ -162,10 +134,9 @@ class SimulationController extends Controller
 
             $result = Results::where('scan_id', $scanId)->firstOrFail();
 
-            // Clear cache
             Cache::forget("sim_status_{$scanId}");
+            Cache::forget("simulation_status_{$scanId}");
 
-            // Reset and redispatch
             $result->update([
                 'simulation_data' => json_encode([
                     'status' => 'queued',
@@ -182,7 +153,7 @@ class SimulationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Regeneration started'
+                'message' => 'World-class regeneration started'
             ]);
         } catch (\Exception $e) {
             Log::error('Regeneration error', ['error' => $e->getMessage()]);
@@ -209,7 +180,6 @@ class SimulationController extends Controller
             $simulationData = json_decode($result->simulation_data, true) ?? [];
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // Build proper image URLs
             $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
 
             return response()->json([

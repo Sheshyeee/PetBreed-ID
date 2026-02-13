@@ -12,7 +12,6 @@ class SimulationStatusController extends Controller
 {
     /**
      * Get simulation status with smart caching
-     * Uses shorter cache for generating, longer for complete
      */
     public function getStatus(Request $request)
     {
@@ -23,9 +22,7 @@ class SimulationStatusController extends Controller
                 return $this->errorResponse('No scan_id provided', 404);
             }
 
-            // Smart cache strategy: shorter TTL while generating, longer when complete
             $cacheKey = "sim_status_{$scanId}";
-
             $responseData = Cache::get($cacheKey);
 
             if (!$responseData) {
@@ -37,12 +34,12 @@ class SimulationStatusController extends Controller
 
                 $responseData = $this->buildResponse($result, $scanId);
 
-                // Adaptive caching
+                // Adaptive caching based on status
                 $status = $responseData['status'];
                 $cacheTTL = match ($status) {
-                    'complete' => 300, // 5 minutes for completed
-                    'failed' => 60,    // 1 minute for failed
-                    default => 3       // 3 seconds while generating
+                    'complete' => 300,
+                    'failed' => 60,
+                    default => 3
                 };
 
                 Cache::put($cacheKey, $responseData, $cacheTTL);
@@ -53,8 +50,7 @@ class SimulationStatusController extends Controller
                 ->header('Pragma', 'no-cache');
         } catch (\Exception $e) {
             Log::error('Simulation status error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
 
             return $this->errorResponse('Internal server error', 500);
@@ -62,7 +58,7 @@ class SimulationStatusController extends Controller
     }
 
     /**
-     * Build response data from result
+     * Build response data
      */
     private function buildResponse($result, $scanId)
     {
@@ -97,7 +93,7 @@ class SimulationStatusController extends Controller
     }
 
     /**
-     * Build full image URL
+     * Build image URL
      */
     private function buildImageUrl($path, $baseUrl)
     {
@@ -105,7 +101,7 @@ class SimulationStatusController extends Controller
     }
 
     /**
-     * Calculate generation progress
+     * Calculate progress
      */
     private function calculateProgress($simulations)
     {
@@ -121,7 +117,7 @@ class SimulationStatusController extends Controller
     }
 
     /**
-     * Error response helper
+     * Error response
      */
     private function errorResponse($message, $code)
     {
