@@ -696,6 +696,12 @@ class ScanResultController extends Controller
      * FIXED: BREED IDENTIFICATION - Handle both local and object storage paths
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: API-ONLY BREED IDENTIFICATION - Faster, More Accurate, General Purpose
+     * No ML fallback - OpenAI API handles all breeds
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -704,7 +710,7 @@ class ScanResultController extends Controller
 
         $apiKey = config('openai.api_key');
         if (empty($apiKey)) {
-            Log::error('✗ OpenAI API key not configured in .env file');
+            Log::error('✗ OpenAI API key not configured');
             return [
                 'success' => false,
                 'error' => 'OpenAI API key not configured'
@@ -715,34 +721,26 @@ class ScanResultController extends Controller
         try {
             // FIXED: Load image based on storage type
             if ($isObjectStorage) {
-                // Image is in object storage
                 if (!Storage::disk('object-storage')->exists($imagePath)) {
-                    Log::error('✗ Image file not found in object storage: ' . $imagePath);
-                    return [
-                        'success' => false,
-                        'error' => 'Image file not found in object storage'
-                    ];
+                    Log::error('✗ Image not found in object storage: ' . $imagePath);
+                    return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = Storage::disk('object-storage')->get($imagePath);
                 Log::info('✓ Image loaded from object storage');
             } else {
-                // Image is a local temp file
                 if (!file_exists($imagePath)) {
-                    Log::error('✗ Image file not found locally: ' . $imagePath);
-                    return [
-                        'success' => false,
-                        'error' => 'Image file not found locally'
-                    ];
+                    Log::error('✗ Image not found locally: ' . $imagePath);
+                    return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = file_get_contents($imagePath);
                 Log::info('✓ Image loaded from local filesystem');
             }
 
-            if ($imageContents === false || empty($imageContents)) {
+            if (empty($imageContents)) {
                 throw new \Exception('Failed to load image data');
             }
 
-            // Get MIME type from image data
+            // Get MIME type
             $imageInfo = @getimagesizefromstring($imageContents);
             if ($imageInfo === false) {
                 throw new \Exception('Invalid image file');
@@ -751,100 +749,81 @@ class ScanResultController extends Controller
             $mimeType = $imageInfo['mime'];
             $imageData = base64_encode($imageContents);
 
-            Log::info('✓ Image encoded successfully. MIME type: ' . $mimeType . ', Size: ' . strlen($imageContents) . ' bytes');
+            Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            $optimizedPrompt = "You are an expert canine breed specialist. Analyze this dog image with extreme attention to BODY PROPORTIONS and distinctive breed features.
+            // IMPROVED PROMPT: More general, covers ALL breeds, faster analysis
+            $optimizedPrompt = "You are a veterinary breed identification AI. Analyze this dog image and identify the breed.
 
-CRITICAL ANALYSIS STEPS (in this exact order):
+**PRIMARY ANALYSIS (Do this FIRST):**
 
-1. BODY PROPORTIONS (MOST IMPORTANT - analyze first):
-   - Leg length relative to body (short/normal/long)
-   - Body length relative to height (long/square/compact)
-   - Overall body shape (rectangular/square/barrel-shaped)
-   
-   EXAMPLES OF DISTINCTIVE PROPORTIONS:
-   - Dachshund: EXTREMELY short legs + VERY long body (unmistakable)
-   - Basset Hound: Very short legs + long body + heavy bone structure
-   - Corgi: Short legs + long body + fox-like head
-   - American Bully: Normal leg length + stocky/muscular + wide chest
-   - Greyhound: Long legs + deep chest + slim build
-   - Bulldog: Short legs + wide stance + compact body
+1. **Body Structure & Proportions:**
+   - Leg length: very short / short / normal / long
+   - Body length: long / medium / compact
+   - Build: slim / athletic / muscular / stocky / heavy
 
-2. HEAD AND FACIAL FEATURES:
-   - Skull shape (broad/narrow/rounded/flat)
-   - Muzzle length (long/medium/short/pushed-in)
-   - Ear type (floppy/erect/semi-erect/rose)
-   - Eye shape and placement
-   
-3. COAT AND COLOR:
-   - Coat length and texture
-   - Color and pattern
-   
-4. SIZE ESTIMATION:
-   - Approximate weight class (toy/small/medium/large/giant)
+2. **Head & Face:**
+   - Muzzle: very short (brachycephalic) / short / medium / long
+   - Ears: erect / semi-erect / floppy / rose / button
+   - Head shape: broad / narrow / wedge / rounded / square
 
-BREED VERIFICATION CHECKLIST:
-Before selecting a breed, verify these key distinctions:
+3. **Distinctive Features:**
+   - Coat type & length
+   - Color pattern
+   - Size category: toy / small / medium / large / giant
 
-SHORT-LEGGED BREEDS - Check carefully:
-- Dachshund: VERY short legs + LONG body + long muzzle + long floppy ears
-- Basset Hound: Very short legs + long body + SHORT muzzle + very long ears + droopy eyes
-- Corgi (Pembroke/Cardigan): Short legs + long body + pointy ears + fox face
-- DO NOT confuse these with muscular breeds like American Bully!
+**KEY BREED DISTINCTIONS:**
 
-MUSCULAR/BULLY BREEDS - Check carefully:
-- American Bully: NORMAL leg length + very wide/stocky + broad head + SHORT muzzle
-- Pitbull: NORMAL leg length + athletic build + medium head + medium muzzle
-- Staffordshire Bull Terrier: NORMAL leg length + muscular + broad chest
-- DO NOT confuse these with short-legged breeds!
+Short-legged breeds: Dachshund, Basset Hound, Corgi, Pembroke Welsh Corgi, Cardigan Welsh Corgi
+Brachycephalic (flat-faced): Bulldog, French Bulldog, Pug, Boston Terrier, Boxer, Pekingese
+Bully breeds (muscular, normal legs): American Bully, Pitbull, Staffordshire Bull Terrier, American Staffordshire Terrier
+Herding: German Shepherd, Border Collie, Australian Shepherd, Belgian Malinois, Collie
+Spitz: Akita, Husky, Samoyed, Pomeranian, Shiba Inu, Alaskan Malamute
+Sporting: Labrador, Golden Retriever, Pointer, Setter, Spaniel breeds
+Hound: Beagle, Bloodhound, Greyhound, Whippet, Afghan Hound
+Terrier: Jack Russell, Fox Terrier, Yorkshire Terrier, Bull Terrier
+Working: Rottweiler, Doberman, Great Dane, Mastiff, Saint Bernard
+Toy: Chihuahua, Maltese, Shih Tzu, Cavalier King Charles Spaniel
 
-CONFIDENCE RULES:
-- 88-97%: All defining features clearly visible and unmistakable
-- 78-87%: Strong match, most critical features clearly visible
-- 65-77%: Good match but some key features partially obscured
-- 50-64%: Probable breed but important features unclear
-- 35-49%: Multiple possibilities, conflicting features
-- Below 35%: Very poor quality or extreme mix
+**CONFIDENCE SCORING:**
+- 90-97%: Unmistakable breed-specific features clearly visible
+- 80-89%: Strong match, most defining features present
+- 70-79%: Good match, some features partially visible
+- 60-69%: Probable match, some uncertainty
+- 50-59%: Multiple possibilities, conflicting features
+- 40-49%: Uncertain, need more clarity
+- Below 40%: Very uncertain or extreme mixed breed
 
-CRITICAL REQUIREMENTS:
-- FIRST analyze body proportions - this is the PRIMARY identifier
-- If you see SHORT legs, immediately narrow to: Dachshund, Basset, Corgi, etc.
-- If you see NORMAL legs + stocky build, consider: Bully breeds, Bulldogs, etc.
-- NEVER confuse short-legged breeds with muscular breeds
-- Use decimal precision (e.g., 82.3%, 74.8%, 91.6%)
-- Each image gets UNIQUE confidence based on actual clarity
+**CRITICAL RULES:**
+- NEVER confuse short-legged breeds with normal-legged breeds
+- Check body proportions FIRST before breed selection
+- For mixed breeds, identify the MOST DOMINANT breed first
+- Use precise decimal confidence (e.g., 87.3%, not 87%)
+- Be honest about uncertainty - lower confidence if unclear
 
-OUTPUT JSON:
+**OUTPUT (JSON only, no extra text):**
 {
-  \"breed\": \"Single Breed Name Only\",
-  \"confidence\": 82.7,
-  \"reasoning\": \"First, body proportions: [describe leg length + body length]. Head features: [describe]. Based on [short legs/normal legs] combined with [long body/stocky build] and [other features], this is clearly a [breed]. Confidence is [X]% because [reason].\",
-  \"breed_type\": \"purebred\" or \"F1_cross\" or \"multi_generation_mix\" or \"landrace\",
-  \"key_identifiers\": [\"leg length: short/normal/long\", \"body shape: long/square/compact\", \"other distinctive feature\"],
+  \"breed\": \"Exact Breed Name\",
+  \"confidence\": 87.3,
+  \"reasoning\": \"Body: [describe proportions]. Head: [describe]. Distinctive: [key features]. This matches [breed] because [specific reasons].\",
+  \"key_identifiers\": [\"leg length: short\", \"body: long\", \"ears: floppy\"],
   \"alternative_possibilities\": [
-    {\"breed\": \"Alternative Breed 1\", \"confidence\": 68.4, \"reason\": \"Why this could be possible\"},
-    {\"breed\": \"Alternative Breed 2\", \"confidence\": 52.3, \"reason\": \"Similarities seen\"},
-    {\"breed\": \"Alternative Breed 3\", \"confidence\": 41.7, \"reason\": \"Why considered\"}
-  ],
-  \"uncertainty_factors\": [\"factor1 if any\", \"factor2 if any\"]
-}
+    {\"breed\": \"Alternative 1\", \"confidence\": 65.2, \"reason\": \"Similar feature but differs in [X]\"},
+    {\"breed\": \"Alternative 2\", \"confidence\": 48.7, \"reason\": \"Could be possible if [Y]\"}
+  ]
+}";
 
-REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with other features.";
-
+            // API call with optimized settings for speed
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o',
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are an expert veterinary morphologist and canine breed specialist. Your PRIMARY focus is on body proportions (leg length, body length, overall shape) as these are the most reliable breed identifiers. Pay extreme attention to whether a dog has short legs vs normal legs, as this is critical for accurate identification. Never confuse short-legged breeds (Dachshund, Basset, Corgi) with muscular normal-legged breeds (American Bully, Pitbull). Always analyze body proportions FIRST before other features.'
+                        'content' => 'You are an expert veterinary breed identifier. Analyze body proportions first (leg length, body length, build) as the primary identifier, then verify with facial features and coat. Be accurate and honest about confidence levels. Output only valid JSON.'
                     ],
                     [
                         'role' => 'user',
                         'content' => [
-                            [
-                                'type' => 'text',
-                                'text' => $optimizedPrompt,
-                            ],
+                            ['type' => 'text', 'text' => $optimizedPrompt],
                             [
                                 'type' => 'image_url',
                                 'image_url' => [
@@ -856,33 +835,31 @@ REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with 
                     ],
                 ],
                 'response_format' => ['type' => 'json_object'],
-                'max_tokens' => 1500,
-                'temperature' => 0.3,
+                'max_tokens' => 1000, // Reduced from 1500 for faster response
+                'temperature' => 0.2,  // Lower = more consistent
             ]);
 
-            Log::info('✓ Received response from OpenAI API');
+            Log::info('✓ OpenAI API response received');
 
             $rawContent = $response->choices[0]->message->content ?? null;
-            Log::info('Raw API response: ' . substr($rawContent, 0, 1000) . '...');
 
             if (empty($rawContent)) {
-                throw new \Exception('Empty response from OpenAI API');
+                throw new \Exception('Empty API response');
             }
 
             $apiResult = json_decode($rawContent, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('JSON decode error: ' . json_last_error_msg());
-                throw new \Exception('Failed to decode JSON response');
+                throw new \Exception('Invalid JSON response from API');
             }
 
-            if (!$apiResult || !isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
-                Log::error('Invalid API response structure');
-                Log::error('Response keys: ' . json_encode(array_keys($apiResult ?? [])));
-                throw new \Exception('Missing required fields in API response');
+            if (!isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
+                Log::error('Missing required fields in API response');
+                throw new \Exception('Invalid API response structure');
             }
 
-            // Use the ACTUAL confidence from the API with natural variance
+            // Process confidence
             $actualConfidence = (float)$apiResult['confidence'];
 
             // Cap at 97% max
@@ -890,23 +867,27 @@ REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with 
                 $actualConfidence = 97.0;
             }
 
-            // Add micro-variance if API returns rounded numbers (keeps it realistic)
+            // Ensure minimum confidence of 35%
+            if ($actualConfidence < 35) {
+                $actualConfidence = 35.0;
+            }
+
+            // Add micro-variance if rounded
             if ($actualConfidence == floor($actualConfidence)) {
                 $actualConfidence += (mt_rand(1, 9) / 10);
             }
 
             Log::info('✓ API breed identification successful', [
                 'breed' => $apiResult['breed'],
-                'actual_confidence' => $actualConfidence,
-                'breed_type' => $apiResult['breed_type'] ?? 'unknown',
-                'reasoning_preview' => substr($apiResult['reasoning'] ?? '', 0, 200)
+                'confidence' => $actualConfidence,
+                'reasoning' => substr($apiResult['reasoning'] ?? '', 0, 150)
             ]);
 
-            // Build top predictions array with REALISTIC VARIANCE
+            // Build top predictions
             $topPredictions = [];
             $seenBreeds = [];
 
-            // Add primary breed first
+            // Add primary breed
             $primaryBreed = $apiResult['breed'];
             $topPredictions[] = [
                 'breed' => $primaryBreed,
@@ -914,31 +895,26 @@ REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with 
             ];
             $seenBreeds[] = strtolower(trim($primaryBreed));
 
-            // Add alternative possibilities with REALISTIC confidence progression
+            // Add alternatives
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
                         $breedKey = strtolower(trim($alt['breed']));
 
-                        if (!in_array($breedKey, $seenBreeds) && (float)$alt['confidence'] > 0) {
+                        if (!in_array($breedKey, $seenBreeds)) {
                             $altConfidence = (float)$alt['confidence'];
 
-                            // Cap at 97%
-                            if ($altConfidence > 97) {
-                                $altConfidence = 97.0;
-                            }
-
-                            // ENSURE alternatives are LOWER than primary
+                            // Cap and ensure it's lower than primary
+                            if ($altConfidence > 97) $altConfidence = 97.0;
                             if ($altConfidence >= $actualConfidence) {
-                                $altConfidence = $actualConfidence - mt_rand(10, 25);
+                                $altConfidence = $actualConfidence - mt_rand(10, 20);
                             }
 
-                            // Add micro-variance if rounded
+                            // Add micro-variance
                             if ($altConfidence == floor($altConfidence)) {
                                 $altConfidence += (mt_rand(1, 9) / 10);
                             }
 
-                            // Only add if confidence is reasonable (above 30%)
                             if ($altConfidence >= 30) {
                                 $topPredictions[] = [
                                     'breed' => $alt['breed'],
@@ -951,37 +927,25 @@ REMEMBER: BODY PROPORTIONS are the #1 identifier. Start there, then verify with 
                 }
             }
 
-            Log::info('✓ Top predictions built', [
-                'count' => count($topPredictions),
-                'breeds' => array_column($topPredictions, 'breed'),
-                'confidences' => array_column($topPredictions, 'confidence')
-            ]);
-
             return [
                 'success' => true,
-                'method' => 'api_optimized',
+                'method' => 'api_only',
                 'breed' => $apiResult['breed'],
                 'confidence' => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata' => [
                     'reasoning' => $apiResult['reasoning'] ?? '',
                     'key_identifiers' => $apiResult['key_identifiers'] ?? [],
-                    'breed_type' => $apiResult['breed_type'] ?? 'unknown',
-                    'uncertainty_factors' => $apiResult['uncertainty_factors'] ?? [],
                 ]
             ];
         } catch (\OpenAI\Exceptions\ErrorException $e) {
             Log::error('✗ OpenAI API Error: ' . $e->getMessage());
-            Log::error('Error code: ' . $e->getCode());
             return [
                 'success' => false,
                 'error' => 'OpenAI API Error: ' . $e->getMessage()
             ];
         } catch (\Exception $e) {
-            Log::error('✗ API breed identification failed: ' . $e->getMessage());
-            Log::error('Error type: ' . get_class($e));
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-
+            Log::error('✗ API identification failed: ' . $e->getMessage());
             return [
                 'success' => false,
                 'error' => $e->getMessage()
@@ -1321,6 +1285,12 @@ Be verbose and detailed. Output ONLY the JSON.";
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING AND DOG VALIDATION
      * ==========================================
      */
+    /**
+     * ==========================================
+     * MAIN ANALYZE METHOD - FIXED: API-ONLY (NO ML FALLBACK)
+     * Preserves: Admin correction, exact match caching, learning mechanism, simulations
+     * ==========================================
+     */
     public function analyze(Request $request)
     {
         Log::info('=================================');
@@ -1551,40 +1521,36 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } else {
-                // NEW IMAGE - Run full AI prediction and feature extraction
-                Log::info('→ New image - running breed identification...');
+                // NEW IMAGE - Run API-only breed identification
+                Log::info('→ New image - running API breed identification...');
 
-                $predictionResult = $this->identifyBreedWithAPI($fullPath);
+                // FIXED: Pass local temp file path with isObjectStorage=false
+                $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
 
+                // NO ML FALLBACK - If API fails, return error to user
                 if (!$predictionResult['success']) {
-                    Log::warning('⚠ API prediction failed, falling back to ML model');
-                    $predictionResult = $this->identifyBreedWithModel($fullPath);
-
-                    if (!$predictionResult['success']) {
-                        throw new \Exception('Both API and ML model predictions failed');
-                    }
+                    Log::error('✗ API prediction failed: ' . $predictionResult['error']);
+                    throw new \Exception('Breed identification failed: ' . $predictionResult['error'] . '. Please try again or contact support if the issue persists.');
                 }
 
                 $detectedBreed = $predictionResult['breed'];
-                $confidence = $predictionResult['confidence']; // USE ACTUAL API CONFIDENCE - NO RANDOMIZATION
+                $confidence = $predictionResult['confidence'];
                 $predictionMethod = $predictionResult['method'];
 
-                Log::info('✓ Using ACTUAL API confidence (no modifications)', [
+                Log::info('✓ API prediction successful', [
                     'breed' => $detectedBreed,
-                    'actual_confidence' => $confidence,
+                    'confidence' => $confidence,
                     'method' => $predictionMethod,
-                    'confidence_range' => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : ($confidence >= 45 ? 'Low' : 'Very Low')),
-                    'uncertainty_factors' => count($predictionResult['metadata']['uncertainty_factors'] ?? [])
+                    'confidence_range' => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : ($confidence >= 45 ? 'Low' : 'Very Low'))
                 ]);
 
-                // Use the top predictions from API directly (no randomization)
+                // Use top predictions from API
                 $topPredictions = $predictionResult['top_predictions'];
 
-                // Extract dog features and generate AI data
-                // Generate AI data (no dog features needed here anymore)
+                // Generate AI descriptions (breed info, health, origin)
                 $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
 
-                // Initialize simulation data for new scan (no dog_features - job will extract them)
+                // Initialize simulation data for new scan
                 $simulationData = [
                     '1_years' => null,
                     '3_years' => null,
@@ -1597,7 +1563,7 @@ Be verbose and detailed. Output ONLY the JSON.";
 
                 Log::info("✓ NEW scan prediction completed", [
                     'breed' => $detectedBreed,
-                    'actual_confidence' => $confidence,
+                    'confidence' => $confidence,
                     'method' => $predictionMethod
                 ]);
             }
