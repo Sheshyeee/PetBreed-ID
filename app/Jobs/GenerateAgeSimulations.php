@@ -189,14 +189,9 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     $apiKey = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
 
-    // Try models in order of preference
-    // Configure your working model in .env as GEMINI_MODEL
-    $modelName = config('services.gemini.model') ?? env('GEMINI_MODEL', 'gemini-2.0-flash-thinking-exp-01-21');
-
-    // Available models (uncomment the one that works for you):
-    // - gemini-2.0-flash-thinking-exp-01-21 (current stable)
-    // - gemini-1.5-pro-latest (reliable, slower)
-    // - gemini-1.5-flash-latest (faster, good quality)
+    // Use Nano Banana Pro - the image generation model
+    // This is the same as gemini-3-pro-image-preview
+    $modelName = config('services.gemini.model') ?? env('GEMINI_MODEL', 'nano-banana-pro-preview');
 
     $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
