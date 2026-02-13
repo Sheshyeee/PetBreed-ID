@@ -80,10 +80,21 @@ class SimulationStatusController extends Controller
             '3_years' => $this->buildImageUrl($simulationData['3_years'] ?? null, $baseUrl),
         ];
 
+        // FIX: Use the same buildImageUrl method for the original image
+        $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
+
+        // Log for debugging
+        Log::info('🖼️ Image URLs built', [
+            'original_image_path' => $result->image,
+            'original_image_url' => $originalImageUrl,
+            'base_url' => $baseUrl,
+            'scan_id' => $scanId
+        ]);
+
         return [
             'status' => $status,
             'simulations' => $simulations,
-            'original_image' => $baseUrl . '/' . $result->image,
+            'original_image' => $originalImageUrl, // FIXED: Now uses buildImageUrl
             'breed' => $result->breed,
             'scan_id' => $scanId,
             'timestamp' => now()->timestamp,
@@ -93,11 +104,22 @@ class SimulationStatusController extends Controller
     }
 
     /**
-     * Build image URL
+     * Build image URL - handles both full URLs and paths
      */
     private function buildImageUrl($path, $baseUrl)
     {
-        return $path ? $baseUrl . '/' . $path : null;
+        // If path is null or empty, return null
+        if (!$path) {
+            return null;
+        }
+
+        // If it's already a full URL, return as-is
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        // Build full URL with base URL
+        return $baseUrl . '/' . $path;
     }
 
     /**
