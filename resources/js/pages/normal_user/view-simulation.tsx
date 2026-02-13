@@ -38,7 +38,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
     const MAX_POLLING_ATTEMPTS = 120;
 
-    // FIXED: Proper image URL handling
+    // FIXED: Proper image URL handling - returns the URL as-is if it's already a full URL
     const getImageUrl = useCallback((path: string | null): string => {
         if (!path) {
             console.log('⚠️ No path provided, using default');
@@ -51,9 +51,9 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
             return path;
         }
 
-        // If it's a relative path, prepend storage URL
-        console.log('🔗 Converting relative path to storage URL:', path);
-        return `/storage/${path}`;
+        // This shouldn't happen if backend is working correctly, but handle it anyway
+        console.log('⚠️ Received relative path (unexpected):', path);
+        return path; // Return as-is, might be a relative URL that works
     }, []);
 
     const hasSimulations = Boolean(
@@ -62,13 +62,23 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
     // Debug logging
     useEffect(() => {
-        console.log('🖼️ Image URLs:', {
-            originalImage: currentOriginalImage,
-            originalImageUrl: getImageUrl(currentOriginalImage),
+        console.log('🖼️ Current State:', {
+            breed,
+            originalImage_prop: originalImage,
+            currentOriginalImage_state: currentOriginalImage,
+            resolvedURL: getImageUrl(currentOriginalImage),
             simulations_1yr: simulations['1_years'],
             simulations_3yr: simulations['3_years'],
+            status,
         });
-    }, [currentOriginalImage, simulations, getImageUrl]);
+    }, [
+        currentOriginalImage,
+        simulations,
+        getImageUrl,
+        originalImage,
+        breed,
+        status,
+    ]);
 
     useEffect(() => {
         if (!isPolling || pollingAttempts >= MAX_POLLING_ATTEMPTS) {
@@ -103,9 +113,11 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
                 console.log('📥 Poll Response:', {
                     status: data.status,
-                    has_1: Boolean(data.simulations['1_years']),
-                    has_3: Boolean(data.simulations['3_years']),
                     original_image: data.original_image,
+                    has_1yr: Boolean(data.simulations['1_years']),
+                    has_3yr: Boolean(data.simulations['3_years']),
+                    simulations_1yr_url: data.simulations['1_years'],
+                    simulations_3yr_url: data.simulations['3_years'],
                     timestamp: data.timestamp,
                 });
 
@@ -288,7 +300,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             currentOriginalImage,
                                                         )}
                                                         alt="Current appearance"
-                                                        className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        className="w-full rounded-2xl object-contain shadow-lg"
                                                         key={`orig-${lastUpdate}-${currentOriginalImage}`}
                                                         onError={(e) => {
                                                             console.error(
@@ -322,7 +334,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                                 ],
                                                             )}
                                                             alt="Appearance in 1 year"
-                                                            className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            className="w-full rounded-2xl object-contain shadow-lg"
                                                             key={`1yr-${lastUpdate}-${simulations['1_years']}`}
                                                             onError={(e) => {
                                                                 console.error(
@@ -372,7 +384,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                             currentOriginalImage,
                                                         )}
                                                         alt="Current appearance"
-                                                        className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                        className="w-full rounded-2xl object-contain shadow-lg"
                                                         key={`orig2-${lastUpdate}-${currentOriginalImage}`}
                                                         onError={(e) => {
                                                             console.error(
@@ -401,7 +413,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                                                                 ],
                                                             )}
                                                             alt="Appearance in 3 years"
-                                                            className="aspect-square w-full rounded-2xl object-cover shadow-lg"
+                                                            className="w-full rounded-2xl object-contain shadow-lg"
                                                             key={`3yr-${lastUpdate}-${simulations['3_years']}`}
                                                             onError={(e) => {
                                                                 console.error(

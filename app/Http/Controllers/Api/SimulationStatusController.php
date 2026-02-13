@@ -80,21 +80,25 @@ class SimulationStatusController extends Controller
             '3_years' => $this->buildImageUrl($simulationData['3_years'] ?? null, $baseUrl),
         ];
 
-        // FIX: Use the same buildImageUrl method for the original image
+        // FIX: Properly build the original image URL
         $originalImageUrl = $this->buildImageUrl($result->image, $baseUrl);
 
-        // Log for debugging
-        Log::info('🖼️ Image URLs built', [
-            'original_image_path' => $result->image,
+        // Enhanced logging for debugging
+        Log::info('🖼️ Image URLs Debug', [
+            'scan_id' => $scanId,
+            'result_image_raw' => $result->image,
             'original_image_url' => $originalImageUrl,
             'base_url' => $baseUrl,
-            'scan_id' => $scanId
+            'simulations_1yr_path' => $simulationData['1_years'] ?? null,
+            'simulations_3yr_path' => $simulationData['3_years'] ?? null,
+            'simulations_1yr_url' => $simulations['1_years'],
+            'simulations_3yr_url' => $simulations['3_years'],
         ]);
 
         return [
             'status' => $status,
             'simulations' => $simulations,
-            'original_image' => $originalImageUrl, // FIXED: Now uses buildImageUrl
+            'original_image' => $originalImageUrl,
             'breed' => $result->breed,
             'scan_id' => $scanId,
             'timestamp' => now()->timestamp,
@@ -110,16 +114,26 @@ class SimulationStatusController extends Controller
     {
         // If path is null or empty, return null
         if (!$path) {
+            Log::info('⚠️ buildImageUrl: Path is null/empty');
             return null;
         }
 
         // If it's already a full URL, return as-is
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            Log::info('✅ buildImageUrl: Already full URL', ['path' => $path]);
             return $path;
         }
 
         // Build full URL with base URL
-        return $baseUrl . '/' . $path;
+        $fullUrl = $baseUrl . '/' . $path;
+
+        Log::info('🔗 buildImageUrl: Building URL', [
+            'input_path' => $path,
+            'base_url' => $baseUrl,
+            'output_url' => $fullUrl
+        ]);
+
+        return $fullUrl;
     }
 
     /**
