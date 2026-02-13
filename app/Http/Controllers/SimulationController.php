@@ -7,7 +7,6 @@ use App\Jobs\GenerateAgeSimulations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 
 class SimulationController extends Controller
 {
@@ -26,27 +25,14 @@ class SimulationController extends Controller
 
             $result = Results::where('scan_id', $scanId)->firstOrFail();
 
-            Log::info('🔍 Loading simulation view', [
-                'scan_id' => $scanId,
-                'result_id' => $result->id,
-                'image_path' => $result->image,
-            ]);
-
             $this->ensureSimulationStarted($result);
 
             $viewData = $this->prepareViewData($result);
-
-            Log::info('📊 View data prepared', [
-                'scan_id' => $scanId,
-                'original_image' => $viewData['original_image'],
-                'status' => $viewData['simulation_status'],
-            ]);
 
             return inertia('normal_user/view-simulation', $viewData);
         } catch (\Exception $e) {
             Log::error('Simulation view error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
                 'scan_id' => $scanId ?? 'unknown'
             ]);
 
@@ -83,33 +69,30 @@ class SimulationController extends Controller
     }
 
     /**
-     * Prepare view data with full URLs - COMPLETELY REWRITTEN
+     * Prepare view data - FIXED to match ResultController pattern EXACTLY
      */
     private function prepareViewData($result)
     {
         $simulationData = json_decode($result->simulation_data, true) ?? [];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        // Build the original image URL with multiple fallback methods
-        $originalImageUrl = $this->getFullImageUrl($result->image, $baseUrl);
+        // CRITICAL FIX: Build URL EXACTLY like ResultController does
+        $originalImageUrl = $baseUrl . '/' . $result->image;
 
-        // Verify the image exists and log detailed info
-        Log::info('🖼️ Original Image URL Building', [
-            'result_id' => $result->id,
+        Log::info('🖼️ Simulation View Data (matching ResultController pattern)', [
             'scan_id' => $result->scan_id,
-            'image_field_value' => $result->image,
+            'result_image_path' => $result->image,
             'base_url' => $baseUrl,
-            'built_url' => $originalImageUrl,
-            'exists_in_storage' => $this->checkImageExists($result->image),
+            'final_url' => $originalImageUrl,
         ]);
 
         return [
             'scan_id' => $result->scan_id,
             'breed' => $result->breed,
-            'original_image' => $originalImageUrl,
+            'original_image' => $originalImageUrl, // Now matches ResultController exactly
             'simulations' => [
-                '1_years' => $this->getFullImageUrl($simulationData['1_years'] ?? null, $baseUrl),
-                '3_years' => $this->getFullImageUrl($simulationData['3_years'] ?? null, $baseUrl),
+                '1_years' => $this->buildSimulationUrl($simulationData['1_years'] ?? null, $baseUrl),
+                '3_years' => $this->buildSimulationUrl($simulationData['3_years'] ?? null, $baseUrl),
             ],
             'simulation_status' => $simulationData['status'] ?? 'pending',
             'breed_profile' => $simulationData['breed_profile'] ?? null,
@@ -118,56 +101,20 @@ class SimulationController extends Controller
     }
 
     /**
-     * Get full image URL with validation
+     * Build simulation image URL
      */
-    private function getFullImageUrl($path, $baseUrl)
+    private function buildSimulationUrl($path, $baseUrl)
     {
         if (!$path) {
-            Log::warning('⚠️ No image path provided');
             return null;
         }
 
-        // If it's already a full URL, return it
+        // If already full URL, return as-is
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            Log::info('✅ Already full URL', ['path' => $path]);
             return $path;
         }
 
-        // Build the full URL
-        $fullUrl = rtrim($baseUrl, '/') . '/' . ltrim($path, '/');
-
-        Log::info('🔗 Built image URL', [
-            'input_path' => $path,
-            'base_url' => $baseUrl,
-            'output_url' => $fullUrl,
-        ]);
-
-        return $fullUrl;
-    }
-
-    /**
-     * Check if image exists in storage
-     */
-    private function checkImageExists($path)
-    {
-        if (!$path) {
-            return false;
-        }
-
-        try {
-            $exists = Storage::disk('object-storage')->exists($path);
-            Log::info('📁 Storage check', [
-                'path' => $path,
-                'exists' => $exists,
-            ]);
-            return $exists;
-        } catch (\Exception $e) {
-            Log::error('❌ Storage check failed', [
-                'path' => $path,
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
+        return $baseUrl . '/' . $path;
     }
 
     /**
@@ -203,7 +150,7 @@ class SimulationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'World-class regeneration started'
+                'message' => 'Regeneration started'
             ]);
         } catch (\Exception $e) {
             Log::error('Regeneration error', ['error' => $e->getMessage()]);
@@ -230,22 +177,16 @@ class SimulationController extends Controller
             $simulationData = json_decode($result->simulation_data, true) ?? [];
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // Get the full URL for original image
-            $originalImageUrl = $this->getFullImageUrl($result->image, $baseUrl);
-
-            Log::info('📡 Status check response', [
-                'scan_id' => $scanId,
-                'original_image' => $originalImageUrl,
-                'status' => $simulationData['status'] ?? 'pending',
-            ]);
+            // Match ResultController pattern
+            $originalImageUrl = $baseUrl . '/' . $result->image;
 
             return response()->json([
                 'success' => true,
                 'status' => $simulationData['status'] ?? 'pending',
                 'original_image' => $originalImageUrl,
                 'simulations' => [
-                    '1_years' => $this->getFullImageUrl($simulationData['1_years'] ?? null, $baseUrl),
-                    '3_years' => $this->getFullImageUrl($simulationData['3_years'] ?? null, $baseUrl),
+                    '1_years' => $this->buildSimulationUrl($simulationData['1_years'] ?? null, $baseUrl),
+                    '3_years' => $this->buildSimulationUrl($simulationData['3_years'] ?? null, $baseUrl),
                 ],
                 'timestamp' => now()->timestamp
             ]);

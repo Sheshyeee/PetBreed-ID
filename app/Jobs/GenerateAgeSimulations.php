@@ -131,7 +131,7 @@ class GenerateAgeSimulations implements ShouldQueue
     $prompt1Year = $this->buildExpertPrompt($breedProfile, 1);
     $prompt3Years = $this->buildExpertPrompt($breedProfile, 3);
 
-    Log::info("🎨 Using world-class AI prompting techniques");
+    Log::info("🎨 Using world-class AI prompting techniques with IDENTITY LOCK");
 
     // Parallel generation with intelligent retry
     $maxAttempts = 3;
@@ -221,9 +221,9 @@ class GenerateAgeSimulations implements ShouldQueue
         ]
       ],
       'generationConfig' => [
-        'temperature' => 0.6,        // Optimal for realistic results
-        'topK' => 64,                // Maximum quality
-        'topP' => 0.95,
+        'temperature' => 0.4,        // LOWERED from 0.6 for more consistency
+        'topK' => 40,                // LOWERED from 64 for better consistency
+        'topP' => 0.9,              // LOWERED from 0.95 for better consistency
         'maxOutputTokens' => 32768   // Maximum for Nano Banana Pro
       ],
       'safetySettings' => [
@@ -290,7 +290,7 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * Build expert-level transformation prompt
+   * Build expert-level transformation prompt with IDENTITY LOCK
    */
   private function buildExpertPrompt($profile, $years)
   {
@@ -301,292 +301,256 @@ class GenerateAgeSimulations implements ShouldQueue
     $isBrachy = $profile['brachycephalic'] ?? false;
 
     if ($years === 1) {
-      $prompt = "🎯 EXPERT PET PHOTOGRAPHY TRANSFORMATION TASK
-
-Transform this {$breed} dog to show REALISTIC, NATURAL aging after EXACTLY 1 YEAR.
+      $prompt = "🎯 CRITICAL INSTRUCTION: AGE THIS EXACT DOG
 
 ═══════════════════════════════════════════════════════
-🔬 SCIENTIFIC AGING CHANGES (1 YEAR):
+🔒 IDENTITY LOCK - ABSOLUTE REQUIREMENT 🔒
 ═══════════════════════════════════════════════════════
 
-👁️ EYE AGING:
-• Lens: Subtle cloudiness beginning (10-15% opacity increase)
-• Brightness: Reduced sparkle (15-20% less bright)
-• Color: Slight dulling of iris color
-• Detail: Very fine tear staining may appear
+THIS IS NOT A REQUEST FOR 'A {$breed}' - THIS IS THIS SPECIFIC INDIVIDUAL DOG.
 
-🎨 COAT TRANSFORMATION";
+⚠️ MANDATORY PRESERVATION (100% REQUIRED):
+✓ EXACT same coat color(s) - every single color must match
+✓ EXACT same coat pattern - every marking, spot, patch
+✓ EXACT same facial structure and features
+✓ EXACT same ear shape, size, and position
+✓ EXACT same eye color and expression
+✓ EXACT same nose color and shape
+✓ EXACT same body build and proportions
+✓ EXACT same collar or accessories (if present)
+✓ EXACT same background color and elements
+✓ EXACT same pose, angle, and camera position
+✓ EXACT same lighting direction and quality
+
+✅ YOU MAY ONLY CHANGE:
+• Add 3-7 scattered gray hairs on muzzle (subtle)
+• Very slight coat texture change (5-10% less glossy)
+• Minimal eye brightness reduction (10% less sparkle)
+• Nothing else
+
+🚨 FAILURE CONDITIONS:
+❌ If coat color changes = COMPLETE FAILURE
+❌ If markings disappear or move = COMPLETE FAILURE  
+❌ If background changes = COMPLETE FAILURE
+❌ If dog doesn't look identical = COMPLETE FAILURE
+❌ If anyone can't recognize it's the same dog = COMPLETE FAILURE
+
+═══════════════════════════════════════════════════════
+🔬 SUBTLE AGING CHANGES (1 YEAR ONLY):
+═══════════════════════════════════════════════════════
+
+👁️ MINIMAL EYE CHANGES:
+• Brightness: 10% less bright (very subtle)
+• Lens: Barely noticeable start of cloudiness
+
+🎨 MINIMAL COAT CHANGES:";
 
       switch ($coat) {
         case 'curly/fluffy':
-          $prompt .= "\n• Texture: 10-15% less bouncy and fluffy
-• Structure: Individual hairs slightly wiry
-• Volume: Minor loss, less 'puppy-like'
-• Touch: Would feel slightly coarser";
+          $prompt .= "\n• Texture: 5-10% less bouncy (very slight)
+• Quality: Minimally less fluffy";
           break;
 
         case 'double_coat':
-          $prompt .= "\n• Undercoat: Thin by 10-15%
-• Guard hairs: Lose 20% of gloss
-• Texture: Slight roughening
-• Density: Less plush overall";
+          $prompt .= "\n• Gloss: 10-15% reduction (subtle)
+• Texture: Slightly less plush";
           break;
 
         case 'long_silky':
-          $prompt .= "\n• Shine: Lose 20-25% of luster
-• Appearance: More matte finish
-• Texture: Individual strands coarser
-• Flow: Less flowing, more textured";
+          $prompt .= "\n• Shine: 10-15% less luster (subtle)
+• Texture: Slightly less flowing";
           break;
 
         default:
-          $prompt .= "\n• Shine: 15-20% reduction in gloss
-• Texture: Noticeably coarser
-• Vibrancy: Subtle color dulling
-• Quality: Less youthful appearance";
+          $prompt .= "\n• Shine: 10-15% reduction (very subtle)
+• Texture: Minimally coarser";
       }
 
-      $prompt .= "\n\n😺 FACIAL CHANGES:";
+      $prompt .= "\n\n😺 MINIMAL FACIAL CHANGES:";
 
       if ($isBrachy) {
-        $prompt .= "\n• Wrinkles: Deepen by 15-20%
-• Jowls: Slight loosening begins
-• Folds: More pronounced
-• Eyes: May appear more prominent";
+        $prompt .= "\n• Wrinkles: 10% deeper (barely visible)";
       } else {
-        $prompt .= "\n• Muzzle: Very subtle skin loosening
-• Expression lines: Slight deepening
-• Jowls: Early development starting
-• Under-eye: Subtle loosening";
+        $prompt .= "\n• Muzzle: Very subtle loosening (almost invisible)";
       }
 
-      $prompt .= "\n\n⚪ GRAYING PATTERN:";
+      $prompt .= "\n\n⚪ MINIMAL GRAYING:";
 
       switch ($grayPattern) {
         case 'minimal':
-          $prompt .= "\n• Color shift: 10% duller/darker
-• Gray hairs: NONE (breed doesn't gray)
-• Aging: Natural color fade only";
+          $prompt .= "\n• Gray hairs: NONE (breed doesn't gray)
+• Color: Slightly duller (5%)";
           break;
 
         case 'prominent':
-          $prompt .= "\n• Muzzle: 5-10 scattered silver hairs
-• Eyebrows: Very subtle graying
-• Pattern: First early signs only";
+          $prompt .= "\n• Muzzle: 3-5 scattered silver hairs ONLY
+• Very sparse and subtle";
           break;
 
         default:
-          $prompt .= "\n• Muzzle tip: 3-7 scattered gray hairs
-• Coverage: Very minimal
-• Natural: Age-appropriate for {$breed}";
+          $prompt .= "\n• Muzzle tip: 2-4 scattered gray hairs ONLY
+• Barely noticeable";
       }
 
-      $prompt .= "\n\n💪 BODY & POSTURE:";
-
-      if ($size === 'giant') {
-        $prompt .= "\n• Growth: Significant if young
-• Muscle: 5-10% softening if adult
-• Definition: Slightly less toned";
-      } elseif ($size === 'toy' || $size === 'small') {
-        $prompt .= "\n• Build: Maintains compact form
-• Changes: Minimal visible
-• Maturity: Slight proportional changes";
-      } else {
-        $prompt .= "\n• Muscle: 5-10% definition loss
-• Maturity: Slight physical development
-• Composition: Minimal changes";
-      }
-
-      $prompt .= "\n\n😌 EXPRESSION & DEMEANOR:
-• Facial expression: Calmer, more mature
-• Eye brightness: 10-15% less 'bright-eyed'
-• Wisdom: Subtle in the gaze
-• Energy: Natural maturation visible
+      $prompt .= "\n\n💪 BODY CHANGES:
+• Almost none - dog looks nearly identical
+• Maybe 5% less muscle definition
 
 ═══════════════════════════════════════════════════════
-🚫 CRITICAL PRESERVATION REQUIREMENTS:
+📸 OUTPUT REQUIREMENTS:
 ═══════════════════════════════════════════════════════
-✓ EXACT breed characteristics
-✓ IDENTICAL coat base color
-✓ SAME coat pattern/markings
-✓ ALL distinctive features
-✓ EXACT pose and position
-✓ SAME background/environment
-✓ MATCHING lighting conditions
+• MUST look like the EXACT SAME DOG, just slightly older
+• ALL unique features PERFECTLY preserved
+• Background IDENTICAL
+• Pose and angle IDENTICAL
+• Only aging effects applied (subtle!)
 
-❌ DO NOT:
-✗ Make dramatic changes (only 1 year!)
-✗ Change breed appearance
-✗ Alter markings or unique features
-✗ Change pose or background
-✗ Over-age the dog
+REMEMBER: If viewers can't instantly recognize this as the same dog, YOU HAVE FAILED.
 
-═══════════════════════════════════════════════════════
-📸 OUTPUT SPECIFICATIONS:
-═══════════════════════════════════════════════════════
-• Quality: Ultra-high resolution, professional photography
-• Style: Photorealistic, natural aging
-• Accuracy: Scientifically correct for {$breed}
-• Lighting: Match original perfectly
-• Detail: Sharp focus, crystal clear
-• Believability: 100% realistic transformation
-
-Generate the transformed image showing this {$breed} aged exactly 1 year with all changes applied naturally and professionally.";
+Generate the image now.";
     } else {
-      // 3 YEARS - SENIOR DOG
-      $prompt = "🎯 EXPERT PET PHOTOGRAPHY TRANSFORMATION TASK
-
-Transform this {$breed} dog to show REALISTIC SENIOR DOG AGING after EXACTLY 3 YEARS.
+      // 3 YEARS
+      $prompt = "🎯 CRITICAL INSTRUCTION: AGE THIS EXACT DOG
 
 ═══════════════════════════════════════════════════════
-🔬 SENIOR DOG AGING CHANGES (3 YEARS):
+🔒 IDENTITY LOCK - ABSOLUTE REQUIREMENT 🔒
+═══════════════════════════════════════════════════════
+
+THIS IS NOT A REQUEST FOR 'A SENIOR {$breed}' - THIS IS THIS SPECIFIC DOG AGED 3 YEARS.
+
+⚠️ MANDATORY PRESERVATION (100% REQUIRED):
+✓ EXACT same coat base color(s) - every color preserved
+✓ EXACT same coat pattern and markings - all preserved
+✓ EXACT same facial structure
+✓ EXACT same ear shape and position
+✓ EXACT same eye color (can be cloudier, but same color)
+✓ EXACT same nose color
+✓ EXACT same body proportions
+✓ EXACT same collar/accessories (if any)
+✓ EXACT same background and setting
+✓ EXACT same pose and angle
+✓ EXACT same lighting
+
+✅ YOU MAY CHANGE:
+• Add gray/white hairs (30-50% on muzzle and face)
+• Coat texture (coarser, less shiny)
+• Eye cloudiness (cataract-like)
+• Slight facial sagging
+• Some coat thinning
+
+🚨 NEVER CHANGE:
+❌ Coat base colors or patterns
+❌ Unique markings or spots
+❌ Background or environment
+❌ Dog's fundamental appearance
+❌ Pose or camera angle
+
+═══════════════════════════════════════════════════════
+🔬 SENIOR AGING CHANGES (3 YEARS):
 ═══════════════════════════════════════════════════════
 
 👁️ SENIOR EYE CHANGES:
-• Lens: Noticeable cloudiness/haziness (cataract-like)
-• Opacity: 40-50% cloudier than young
-• Brightness: Significantly reduced (40-50% less sparkle)
-• Color: Dull with slight milkiness
-• Tint: Possible light blue/gray lens tint
-• Tear stains: More prominent
+• Cloudiness: 30-40% (cataract-like but NOT blind-looking)
+• Brightness: 30-40% less sparkle
+• Color: SAME color but with slight milkiness
 
-🎨 SENIOR COAT TRANSFORMATION:";
+🎨 SENIOR COAT CHANGES:";
 
       switch ($coat) {
         case 'curly/fluffy':
-          $prompt .= "\n• Texture: 40-50% less fluffy, very wiry
-• Structure: Coarse replacing soft curls
-• Thinning: Noticeable, patchy areas visible
-• Softness: Lost most puppy quality
-• Appearance: Dull, dry, aged";
+          $prompt .= "\n• Texture: 30-40% less fluffy, wiry
+• Thinning: Slight, patchy areas
+• BUT: Same curly structure, same colors";
           break;
 
         case 'double_coat':
-          $prompt .= "\n• Undercoat: 40-50% thinner, patchy
-• Guard hairs: Very rough and coarse
-• Plushness: Significant loss
-• Thinning: Visible on flanks/tail
-• Shine: Completely gone";
+          $prompt .= "\n• Undercoat: 30-40% thinner
+• Guard hairs: Rougher, less glossy
+• BUT: Same coat colors and patterns";
           break;
 
         case 'long_silky':
-          $prompt .= "\n• Shine: Completely lost, very dull
-• Texture: Significantly coarse
-• Thinning: Possible visible areas
-• Silkiness: All gone
-• Quality: Dry, brittle appearance";
+          $prompt .= "\n• Shine: Significantly reduced
+• Texture: Coarser, dry appearance
+• BUT: Same hair colors";
           break;
 
         default:
-          $prompt .= "\n• Texture: Very rough and dull
-• Quality: 30-40% loss of youth
-• Appearance: Dry, brittle
-• Color: Noticeable fading
-• Overall: Clearly aged coat";
+          $prompt .= "\n• Texture: Rougher, duller
+• Quality: 30% loss
+• BUT: SAME base colors";
       }
 
       $prompt .= "\n\n😺 SENIOR FACIAL AGING:";
 
       if ($isBrachy) {
-        $prompt .= "\n• Wrinkles: 40-50% DEEPER, extensive
-• Sagging: Pronounced facial skin
-• Jowls: VERY loose, prominent
-• Around eyes/nose: Deeply set wrinkles
-• Overall: Unmistakably senior face";
+        $prompt .= "\n• Wrinkles: 30-40% deeper
+• Jowls: Looser, more prominent
+• BUT: Same facial structure";
       } else {
-        $prompt .= "\n• Sagging: Clear visible on jowls/under eyes
-• Skin: Loose around muzzle and face
-• Lines: Deeper expression lines
-• Eyes: Prominent aging around them
-• Overall: Senior face unmistakable";
+        $prompt .= "\n• Sagging: Visible on jowls
+• Skin: Looser around muzzle
+• BUT: Same face shape";
       }
 
-      $prompt .= "\n\n⚪ SENIOR GRAYING PATTERN:";
+      $prompt .= "\n\n⚪ SENIOR GRAYING:";
 
       switch ($grayPattern) {
         case 'minimal':
-          $prompt .= "\n• Color change: 30-40% darker/faded
-• Aging: Natural dulling and darkening
-• Overall: Washed out appearance
-• Gray: None (breed characteristic)";
+          $prompt .= "\n• Gray: None (breed characteristic)
+• Color: 25-30% darker/duller
+• BUT: Same base color";
           break;
 
         case 'prominent':
-          $prompt .= "\n• Muzzle: Extensive silver/gray coverage
-• Spread: Gray on eyebrows, forehead
-• Eyes/ears: Graying around them
-• Coverage: 40-60% of face gray
-• Pattern: Clear senior graying";
+          $prompt .= "\n• Muzzle: 40-60% gray coverage
+• Face: Gray around eyes/ears
+• BUT: Underlying coat color same";
           break;
 
         default:
-          $prompt .= "\n• Muzzle: 30-50% gray coverage
-• Spread: Gray around face and eyes
-• Distribution: Scattered on head/ears
-• Pattern: Age-appropriate for {$breed}";
+          $prompt .= "\n• Muzzle: 30-50% gray
+• Face: Gray scattered around
+• BUT: Base colors preserved";
       }
 
-      $prompt .= "\n\n💪 SENIOR BODY CHANGES:";
+      $prompt .= "\n\n💪 SENIOR BODY:";
 
       if ($size === 'giant') {
-        $prompt .= "\n• Posture: Possible slight stiffness
-• Muscle: 20-30% tone reduction
-• Weight: Redistribution, less athletic
-• Stance: Slightly hunched/relaxed
-• Overall: Clear senior physique";
+        $prompt .= "\n• Muscle: 20-30% softer
+• Posture: Slightly hunched
+• BUT: Same body structure";
       } elseif ($size === 'toy' || $size === 'small') {
-        $prompt .= "\n• Build: Compact but clearly senior
-• Muscle: 10-20% softening
-• Aging: Subtle throughout body
-• Appearance: Less sprightly";
+        $prompt .= "\n• Muscle: 10-20% softer
+• BUT: Compact form maintained";
       } else {
-        $prompt .= "\n• Muscle: 20-30% tone reduction
-• Weight: Slight changes visible
-• Body: Less toned, softer
-• Physique: Senior unmistakable";
+        $prompt .= "\n• Muscle: 20-30% reduced
+• BUT: Same proportions";
       }
 
-      $prompt .= "\n\n😌 SENIOR EXPRESSION:
-• Demeanor: Clearly wise, senior dog
-• Eyes: Calm, aged, experienced
-• Alertness: Less alert (not sad, just aged)
-• Wisdom: Natural senior dignity
-• Overall: Healthy senior appearance
+      $prompt .= "\n\n😌 EXPRESSION:
+• Calmer, wiser look
+• Less alert (not sad!)
+• Healthy senior dignity
 
 ═══════════════════════════════════════════════════════
-🚫 CRITICAL PRESERVATION REQUIREMENTS:
+📸 OUTPUT REQUIREMENTS:
 ═══════════════════════════════════════════════════════
-✓ EXACT breed characteristics  
-✓ IDENTICAL coat base color
-✓ SAME pattern (only add gray)
-✓ ALL distinctive markings
-✓ EXACT pose and position
-✓ SAME background
-✓ MATCHING lighting
+• MUST look like the EXACT SAME DOG, just senior
+• ALL markings and colors PRESERVED
+• Background IDENTICAL
+• Pose IDENTICAL
+• Just aged with gray hair and senior features
 
-❌ DO NOT:
-✗ Change breed appearance
-✗ Alter markings/features
-✗ Change pose or background
-✗ Make dog look sick (healthy senior only!)
+CRITICAL: Anyone looking at this should say 'That's the same dog, just older' NOT 'That's a different dog'.
 
-═══════════════════════════════════════════════════════
-📸 OUTPUT SPECIFICATIONS:
-═══════════════════════════════════════════════════════
-• Quality: Ultra-high resolution professional
-• Realism: 100% photorealistic senior transformation
-• Health: Healthy senior (not ill)
-• Accuracy: Scientifically correct aging
-• Detail: Crystal clear, sharp focus
-• Lighting: Perfect match to original
-
-Generate the transformed image showing this {$breed} as a healthy, dignified senior dog aged exactly 3 years with all changes applied naturally.";
+Generate the image now.";
     }
 
     // Add breed-specific traits
     if (!empty($profile['specific_traits'])) {
-      $prompt .= "\n\n🧬 BREED-SPECIFIC NOTES:\n";
-      foreach (array_slice($profile['specific_traits'], 0, 3) as $trait) {
+      $prompt .= "\n\n🧬 BREED NOTES (for aging only):\n";
+      foreach (array_slice($profile['specific_traits'], 0, 2) as $trait) {
         $prompt .= "• {$trait}\n";
       }
     }
@@ -615,7 +579,7 @@ Generate the transformed image showing this {$breed} as a healthy, dignified sen
     if ($this->matchBreed($breedLower, ['chihuahua', 'pomeranian', 'yorkshire', 'toy', 'papillon', 'maltese', 'shih tzu'])) {
       $profile['size_category'] = 'toy';
       $profile['aging_speed'] = 'slow';
-      $profile['specific_traits'][] = 'Toy breeds age slower, maintain youthful features longer';
+      $profile['specific_traits'][] = 'Toy breeds age slower';
     } elseif ($this->matchBreed($breedLower, ['corgi', 'beagle', 'french bulldog', 'boston terrier', 'cocker spaniel'])) {
       $profile['size_category'] = 'small';
       $profile['aging_speed'] = 'slow';
@@ -623,7 +587,7 @@ Generate the transformed image showing this {$breed} as a healthy, dignified sen
     } elseif ($this->matchBreed($breedLower, ['great dane', 'mastiff', 'saint bernard', 'newfoundland', 'wolfhound', 'leonberger', 'bernese'])) {
       $profile['size_category'] = 'giant';
       $profile['aging_speed'] = 'fast';
-      $profile['specific_traits'][] = 'Giant breeds age faster with earlier senior signs';
+      $profile['specific_traits'][] = 'Giant breeds age faster';
     } elseif ($this->matchBreed($breedLower, ['german shepherd', 'golden retriever', 'labrador', 'rottweiler', 'doberman', 'boxer', 'husky'])) {
       $profile['size_category'] = 'large';
       $profile['specific_traits'][] = 'Large breeds show moderate aging';
@@ -632,28 +596,28 @@ Generate the transformed image showing this {$breed} as a healthy, dignified sen
     // COAT TYPES
     if ($this->matchBreed($breedLower, ['poodle', 'bichon', 'maltese', 'shih tzu', 'lhasa apso', 'havanese'])) {
       $profile['coat_type'] = 'curly/fluffy';
-      $profile['specific_traits'][] = 'Curly coat becomes wiry, loses fluffiness';
+      $profile['specific_traits'][] = 'Curly coat becomes wiry with age';
     } elseif ($this->matchBreed($breedLower, ['husky', 'malamute', 'samoyed', 'chow', 'akita'])) {
       $profile['coat_type'] = 'double_coat';
-      $profile['specific_traits'][] = 'Double coat thins significantly with age';
+      $profile['specific_traits'][] = 'Double coat thins with age';
     } elseif ($this->matchBreed($breedLower, ['golden retriever', 'cocker spaniel', 'setter', 'cavalier'])) {
       $profile['coat_type'] = 'long_silky';
-      $profile['specific_traits'][] = 'Silky coat loses shine, becomes coarser';
+      $profile['specific_traits'][] = 'Silky coat loses shine';
     }
 
     // GRAYING PATTERNS
     if ($this->matchBreed($breedLower, ['rottweiler', 'doberman', 'black lab', 'pug', 'pit bull', 'scottish'])) {
       $profile['gray_pattern'] = 'minimal';
-      $profile['specific_traits'][] = 'Dark coat darkens/dulls rather than grays';
+      $profile['specific_traits'][] = 'Dark coat dulls rather than grays';
     } elseif ($this->matchBreed($breedLower, ['german shepherd', 'schnauzer', 'yorkshire', 'weimaraner'])) {
       $profile['gray_pattern'] = 'prominent';
-      $profile['specific_traits'][] = 'Grays prominently on muzzle and face';
+      $profile['specific_traits'][] = 'Grays prominently on muzzle';
     }
 
-    // BRACHYCEPHALIC (FLAT-FACED)
+    // BRACHYCEPHALIC
     if ($this->matchBreed($breedLower, ['pug', 'french bulldog', 'boston terrier', 'shih tzu', 'bulldog', 'boxer', 'mastiff'])) {
       $profile['brachycephalic'] = true;
-      $profile['specific_traits'][] = 'Facial wrinkles deepen significantly with age';
+      $profile['specific_traits'][] = 'Facial wrinkles deepen with age';
     }
 
     return $profile;
@@ -711,7 +675,6 @@ Generate the transformed image showing this {$breed} as a healthy, dignified sen
         }
 
         // Slight sharpening for better AI processing
-        // FIX: Use the correct sharpen filter with matrix
         $sharpenMatrix = [
           [-1, -1, -1],
           [-1, 16, -1],
