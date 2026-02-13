@@ -6,17 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Results;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class SimulationStatusController extends Controller
 {
     /**
      * Get the current simulation status
-     * FIXED: Now accepts scan_id as query parameter instead of relying on session
+     * SIMPLE OPTIMIZATION: Just add 5-second cache to reduce DB load
      */
     public function getStatus(Request $request)
     {
         try {
-            // Try to get scan_id from request first, fall back to session
             $scanId = $request->input('scan_id') ?? session('last_scan_id');
 
             Log::info("=== SIMULATION STATUS API CALLED ===");
@@ -36,9 +36,65 @@ class SimulationStatusController extends Controller
                 ], 404);
             }
 
-            $result = Results::where('scan_id', $scanId)->first();
+            // OPTIMIZATION: Cache the result for 5 seconds to reduce DB queries
+            // This helps when frontend is polling every 2 seconds
+            $cacheKey = "simulation_status_{$scanId}";
 
-            if (!$result) {
+            $responseData = Cache::remember($cacheKey, 5, function () use ($scanId) {
+                $result = Results::where('scan_id', $scanId)->first();
+
+                if (!$result) {
+                    return null; // Will be handled below
+                }
+
+                // Decode simulation data
+                $simulationData = json_decode($result->simulation_data, true);
+
+                Log::info("Raw simulation_data from DB: " . $result->simulation_data);
+
+                // Ensure proper structure
+                if (!$simulationData || !is_array($simulationData)) {
+                    Log::warning("Invalid simulation_data, using defaults");
+                    $simulationData = [
+                        '1_years' => null,
+                        '3_years' => null,
+                        'status' => 'pending',
+                    ];
+                }
+
+                // Build base URL from object storage
+                $baseUrl = config('filesystems.disks.object-storage.url');
+
+                // Extract status and simulations WITH FULL URLS
+                $status = $simulationData['status'] ?? 'pending';
+                $simulations = [
+                    '1_years' => $simulationData['1_years']
+                        ? $baseUrl . '/' . $simulationData['1_years']
+                        : null,
+                    '3_years' => $simulationData['3_years']
+                        ? $baseUrl . '/' . $simulationData['3_years']
+                        : null,
+                ];
+
+                // Also include original image with full URL
+                $originalImage = $baseUrl . '/' . $result->image;
+
+                Log::info("✓ Returning status: {$status}");
+                Log::info("✓ 1_years: " . ($simulations['1_years'] ? 'EXISTS' : 'NULL'));
+                Log::info("✓ 3_years: " . ($simulations['3_years'] ? 'EXISTS' : 'NULL'));
+
+                return [
+                    'status' => $status,
+                    'simulations' => $simulations,
+                    'original_image' => $originalImage,
+                    'scan_id' => $scanId,
+                    'timestamp' => now()->timestamp,
+                    'has_1_year' => !is_null($simulations['1_years']),
+                    'has_3_years' => !is_null($simulations['3_years']),
+                ];
+            });
+
+            if (!$responseData) {
                 Log::error("Result not found for scan_id: {$scanId}");
                 return response()->json([
                     'status' => 'failed',
@@ -49,52 +105,6 @@ class SimulationStatusController extends Controller
                     'message' => 'Scan not found'
                 ], 404);
             }
-
-            // Decode simulation data
-            $simulationData = json_decode($result->simulation_data, true);
-
-            Log::info("Raw simulation_data from DB: " . $result->simulation_data);
-
-            // Ensure proper structure
-            if (!$simulationData || !is_array($simulationData)) {
-                Log::warning("Invalid simulation_data, using defaults");
-                $simulationData = [
-                    '1_years' => null,
-                    '3_years' => null,
-                    'status' => 'pending',
-                ];
-            }
-
-            // Build base URL from object storage
-            $baseUrl = config('filesystems.disks.object-storage.url');
-
-            // Extract status and simulations WITH FULL URLS
-            $status = $simulationData['status'] ?? 'pending';
-            $simulations = [
-                '1_years' => $simulationData['1_years']
-                    ? $baseUrl . '/' . $simulationData['1_years']
-                    : null,
-                '3_years' => $simulationData['3_years']
-                    ? $baseUrl . '/' . $simulationData['3_years']
-                    : null,
-            ];
-
-            // Also include original image with full URL
-            $originalImage = $baseUrl . '/' . $result->image;
-
-            Log::info("✓ Returning status: {$status}");
-            Log::info("✓ 1_years: " . ($simulations['1_years'] ? 'EXISTS' : 'NULL'));
-            Log::info("✓ 3_years: " . ($simulations['3_years'] ? 'EXISTS' : 'NULL'));
-
-            $responseData = [
-                'status' => $status,
-                'simulations' => $simulations,
-                'original_image' => $originalImage,
-                'scan_id' => $scanId,
-                'timestamp' => now()->timestamp,
-                'has_1_year' => !is_null($simulations['1_years']),
-                'has_3_years' => !is_null($simulations['3_years']),
-            ];
 
             return response()->json($responseData)
                 ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
