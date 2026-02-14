@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
     Table,
     TableBody,
-    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -15,15 +15,24 @@ import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
-    ChartNoAxesCombined,
+    Activity,
+    AlertCircle,
+    ArrowDown,
+    ArrowUp,
+    BarChart3,
+    Brain,
+    CheckCircle2,
+    ChevronRight,
+    Database,
     GraduationCap,
-    ShieldCheck,
+    LineChart,
+    Minus,
     Sparkles,
+    Target,
     TrendingUp,
-    TriangleAlert,
+    Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -70,7 +79,7 @@ type PageProps = {
     accuracyBeforeCorrections?: number;
     accuracyAfterCorrections?: number;
     lastCorrectionCount?: number;
-    breedLearningProgress?: BreedLearning[]; // NEW
+    breedLearningProgress?: BreedLearning[];
 };
 
 export default function Dashboard() {
@@ -99,473 +108,807 @@ export default function Dashboard() {
     } = usePage<PageProps>().props;
 
     const [isUpdating, setIsUpdating] = useState(false);
-    const [previousCapacity, setPreviousCapacity] = useState<number | null>(
-        null,
-    );
+    const [showLearningInsights, setShowLearningInsights] = useState(true);
 
-    // Helper function to format trend percentage
+    // Format trend with sign
     const formatTrend = (trend: number) => {
-        const sign = trend >= 0 ? '+' : '';
+        const sign = trend > 0 ? '+' : '';
         return `${sign}${trend.toFixed(1)}%`;
     };
 
-    // Helper function to get trend color classes
-    const getTrendColor = (trend: number) => {
-        if (trend >= 0) {
-            return 'text-green-600 dark:text-green-400';
-        }
-        return 'text-red-600 dark:text-red-400';
+    // Get trend icon
+    const getTrendIcon = (trend: number) => {
+        if (trend > 0) return <ArrowUp className="h-3 w-3 text-green-600" />;
+        if (trend < 0) return <ArrowDown className="h-3 w-3 text-red-600" />;
+        return <Minus className="h-3 w-3 text-gray-400" />;
     };
 
-    // Calculate REALISTIC learning capacity based on actual metrics
-    const calculateLearningCapacity = () => {
+    // Get trend color
+    const getTrendColor = (trend: number, inverse = false) => {
+        if (inverse) {
+            if (trend < 0) return 'text-green-600 dark:text-green-400';
+            if (trend > 0) return 'text-red-600 dark:text-red-400';
+        } else {
+            if (trend > 0) return 'text-green-600 dark:text-green-400';
+            if (trend < 0) return 'text-red-600 dark:text-red-400';
+        }
+        return 'text-gray-600 dark:text-gray-400';
+    };
+
+    // Calculate learning health score
+    const calculateLearningHealth = () => {
+        // Memory size score (0-25 points)
         const memoryScore = Math.min(25, (memoryCount / 100) * 25);
+
+        // Breed diversity score (0-20 points)
         const diversityScore = Math.min(20, (uniqueBreedsLearned / 30) * 20);
-        const confidenceImprovementScore = Math.max(
-            0,
-            Math.min(30, confidenceTrend * 3),
-        );
+
+        // Accuracy improvement score (0-30 points)
         const accuracyScore = Math.max(
             0,
-            Math.min(25, accuracyImprovement * 2.5),
+            Math.min(30, accuracyImprovement * 3),
+        );
+
+        // Confidence trend score (0-25 points)
+        const confidenceScore = Math.max(
+            0,
+            Math.min(25, (confidenceTrend + 10) * 2.5),
         );
 
         return Math.min(
             100,
-            memoryScore +
-                diversityScore +
-                confidenceImprovementScore +
-                accuracyScore,
+            memoryScore + diversityScore + accuracyScore + confidenceScore,
         );
     };
 
-    const learningCapacity = calculateLearningCapacity();
+    const learningHealth = calculateLearningHealth();
 
+    // Get learning status
     const getLearningStatus = () => {
         if (memoryCount === 0) {
             return {
-                label: 'Not Learning Yet',
-                color: 'text-gray-600 dark:text-gray-400',
+                status: 'Not Started',
+                color: 'text-gray-600',
                 bgColor: 'bg-gray-100 dark:bg-gray-800',
-                description: 'Start correcting breeds to enable learning',
+                icon: AlertCircle,
+                description: 'Start correcting to enable learning',
             };
         }
-        if (learningCapacity >= 80) {
+        if (learningHealth >= 80) {
             return {
-                label: 'Highly Trained',
-                color: 'text-green-600 dark:text-green-400',
+                status: 'Excellent',
+                color: 'text-green-600',
                 bgColor: 'bg-green-100 dark:bg-green-950',
-                description: 'System shows strong learning progress',
+                icon: CheckCircle2,
+                description: 'System learning optimally',
             };
         }
-        if (learningCapacity >= 60) {
+        if (learningHealth >= 60) {
             return {
-                label: 'Actively Learning',
-                color: 'text-blue-600 dark:text-blue-400',
+                status: 'Good',
+                color: 'text-blue-600',
                 bgColor: 'bg-blue-100 dark:bg-blue-950',
-                description: 'Good learning progress detected',
+                icon: TrendingUp,
+                description: 'Strong learning progress',
             };
         }
-        if (learningCapacity >= 40) {
+        if (learningHealth >= 40) {
             return {
-                label: 'Building Knowledge',
-                color: 'text-yellow-600 dark:text-yellow-400',
+                status: 'Fair',
+                color: 'text-yellow-600',
                 bgColor: 'bg-yellow-100 dark:bg-yellow-950',
-                description: 'Learning in progress, needs more data',
+                icon: Activity,
+                description: 'Learning in progress',
             };
         }
         return {
-            label: 'Early Training',
-            color: 'text-orange-600 dark:text-orange-400',
+            status: 'Poor',
+            color: 'text-orange-600',
             bgColor: 'bg-orange-100 dark:bg-orange-950',
-            description: 'Just started learning, add more corrections',
+            icon: AlertCircle,
+            description: 'Needs more corrections',
         };
     };
 
     const learningStatus = getLearningStatus();
+    const StatusIcon = learningStatus.icon;
 
-    const getProgressBarColor = () => {
-        if (learningCapacity >= 80)
-            return '[&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600';
-        if (learningCapacity >= 60)
-            return '[&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-indigo-600';
-        if (learningCapacity >= 40)
-            return '[&>div]:bg-gradient-to-r [&>div]:from-yellow-500 [&>div]:to-orange-500';
-        if (learningCapacity >= 20)
-            return '[&>div]:bg-gradient-to-r [&>div]:from-orange-500 [&>div]:to-red-500';
-        return '[&>div]:bg-gradient-to-r [&>div]:from-gray-400 [&>div]:to-gray-500';
-    };
-
+    // Auto-refresh every 30 seconds
     useEffect(() => {
         const interval = setInterval(() => {
-            const correctionsUntilUpdate = 5 - (correctedBreedCount % 5);
-
-            if (correctionsUntilUpdate === 1) {
+            if (correctedBreedCount % 5 === 0) {
                 router.reload({
                     only: [
-                        'correctedBreedCount',
+                        'breedLearningProgress',
                         'memoryCount',
                         'uniqueBreedsLearned',
-                        'avgConfidence',
-                        'confidenceTrend',
-                        'memoryHitRate',
-                        'accuracyImprovement',
-                        'breedCoverage',
-                        'accuracyBeforeCorrections',
-                        'accuracyAfterCorrections',
-                        'lastCorrectionCount',
-                        'breedLearningProgress',
                     ],
-
-                    onSuccess: () => {
-                        if (
-                            lastCorrectionCount > 0 &&
-                            correctedBreedCount >= lastCorrectionCount + 5
-                        ) {
-                            setIsUpdating(true);
-                            const capacityChange = previousCapacity
-                                ? learningCapacity - previousCapacity
-                                : 0;
-
-                            toast.success('Learning Progress Updated!', {
-                                description: `+5 corrections applied. Learning capacity ${capacityChange > 0 ? 'increased' : 'updated'} to ${learningCapacity.toFixed(1)}%`,
-                                icon: (
-                                    <Sparkles className="h-4 w-4 text-green-500" />
-                                ),
-                                duration: 4000,
-                            });
-
-                            setTimeout(() => setIsUpdating(false), 1000);
-                            setPreviousCapacity(learningCapacity);
-                        }
-                    },
                 });
             }
-        }, 10000);
+        }, 30000);
 
         return () => clearInterval(interval);
-    }, [
-        correctedBreedCount,
-        lastCorrectionCount,
-        learningCapacity,
-        previousCapacity,
-    ]);
-
-    useEffect(() => {
-        if (previousCapacity === null) {
-            setPreviousCapacity(learningCapacity);
-        }
-    }, []);
-
-    const correctionsUntilUpdate = 5 - (correctedBreedCount % 5);
-
-    const metricDescriptions = {
-        memoryBank:
-            'Total number of dog image embeddings stored in the learning system. Each correction adds a new pattern to memory.',
-        breedDiversity:
-            'Number of unique dog breeds the system has learned from corrections. Higher diversity improves overall accuracy.',
-        avgConfidence:
-            'Average prediction confidence for scans this week. Higher values indicate more certain predictions.',
-        confidenceTrend:
-            'Change in average confidence compared to last week. Positive trends show learning improvement.',
-        memoryUsage:
-            'Percentage of recent scans that benefited from memory patterns. Shows how often corrections help future predictions.',
-        accuracyGain:
-            'Real improvement in high-confidence predictions (≥80%) comparing scans before vs after corrections were added.',
-        breedCoverage:
-            'Ratio of unique breeds learned vs total corrections. Shows learning efficiency and pattern diversity.',
-    };
+    }, [correctedBreedCount]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
+            <Head title="Learning Analytics Dashboard" />
 
-            <div className="flex h-full flex-col gap-6 p-4">
-                {/* Existing Stats Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card className="flex flex-row justify-between p-4 dark:bg-neutral-900">
+            <div className="flex h-full flex-col gap-6 p-4 md:p-6">
+                {/* Header Section */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                Total Scans
+                            <h1 className="text-2xl font-bold dark:text-white">
+                                Learning Analytics
                             </h1>
-                            <div className="flex items-baseline space-x-1">
-                                <p className="text-lg font-bold">
-                                    {resultCount}
-                                </p>
-                                <p
-                                    className={`text-sm font-bold ${getTrendColor(totalScansWeeklyTrend)}`}
-                                >
-                                    {formatTrend(totalScansWeeklyTrend)}
-                                </p>
-                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Real-time visualization of AI learning progress
+                            </p>
                         </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-600">
-                            <ChartNoAxesCombined className="h-5 w-5 text-white" />
+                        <div className="flex items-center gap-2">
+                            <Badge
+                                className={`${learningStatus.bgColor} ${learningStatus.color} border-0 px-3 py-1.5`}
+                            >
+                                <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
+                                {learningStatus.status}
+                            </Badge>
                         </div>
-                    </Card>
-
-                    <Card className="flex flex-row justify-between p-4 dark:bg-neutral-900">
-                        <div>
-                            <h1 className="text-sm text-gray-600 dark:text-white/70">
-                                Corrected
-                            </h1>
-                            <div className="flex items-baseline space-x-1">
-                                <p className="text-lg font-bold">
-                                    {correctedBreedCount}
-                                </p>
-                                <p
-                                    className={`text-sm font-bold ${getTrendColor(correctedWeeklyTrend)}`}
-                                >
-                                    {formatTrend(correctedWeeklyTrend)}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-600">
-                            <ShieldCheck className="h-5 w-5 text-white" />
-                        </div>
-                    </Card>
-
-                    <Card className="flex flex-row justify-between p-4 dark:bg-neutral-900">
-                        <div>
-                            <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                High Confidence
-                            </h1>
-                            <div className="flex items-baseline space-x-1">
-                                <p className="text-lg font-bold">
-                                    {highConfidenceCount}
-                                </p>
-                                <p
-                                    className={`text-sm font-bold ${getTrendColor(highConfidenceWeeklyTrend)}`}
-                                >
-                                    {formatTrend(highConfidenceWeeklyTrend)}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-600">
-                            <TrendingUp className="h-5 w-5 text-white" />
-                        </div>
-                    </Card>
-
-                    <Card className="flex flex-row justify-between p-4 dark:bg-neutral-900">
-                        <div>
-                            <h1 className="text-sm text-gray-600 dark:text-white/80">
-                                Low Confidence
-                            </h1>
-                            <div className="flex items-baseline space-x-1">
-                                <p className="text-lg font-bold">
-                                    {lowConfidenceCount}
-                                </p>
-                                <p
-                                    className={`text-sm font-bold ${getTrendColor(lowConfidenceWeeklyTrend)}`}
-                                >
-                                    {formatTrend(lowConfidenceWeeklyTrend)}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-600">
-                            <TriangleAlert className="h-5 w-5 text-white" />
-                        </div>
-                    </Card>
+                    </div>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="flex flex-col gap-4 lg:flex-row">
-                    {/* Recent Scans Table */}
-                    <Card className="flex-1 p-5 dark:bg-neutral-900">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-lg font-bold dark:text-white">
-                                    Recent Scans
-                                </h1>
-                                <h1 className="text-sm text-gray-600 dark:text-white/70">
-                                    Latest scans processed by the system.
-                                </h1>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableCaption>
-                                    A list of your recent scans.
-                                </TableCaption>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Scan ID</TableHead>
-                                        <TableHead>Breed</TableHead>
-                                        <TableHead>Confidence</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {results?.map((result) => (
-                                        <TableRow key={result.scan_id}>
-                                            <TableCell className="font-mono text-xs">
-                                                {result.scan_id}
-                                            </TableCell>
-                                            <TableCell>
-                                                {result.breed}
-                                            </TableCell>
-                                            <TableCell>
-                                                {result.confidence}%
-                                            </TableCell>
-                                            <TableCell>
-                                                {result.confidence >= 80 ? (
-                                                    <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                                                        High Confidence
-                                                    </Badge>
-                                                ) : result.confidence >= 60 ? (
-                                                    <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400">
-                                                        Medium Confidence
-                                                    </Badge>
-                                                ) : result.confidence >= 40 ? (
-                                                    <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400">
-                                                        Low Confidence
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400">
-                                                        Very Low Confidence
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* NEW: Breed Learning Progress Table */}
-                {breedLearningProgress && breedLearningProgress.length > 0 && (
-                    <Card className="p-6 dark:bg-neutral-900">
-                        <div className="mb-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-pink-600">
-                                    <GraduationCap className="h-5 w-5 text-white" />
+                {/* Learning Health Score - Hero Section */}
+                <Card className="overflow-hidden border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-blue-900 dark:from-blue-950/50 dark:to-indigo-950/50">
+                    <div className="p-6">
+                        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                            {/* Left: Score */}
+                            <div className="flex items-center gap-6">
+                                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
+                                    <div className="text-center">
+                                        <div className="text-3xl font-bold text-white">
+                                            {learningHealth.toFixed(0)}
+                                        </div>
+                                        <div className="text-xs text-blue-100">
+                                            Health
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold dark:text-white">
-                                        Breed Learning Progress
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                        Learning Health Score
                                     </h2>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Track how well the system learned each
-                                        breed from corrections
+                                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                        {learningStatus.description}
+                                    </p>
+                                    <div className="mt-3 flex items-center gap-4 text-sm">
+                                        <div className="flex items-center gap-1">
+                                            <Brain className="h-4 w-4 text-blue-600" />
+                                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                                {memoryCount} examples learned
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <GraduationCap className="h-4 w-4 text-indigo-600" />
+                                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                                {uniqueBreedsLearned} breeds
+                                                mastered
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right: Progress Bar */}
+                            <div className="w-full md:w-64">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm font-medium">
+                                        <span className="text-gray-700 dark:text-gray-300">
+                                            Learning Progress
+                                        </span>
+                                        <span className="text-gray-900 dark:text-white">
+                                            {learningHealth.toFixed(0)}%
+                                        </span>
+                                    </div>
+                                    <Progress
+                                        value={learningHealth}
+                                        className="h-3 [&>div]:bg-gradient-to-r [&>div]:from-blue-600 [&>div]:to-indigo-600"
+                                    />
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                                        {learningHealth < 40
+                                            ? 'Keep correcting to improve learning'
+                                            : learningHealth < 70
+                                              ? 'Good progress! Continue teaching'
+                                              : 'Excellent! System is well-trained'}
                                     </p>
                                 </div>
                             </div>
-                            <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                                Top {breedLearningProgress.length} Breeds
-                            </Badge>
                         </div>
+                    </div>
+                </Card>
 
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Breed</TableHead>
-                                        <TableHead className="text-center">
-                                            Examples
-                                        </TableHead>
-                                        <TableHead className="text-center">
-                                            Corrections
-                                        </TableHead>
-                                        <TableHead>Success Rate</TableHead>
-                                        <TableHead className="text-center">
-                                            Avg Confidence
-                                        </TableHead>
-                                        <TableHead>Learning Time</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {breedLearningProgress.map((breed, idx) => (
-                                        <TableRow key={breed.breed}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    {idx === 0 && (
-                                                        <Sparkles className="h-4 w-4 text-yellow-500" />
-                                                    )}
-                                                    {breed.breed}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge
-                                                    variant="outline"
-                                                    className="font-mono"
-                                                >
-                                                    {breed.examples_learned}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge
-                                                    variant="outline"
-                                                    className="font-mono"
-                                                >
-                                                    {breed.corrections_made}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Progress
-                                                        value={
-                                                            breed.success_rate
-                                                        }
-                                                        className={`h-2 w-24 ${
-                                                            breed.success_rate >=
-                                                            80
-                                                                ? '[&>div]:bg-green-600'
-                                                                : breed.success_rate >=
-                                                                    60
-                                                                  ? '[&>div]:bg-yellow-500'
-                                                                  : '[&>div]:bg-orange-500'
-                                                        }`}
-                                                    />
-                                                    <span className="w-12 text-xs font-semibold">
-                                                        {breed.success_rate}%
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <span
-                                                    className={`font-bold ${
-                                                        breed.avg_confidence >=
-                                                        80
-                                                            ? 'text-green-600 dark:text-green-400'
-                                                            : breed.avg_confidence >=
-                                                                60
-                                                              ? 'text-yellow-600 dark:text-yellow-400'
-                                                              : 'text-orange-600 dark:text-orange-400'
-                                                    }`}
-                                                >
-                                                    {breed.avg_confidence}%
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                    <div>
-                                                        {breed.days_learning}{' '}
-                                                        days
-                                                    </div>
-                                                    <div className="text-xs opacity-75">
-                                                        Since{' '}
-                                                        {breed.first_learned}
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                {/* Key Metrics - 4 Column Grid */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* Total Scans */}
+                    <Card className="p-5 dark:bg-neutral-900">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                    Total Scans
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                        {resultCount}
+                                    </p>
+                                    <div
+                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(totalScansWeeklyTrend)}`}
+                                    >
+                                        {getTrendIcon(totalScansWeeklyTrend)}
+                                        <span>
+                                            {formatTrend(totalScansWeeklyTrend)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    vs last week
+                                </p>
+                            </div>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950">
+                                <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            </div>
                         </div>
+                    </Card>
 
-                        <div className="mt-4 rounded-lg bg-purple-50 p-3 dark:bg-purple-950/20">
-                            <p className="text-xs text-purple-800 dark:text-purple-300">
-                                💡 <strong>Success Rate</strong> shows how many
-                                recent scans (last 10) got high confidence
-                                (≥80%) for each breed. Higher rates mean better
-                                learning!
+                    {/* Corrections Made */}
+                    <Card className="p-5 dark:bg-neutral-900">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                    Corrections Made
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                        {correctedBreedCount}
+                                    </p>
+                                    <div
+                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(correctedWeeklyTrend)}`}
+                                    >
+                                        {getTrendIcon(correctedWeeklyTrend)}
+                                        <span>
+                                            {formatTrend(correctedWeeklyTrend)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Teaching the AI
+                                </p>
+                            </div>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
+                                <GraduationCap className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* High Confidence */}
+                    <Card className="p-5 dark:bg-neutral-900">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                    High Confidence
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                        {highConfidenceCount}
+                                    </p>
+                                    <div
+                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(highConfidenceWeeklyTrend)}`}
+                                    >
+                                        {getTrendIcon(
+                                            highConfidenceWeeklyTrend,
+                                        )}
+                                        <span>
+                                            {formatTrend(
+                                                highConfidenceWeeklyTrend,
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    ≥80% confidence
+                                </p>
+                            </div>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 dark:bg-green-950">
+                                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Low Confidence */}
+                    <Card className="p-5 dark:bg-neutral-900">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                    Low Confidence
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                        {lowConfidenceCount}
+                                    </p>
+                                    <div
+                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(lowConfidenceWeeklyTrend, true)}`}
+                                    >
+                                        {getTrendIcon(lowConfidenceWeeklyTrend)}
+                                        <span>
+                                            {formatTrend(
+                                                lowConfidenceWeeklyTrend,
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    ≤40% confidence
+                                </p>
+                            </div>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950">
+                                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Learning Impact Metrics - 3 Column */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {/* Accuracy Improvement */}
+                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 dark:from-green-950/30 dark:to-emerald-950/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                                    Accuracy Improvement
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-4xl font-bold text-green-900 dark:text-green-300">
+                                        {accuracyImprovement >= 0 ? '+' : ''}
+                                        {accuracyImprovement.toFixed(1)}%
+                                    </p>
+                                </div>
+                                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                                    Before:{' '}
+                                    {accuracyBeforeCorrections.toFixed(1)}% →
+                                    After: {accuracyAfterCorrections.toFixed(1)}
+                                    %
+                                </p>
+                            </div>
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-200 dark:bg-green-900">
+                                <Target className="h-7 w-7 text-green-700 dark:text-green-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
+                            <p className="text-xs font-medium text-green-800 dark:text-green-200">
+                                💡 <strong>Real Impact:</strong> The system now
+                                makes {accuracyImprovement.toFixed(1)}% more
+                                high-confidence predictions since you started
+                                correcting!
                             </p>
                         </div>
                     </Card>
+
+                    {/* Avg Confidence Trend */}
+                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 dark:from-blue-950/30 dark:to-indigo-950/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                                    Avg Confidence Score
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-4xl font-bold text-blue-900 dark:text-blue-300">
+                                        {avgConfidence.toFixed(1)}%
+                                    </p>
+                                    <div
+                                        className={`flex items-center gap-0.5 text-lg font-bold ${getTrendColor(confidenceTrend)}`}
+                                    >
+                                        {getTrendIcon(confidenceTrend)}
+                                        <span className="text-base">
+                                            {confidenceTrend.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                    This week vs last week
+                                </p>
+                            </div>
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-200 dark:bg-blue-900">
+                                <LineChart className="h-7 w-7 text-blue-700 dark:text-blue-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
+                            <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
+                                📈 <strong>Trend:</strong>{' '}
+                                {confidenceTrend > 0
+                                    ? 'Confidence is rising! Learning is working.'
+                                    : confidenceTrend < 0
+                                      ? 'Confidence dipped this week - keep correcting!'
+                                      : 'Confidence is stable.'}
+                            </p>
+                        </div>
+                    </Card>
+
+                    {/* Memory Hit Rate */}
+                    <Card className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 dark:from-purple-950/30 dark:to-pink-950/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-purple-700 dark:text-purple-400">
+                                    Memory Usage Rate
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-4xl font-bold text-purple-900 dark:text-purple-300">
+                                        {memoryHitRate.toFixed(1)}%
+                                    </p>
+                                </div>
+                                <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
+                                    {memoryCount > 0
+                                        ? `${memoryCount} patterns stored`
+                                        : 'No patterns yet'}
+                                </p>
+                            </div>
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-200 dark:bg-purple-900">
+                                <Database className="h-7 w-7 text-purple-700 dark:text-purple-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
+                            <p className="text-xs font-medium text-purple-800 dark:text-purple-200">
+                                🧠 <strong>Memory:</strong>{' '}
+                                {memoryHitRate > 50
+                                    ? 'Memory is actively helping predictions!'
+                                    : 'Add more corrections to boost memory usage.'}
+                            </p>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Breed Learning Progress Table */}
+                {breedLearningProgress && breedLearningProgress.length > 0 && (
+                    <Card className="overflow-hidden dark:bg-neutral-900">
+                        <div className="border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-6 dark:border-gray-800 dark:from-indigo-950/50 dark:to-purple-950/50">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg">
+                                        <Sparkles className="h-6 w-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                                            Breed Mastery Levels
+                                        </h2>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                            Track AI learning progress for each
+                                            breed
+                                        </p>
+                                    </div>
+                                </div>
+                                <Badge className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-white">
+                                    {breedLearningProgress.length} Breeds
+                                    Learned
+                                </Badge>
+                            </div>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-b-2 border-gray-200 dark:border-gray-800">
+                                            <TableHead className="font-bold">
+                                                Rank
+                                            </TableHead>
+                                            <TableHead className="font-bold">
+                                                Breed Name
+                                            </TableHead>
+                                            <TableHead className="text-center font-bold">
+                                                AI Memory
+                                            </TableHead>
+                                            <TableHead className="text-center font-bold">
+                                                Your Teaching
+                                            </TableHead>
+                                            <TableHead className="font-bold">
+                                                Success Rate
+                                            </TableHead>
+                                            <TableHead className="text-center font-bold">
+                                                Avg Confidence
+                                            </TableHead>
+                                            <TableHead className="font-bold">
+                                                Learning Duration
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {breedLearningProgress.map(
+                                            (breed, idx) => {
+                                                const masteryLevel =
+                                                    breed.success_rate >= 90
+                                                        ? 'Master'
+                                                        : breed.success_rate >=
+                                                            75
+                                                          ? 'Expert'
+                                                          : breed.success_rate >=
+                                                              60
+                                                            ? 'Proficient'
+                                                            : 'Learning';
+                                                const masteryColor =
+                                                    breed.success_rate >= 90
+                                                        ? 'text-purple-600 bg-purple-100 dark:bg-purple-950 dark:text-purple-300'
+                                                        : breed.success_rate >=
+                                                            75
+                                                          ? 'text-blue-600 bg-blue-100 dark:bg-blue-950 dark:text-blue-300'
+                                                          : breed.success_rate >=
+                                                              60
+                                                            ? 'text-green-600 bg-green-100 dark:bg-green-950 dark:text-green-300'
+                                                            : 'text-orange-600 bg-orange-100 dark:bg-orange-950 dark:text-orange-300';
+
+                                                return (
+                                                    <TableRow
+                                                        key={breed.breed}
+                                                        className="hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                                                    >
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                {idx === 0 && (
+                                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
+                                                                        <span className="text-xs font-bold text-white">
+                                                                            1
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {idx === 1 && (
+                                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-gray-300 to-gray-400">
+                                                                        <span className="text-xs font-bold text-white">
+                                                                            2
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {idx === 2 && (
+                                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600">
+                                                                        <span className="text-xs font-bold text-white">
+                                                                            3
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {idx > 2 && (
+                                                                    <span className="text-sm font-semibold text-gray-500">
+                                                                        #
+                                                                        {idx +
+                                                                            1}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold text-gray-900 dark:text-white">
+                                                                    {
+                                                                        breed.breed
+                                                                    }
+                                                                </span>
+                                                                <Badge
+                                                                    className={`text-xs ${masteryColor}`}
+                                                                >
+                                                                    {
+                                                                        masteryLevel
+                                                                    }
+                                                                </Badge>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="font-mono font-bold"
+                                                            >
+                                                                {
+                                                                    breed.examples_learned
+                                                                }{' '}
+                                                                examples
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="font-mono font-bold"
+                                                            >
+                                                                {
+                                                                    breed.corrections_made
+                                                                }{' '}
+                                                                corrections
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-3">
+                                                                <Progress
+                                                                    value={
+                                                                        breed.success_rate
+                                                                    }
+                                                                    className={`h-2.5 w-32 ${
+                                                                        breed.success_rate >=
+                                                                        80
+                                                                            ? '[&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600'
+                                                                            : breed.success_rate >=
+                                                                                60
+                                                                              ? '[&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-indigo-600'
+                                                                              : '[&>div]:bg-gradient-to-r [&>div]:from-yellow-500 [&>div]:to-orange-500'
+                                                                    }`}
+                                                                />
+                                                                <span
+                                                                    className={`text-sm font-bold ${
+                                                                        breed.success_rate >=
+                                                                        80
+                                                                            ? 'text-green-600 dark:text-green-400'
+                                                                            : breed.success_rate >=
+                                                                                60
+                                                                              ? 'text-blue-600 dark:text-blue-400'
+                                                                              : 'text-orange-600 dark:text-orange-400'
+                                                                    }`}
+                                                                >
+                                                                    {
+                                                                        breed.success_rate
+                                                                    }
+                                                                    %
+                                                                </span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <span
+                                                                className={`text-lg font-bold ${
+                                                                    breed.avg_confidence >=
+                                                                    85
+                                                                        ? 'text-green-600 dark:text-green-400'
+                                                                        : breed.avg_confidence >=
+                                                                            70
+                                                                          ? 'text-blue-600 dark:text-blue-400'
+                                                                          : 'text-orange-600 dark:text-orange-400'
+                                                                }`}
+                                                            >
+                                                                {
+                                                                    breed.avg_confidence
+                                                                }
+                                                                %
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-sm">
+                                                                <div className="font-semibold text-gray-900 dark:text-white">
+                                                                    {
+                                                                        breed.days_learning
+                                                                    }{' '}
+                                                                    days
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    Since{' '}
+                                                                    {
+                                                                        breed.first_learned
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            },
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Explanation Box */}
+                            <div className="mt-6 grid gap-4 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-6 md:grid-cols-2 dark:from-indigo-950/30 dark:to-purple-950/30">
+                                <div className="flex gap-3">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900">
+                                        <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                                            Success Rate
+                                        </h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                            % of recent scans (last 10) that got
+                                            ≥80% confidence. Higher = Better
+                                            learning!
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900">
+                                        <Brain className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                                            AI Memory vs Your Teaching
+                                        </h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                            AI Memory = patterns learned. Your
+                                            Teaching = corrections made. Both
+                                            improve accuracy!
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
                 )}
+
+                {/* Recent Scans Table */}
+                <Card className="dark:bg-neutral-900">
+                    <div className="border-b border-gray-200 p-6 dark:border-gray-800">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                                    Recent Scans
+                                </h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Latest predictions from the system
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    router.visit('/model/scan-results')
+                                }
+                            >
+                                View All
+                                <ChevronRight className="ml-1 h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Scan ID</TableHead>
+                                    <TableHead>Breed</TableHead>
+                                    <TableHead>Confidence</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {results?.map((result) => (
+                                    <TableRow key={result.scan_id}>
+                                        <TableCell className="font-mono text-xs">
+                                            {result.scan_id}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {result.breed}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Progress
+                                                    value={result.confidence}
+                                                    className="h-2 w-20"
+                                                />
+                                                <span className="text-sm font-semibold">
+                                                    {result.confidence}%
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {result.confidence >= 80 ? (
+                                                <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                                    High
+                                                </Badge>
+                                            ) : result.confidence >= 60 ? (
+                                                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400">
+                                                    Medium
+                                                </Badge>
+                                            ) : result.confidence >= 40 ? (
+                                                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400">
+                                                    Low
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400">
+                                                    Very Low
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </Card>
             </div>
         </AppLayout>
     );
