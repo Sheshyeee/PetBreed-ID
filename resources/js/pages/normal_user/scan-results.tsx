@@ -100,7 +100,7 @@ const ScanResults = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-10 lg:px-8">
+            <main className="mx-auto w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-8">
                 {/* Page Header */}
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>

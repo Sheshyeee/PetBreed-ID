@@ -80,7 +80,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 pb-10 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-5xl px-4 pt-4 pb-8 sm:px-10 md:px-8">
+            <main className="mx-auto w-full max-w-5xl px-8 pt-4 pb-8 sm:px-8 md:px-8">
                 {/* --- Header Section --- */}
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
