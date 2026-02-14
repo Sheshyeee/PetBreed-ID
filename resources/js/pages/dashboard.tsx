@@ -236,26 +236,6 @@ export default function Dashboard() {
 
             <div className="flex h-full flex-col gap-6 p-4 md:p-6">
                 {/* Header Section */}
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold dark:text-white">
-                                Learning Analytics
-                            </h1>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Real-time visualization of AI learning progress
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge
-                                className={`${learningStatus.bgColor} ${learningStatus.color} border-0 px-3 py-1.5`}
-                            >
-                                <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
-                                {learningStatus.status}
-                            </Badge>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Learning Health Score - Hero Section */}
                 <Card className="overflow-hidden border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-blue-900 dark:from-blue-950/50 dark:to-indigo-950/50">
@@ -832,7 +812,7 @@ export default function Dashboard() {
 
                 {/* Recent Scans Table */}
                 <Card className="dark:bg-neutral-900">
-                    <div className="border-b border-gray-200 p-6 dark:border-gray-800">
+                    <div className="border-b border-gray-200 px-6 py-0 dark:border-gray-800">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -857,7 +837,7 @@ export default function Dashboard() {
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
-                                <TableRow>
+                                <TableRow className="mx-auto">
                                     <TableHead>Scan ID</TableHead>
                                     <TableHead>Breed</TableHead>
                                     <TableHead>Confidence</TableHead>
@@ -866,7 +846,10 @@ export default function Dashboard() {
                             </TableHeader>
                             <TableBody>
                                 {results?.map((result) => (
-                                    <TableRow key={result.scan_id}>
+                                    <TableRow
+                                        key={result.scan_id}
+                                        className="mx-auto"
+                                    >
                                         <TableCell className="font-mono text-xs">
                                             {result.scan_id}
                                         </TableCell>
