@@ -119,7 +119,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
 
     return (
         <AlertDialog open={isOpen}>
-            <AlertDialogContent className="max-w-md border-0 bg-white p-0 shadow-xl dark:bg-gray-900">
+            <AlertDialogContent className="mx-4 max-w-md border-0 bg-white p-0 shadow-xl sm:mx-0 dark:bg-gray-900">
                 {/* Header Section with Gradient */}
                 <div className="relative overflow-hidden rounded-t-lg bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 px-6 pt-6 pb-8">
                     {/* Animated Background Pattern */}

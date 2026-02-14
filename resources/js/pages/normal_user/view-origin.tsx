@@ -80,17 +80,17 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 pb-10 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-5xl px-8 pt-4 pb-8 sm:px-8 md:px-8">
+            <main className="mx-auto mt-[-45px] w-full max-w-5xl px-8 pt-4 pb-8 sm:px-8 md:px-8">
                 {/* --- Header Section --- */}
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
+                        <h1 className="text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
                             {results?.breed || 'Breed'} Origin & History
                         </h1>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        <p className="mt-[-2] text-sm text-gray-600 dark:text-gray-400">
                             Breed heritage and evolution
                         </p>
                     </div>
@@ -98,7 +98,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- Geographic Origin Card --- */}
                 <Card className="mt-6 flex flex-col border-cyan-200 bg-cyan-50 p-8 sm:p-10 md:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
-                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Geographic Origin
                     </h2>
 
@@ -114,11 +114,11 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                                         <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                             {country}
                                         </h3>
-                                        <p className="mt-1 text-base text-gray-700 dark:text-gray-300">
+                                        <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
                                             {region}
                                         </p>
                                     </div>
-                                    <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300">
+                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                                         {description}
                                     </p>
                                 </div>
@@ -146,7 +146,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- History Timeline Card --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
                         History Timeline
                     </h2>
 
@@ -161,7 +161,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                                         <span className="min-w-[100px] text-base font-bold text-cyan-700 dark:text-cyan-400">
                                             {item.year}
                                         </span>
-                                        <p className="mt-2 text-base leading-relaxed text-gray-700 sm:mt-0 dark:text-gray-300">
+                                        <p className="mt-2 text-sm leading-relaxed text-gray-700 sm:mt-0 dark:text-gray-300">
                                             {item.event}
                                         </p>
                                     </div>
@@ -177,7 +177,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- Detailed History Accordion --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Detailed History
                     </h2>
 
@@ -192,7 +192,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                                     <AccordionTrigger className="text-left text-base font-bold text-gray-900 hover:text-gray-700 sm:text-lg dark:text-white dark:hover:text-gray-300">
                                         {detail.title}
                                     </AccordionTrigger>
-                                    <AccordionContent className="flex flex-col gap-2 pt-2 text-base leading-relaxed text-gray-700 dark:text-gray-300">
+                                    <AccordionContent className="flex flex-col gap-2 pt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                                         {detail.content}
                                     </AccordionContent>
                                 </AccordionItem>

@@ -206,16 +206,16 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-8">
+            <main className="mx-auto mt-[-45px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-8">
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div className="flex-1">
-                        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
+                        <h1 className="text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Future Appearance Simulation
                         </h1>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        <p className="mt-[-4] text-sm text-gray-600 dark:text-gray-400">
                             See how your {breed} will look 1 and 3 years from
                             now
                         </p>
