@@ -88,7 +88,7 @@ export default function ReviewDog() {
                                 src={result?.image}
                                 alt="Scanned Dog"
                                 className="max-h-[300px] w-auto rounded-lg object-contain shadow-md lg:max-h-[400px]"
-                            />
+                        />
                         </div>
 
                         {/* Metadata Section */}

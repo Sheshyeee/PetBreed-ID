@@ -2033,98 +2033,206 @@ Be verbose and detailed. Output ONLY the JSON.";
 
     public function correctBreed(Request $request)
     {
+        // Validate input
         $validated = $request->validate([
             'scan_id' => 'required|string',
             'correct_breed' => 'required|string|max:255',
         ]);
 
-        $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
-
-        // Update the result's pending status to 'verified'
-        $result->update([
-            'pending' => 'verified',
-            'breed' => $validated['correct_breed'],
-            'confidence' => 100.0,
-        ]);
-
-        BreedCorrection::create([
-            'scan_id' => $result->scan_id,
-            'image_path' => $result->image,
-            'original_breed' => $result->breed,
-            'corrected_breed' => $validated['correct_breed'],
-            'status' => 'Added',
-        ]);
-
-        // ✨ CREATE NOTIFICATION FOR USER
-        if ($result->user_id) {
-            \App\Models\Notification::create([
-                'user_id' => $result->user_id,
-                'type' => 'scan_verified',
-                'title' => 'Scan Verified by Veterinarian',
-                'message' => "Your scan has been verified! The breed has been confirmed as {$validated['correct_breed']}.",
-                'data' => [
-                    'scan_id' => $result->scan_id,
-                    'breed' => $validated['correct_breed'],
-                    'original_breed' => $result->breed,
-                    'confidence' => 100.0,
-                    'image' => $result->image,
-                ],
-            ]);
-
-            Log::info('✓ Notification created for user', [
-                'user_id' => $result->user_id,
-                'scan_id' => $result->scan_id,
-                'breed' => $validated['correct_breed']
-            ]);
-        }
-
-        // ML API learning - FIXED FOR OBJECT STORAGE
         try {
-            $mlService = new \App\Services\MLApiService();
+            // Find the scan result
+            $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
 
-            // DOWNLOAD IMAGE FROM OBJECT STORAGE TO TEMP FILE
-            $imageContents = Storage::disk('object-storage')->get($result->image);
+            // ✅ FIX #3: Store ORIGINAL breed BEFORE updating
+            $originalBreed = $result->breed;
+            $originalConfidence = $result->confidence;
 
-            if ($imageContents === false) {
-                throw new \Exception('Failed to download image from object storage');
-            }
-
-            // Create temporary file
-            $tempPath = tempnam(sys_get_temp_dir(), 'ml_learn_');
-            $extension = pathinfo($result->image, PATHINFO_EXTENSION);
-            $tempPathWithExt = $tempPath . '.' . $extension;
-            rename($tempPath, $tempPathWithExt);
-
-            file_put_contents($tempPathWithExt, $imageContents);
-
-            Log::info('✓ Image downloaded from object storage to temp file', [
-                'temp_path' => $tempPathWithExt,
-                'file_size' => strlen($imageContents)
+            Log::info('📝 Starting breed correction', [
+                'scan_id' => $validated['scan_id'],
+                'original_breed' => $originalBreed,
+                'original_confidence' => $originalConfidence,
+                'corrected_breed' => $validated['correct_breed']
             ]);
 
-            // Now send to ML API
-            $learnResult = $mlService->learnBreed($tempPathWithExt, $validated['correct_breed']);
+            // Normalize breed name (lowercase, trimmed)
+            $normalizedCorrectBreed = strtolower(trim($validated['correct_breed']));
 
-            // Clean up temp file
-            if (file_exists($tempPathWithExt)) {
-                unlink($tempPathWithExt);
+            // ============================================================================
+            // STEP 1: CREATE CORRECTION RECORD (BEFORE UPDATING RESULT)
+            // ============================================================================
+
+            // ✅ FIX #2: Store just the relative path, not the full URL
+            $imagePath = $result->image; // This should be like "scans/users/1/abc123.jpg"
+
+            $correction = BreedCorrection::create([
+                'scan_id' => $result->scan_id,
+                'image_path' => $imagePath, // Relative path for flexibility
+                'original_breed' => $originalBreed, // ✅ Now correctly stores AI's prediction
+                'corrected_breed' => $validated['correct_breed'], // Human's correction
+                'confidence' => $originalConfidence,
+                'status' => 'Added to Memory',
+            ]);
+
+            Log::info('✓ Correction record created', [
+                'correction_id' => $correction->id,
+                'original_breed' => $originalBreed,
+                'corrected_breed' => $validated['correct_breed']
+            ]);
+
+            // ============================================================================
+            // STEP 2: UPDATE SCAN RESULT
+            // ============================================================================
+
+            $result->update([
+                'pending' => 'verified',
+                'breed' => $validated['correct_breed'], // Update to corrected breed
+                'confidence' => 100.0, // Admin verified = 100%
+            ]);
+
+            Log::info('✓ Result updated to verified', [
+                'scan_id' => $result->scan_id,
+                'new_breed' => $validated['correct_breed']
+            ]);
+
+            // ============================================================================
+            // STEP 3: NOTIFY USER
+            // ============================================================================
+
+            if ($result->user_id) {
+                \App\Models\Notification::create([
+                    'user_id' => $result->user_id,
+                    'type' => 'scan_verified',
+                    'title' => 'Scan Verified by Veterinarian',
+                    'message' => "Your scan has been verified! The breed has been confirmed as {$validated['correct_breed']}.",
+                    'data' => [
+                        'scan_id' => $result->scan_id,
+                        'breed' => $validated['correct_breed'],
+                        'original_breed' => $originalBreed,
+                        'confidence' => 100.0,
+                        'image' => $result->image,
+                    ],
+                ]);
+
+                Log::info('✓ User notified', [
+                    'user_id' => $result->user_id,
+                    'scan_id' => $result->scan_id
+                ]);
             }
 
-            if ($learnResult['success']) {
-                Log::info("✓ ML API learning successful", [
-                    'status' => $learnResult['status'],
-                    'breed' => $learnResult['breed']
+            // ============================================================================
+            // STEP 4: TEACH ML API (THE CRITICAL LEARNING STEP)
+            // ============================================================================
+
+            try {
+                $mlService = new \App\Services\MLApiService();
+
+                // Download image from object storage to temporary file
+                $imageContents = Storage::disk('object-storage')->get($result->image);
+
+                if ($imageContents === false) {
+                    throw new \Exception('Failed to download image from object storage: ' . $result->image);
+                }
+
+                // Create temporary file with correct extension
+                $tempPath = tempnam(sys_get_temp_dir(), 'ml_learn_');
+                $extension = pathinfo($result->image, PATHINFO_EXTENSION) ?: 'jpg';
+                $tempPathWithExt = $tempPath . '.' . $extension;
+
+                // Rename to add extension
+                if (file_exists($tempPath)) {
+                    rename($tempPath, $tempPathWithExt);
+                }
+
+                // Write image content to temp file
+                file_put_contents($tempPathWithExt, $imageContents);
+
+                Log::info('✓ Image downloaded from object storage', [
+                    'temp_path' => $tempPathWithExt,
+                    'file_size' => strlen($imageContents),
+                    'extension' => $extension
                 ]);
-            } else {
-                Log::warning("ML API learning failed", [
-                    'error' => $learnResult['error'] ?? 'Unknown error'
+
+                // Send to ML API for learning
+                $learnResult = $mlService->learnBreed(
+                    $tempPathWithExt,
+                    $normalizedCorrectBreed // ✅ Send normalized breed name
+                );
+
+                // Clean up temp file
+                if (file_exists($tempPathWithExt)) {
+                    unlink($tempPathWithExt);
+                    Log::debug('✓ Temp file cleaned up', ['path' => $tempPathWithExt]);
+                }
+
+                // Check learning result
+                if ($learnResult['success']) {
+                    $status = $learnResult['status']; // 'added', 'updated', or 'skipped'
+
+                    // Update correction status based on ML API response
+                    $correction->update([
+                        'status' => ucfirst($status) . ' to ML Memory'
+                    ]);
+
+                    Log::info('✓✓✓ ML API LEARNING SUCCESSFUL ✓✓✓', [
+                        'scan_id' => $result->scan_id,
+                        'status' => $status,
+                        'message' => $learnResult['message'],
+                        'breed' => $learnResult['breed']
+                    ]);
+
+                    return redirect('/model/scan-results')->with(
+                        'success',
+                        "✓ Correction saved! ML Status: {$learnResult['message']}"
+                    );
+                } else {
+                    Log::warning('ML API learning failed (correction still saved)', [
+                        'scan_id' => $result->scan_id,
+                        'error' => $learnResult['error'] ?? 'Unknown error'
+                    ]);
+
+                    $correction->update([
+                        'status' => 'Saved (ML Error)'
+                    ]);
+
+                    return redirect('/model/scan-results')->with(
+                        'warning',
+                        'Correction saved, but ML learning failed. System will retry later.'
+                    );
+                }
+            } catch (\Exception $e) {
+                Log::error('❌ ML API learning exception', [
+                    'scan_id' => $result->scan_id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
+
+                $correction->update([
+                    'status' => 'Saved (ML Error)'
+                ]);
+
+                return redirect('/model/scan-results')->with(
+                    'warning',
+                    'Correction saved, but ML learning encountered an error: ' . $e->getMessage()
+                );
             }
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Scan result not found', [
+                'scan_id' => $validated['scan_id'] ?? null
+            ]);
+
+            return redirect()->back()->with('error', 'Scan result not found.');
         } catch (\Exception $e) {
-            Log::error("Learning failed: " . $e->getMessage());
-        }
+            Log::error('❌ Unexpected correction error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'scan_id' => $validated['scan_id'] ?? null
+            ]);
 
-        return redirect('/model/scan-results')->with('success', 'Correction saved, status updated to verified, and user notified.');
+            return redirect()->back()->with(
+                'error',
+                'An error occurred while processing the correction. Please try again.'
+            );
+        }
     }
 
     public function deleteResult($id)
