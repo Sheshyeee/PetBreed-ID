@@ -390,7 +390,9 @@ const Scan = () => {
             <Header />
 
             {/* Compact Loading Dialog */}
-            <AnalysisLoadingDialog isOpen={showLoading} />
+            <div className="mx-6">
+                <AnalysisLoadingDialog isOpen={showLoading} />
+            </div>
 
             <div className="mt-[-45px] p-4 text-gray-900 sm:mt-[-20px] sm:p-0 dark:text-white">
                 <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10">

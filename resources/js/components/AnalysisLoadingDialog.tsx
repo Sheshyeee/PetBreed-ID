@@ -118,7 +118,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
     const currentStage = stages[currentStageIndex];
 
     return (
-        <div className="px-6">
+        <div className="mx-6">
             <AlertDialog open={isOpen}>
                 <AlertDialogContent className="max-w-md border-0 bg-white p-0 shadow-xl sm:mx-0 dark:bg-gray-900">
                     {/* Header Section with Gradient */}
