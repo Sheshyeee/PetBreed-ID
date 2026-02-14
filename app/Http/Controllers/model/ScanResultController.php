@@ -1529,7 +1529,17 @@ Be verbose and detailed. Output ONLY the JSON.";
 
             $image = $request->file('image');
             $mimeType = $image->getMimeType();
-            $extension = match ($mimeType) {
+
+            // ==========================================
+            // ✅ FIXED: LARAVEL CLOUD COMPATIBLE - CONVERT AVIF/BMP TO PNG FOR OPENAI
+            // ==========================================
+
+            // OpenAI supported formats: jpeg, png, webp, gif ONLY
+            $openAiSupported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+            $needsConversion = !in_array($mimeType, $openAiSupported);
+
+            // Determine extension for storage (keep original format in object storage)
+            $storageExtension = match ($mimeType) {
                 'image/jpeg', 'image/jpg' => 'jpg',
                 'image/png' => 'png',
                 'image/webp' => 'webp',
@@ -1539,17 +1549,83 @@ Be verbose and detailed. Output ONLY the JSON.";
                 default => $image->extension()
             };
 
-            $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $extension;
+            $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $storageExtension;
 
             // ==========================================
-            // FIXED: Create PERSISTENT temp file that won't be garbage collected
+            // FIXED: Create temp file and convert unsupported formats to PNG for OpenAI
             // ==========================================
             $tempPath = $image->getRealPath();
-            $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $extension;
 
-            // Copy to our controlled temp location
-            if (!copy($tempPath, $persistentTempPath)) {
-                throw new \Exception('Failed to create temporary image file');
+            if ($needsConversion) {
+                Log::info("→ Unsupported format detected ({$mimeType}) - converting to PNG for OpenAI API compatibility");
+
+                // Create temp PNG file for OpenAI API
+                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.png';
+
+                try {
+                    // Use GD library (built into Laravel Cloud)
+                    $gdImage = null;
+
+                    // Load based on original format
+                    if ($mimeType === 'image/avif' && function_exists('imagecreatefromavif')) {
+                        $gdImage = imagecreatefromavif($tempPath);
+                    } elseif ($mimeType === 'image/bmp' || $mimeType === 'image/x-ms-bmp') {
+                        $gdImage = imagecreatefrombmp($tempPath);
+                    } else {
+                        // Fallback: try to detect from file
+                        $imageInfo = getimagesize($tempPath);
+                        switch ($imageInfo[2]) {
+                            case IMAGETYPE_JPEG:
+                                $gdImage = imagecreatefromjpeg($tempPath);
+                                break;
+                            case IMAGETYPE_PNG:
+                                $gdImage = imagecreatefrompng($tempPath);
+                                break;
+                            case IMAGETYPE_GIF:
+                                $gdImage = imagecreatefromgif($tempPath);
+                                break;
+                            case IMAGETYPE_WEBP:
+                                $gdImage = imagecreatefromwebp($tempPath);
+                                break;
+                            case IMAGETYPE_BMP:
+                                $gdImage = imagecreatefrombmp($tempPath);
+                                break;
+                            default:
+                                throw new \Exception("Unable to process image format: {$mimeType}");
+                        }
+                    }
+
+                    if ($gdImage === false) {
+                        throw new \Exception("Failed to load image with GD");
+                    }
+
+                    // Save as PNG (universally supported by OpenAI)
+                    if (!imagepng($gdImage, $persistentTempPath, 9)) {
+                        imagedestroy($gdImage);
+                        throw new \Exception("Failed to save converted PNG");
+                    }
+
+                    imagedestroy($gdImage);
+                    Log::info("✓ Image converted to PNG for OpenAI API compatibility");
+                } catch (\Exception $e) {
+                    Log::error("✗ Image conversion failed: " . $e->getMessage());
+
+                    // If conversion fails, reject unsupported formats
+                    throw new \Exception(
+                        "Unable to process {$mimeType} image. " .
+                            "Please upload as JPEG, PNG, WebP, or GIF for best compatibility."
+                    );
+                }
+            } else {
+                // Supported format - copy directly (no conversion needed)
+                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $storageExtension;
+
+                // Copy to our controlled temp location
+                if (!copy($tempPath, $persistentTempPath)) {
+                    throw new \Exception('Failed to create temporary image file');
+                }
+
+                Log::info("✓ Image format ({$mimeType}) is OpenAI compatible - no conversion needed");
             }
 
             // Register cleanup on shutdown (ensures file is deleted even if script crashes)
@@ -1698,26 +1774,26 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } elseif ($hasExactMatch && $previousResult) {
-                // EXACT IMAGE WITHOUT CORRECTION - CACHE EVERYTHING
+                // EXACT IMAGE MATCH - REUSE ALL DATA
                 $detectedBreed = $previousResult->breed;
                 $confidence = $previousResult->confidence;
                 $topPredictions = $previousResult->top_predictions;
                 $predictionMethod = 'exact_match';
 
-                // REUSE ALL DATA INCLUDING AI DESCRIPTIONS AND SIMULATIONS
+                // REUSE ALL DATA FROM PREVIOUS RESULT
                 $aiData = [
                     'description' => $previousResult->description,
                     'origin_history' => $previousResult->origin_history,
                     'health_risks' => $previousResult->health_risks,
                 ];
 
+                // CACHE SIMULATIONS - Copy from previous result
                 $previousSimulationData = is_string($previousResult->simulation_data)
                     ? json_decode($previousResult->simulation_data, true)
                     : $previousResult->simulation_data;
 
                 $dogFeatures = $previousSimulationData['dog_features'] ?? [];
 
-                // CACHE SIMULATIONS - Copy from previous result
                 $simulationData = [
                     '1_years' => $previousSimulationData['1_years'] ?? null,
                     '3_years' => $previousSimulationData['3_years'] ?? null,
