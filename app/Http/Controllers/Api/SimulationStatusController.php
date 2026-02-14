@@ -48,18 +48,29 @@ class SimulationStatusController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? ['1_years' => null, '3_years' => null, 'status' => 'pending'];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        if (!$result->image) {
-            Log::error('❌ API: NO IMAGE', ['scan_id' => $scanId, 'result' => $result->toArray()]);
+        // ✅ FIX: Build complete URL for original image
+        $originalImageUrl = null;
+        if ($result->image) {
+            // Check if image already has full URL
+            if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
+                $originalImageUrl = $result->image;
+            } else {
+                // Build full URL from base URL + path
+                $originalImageUrl = $baseUrl . '/' . $result->image;
+            }
+
+            Log::info('✅ Original image URL built', [
+                'scan_id' => $scanId,
+                'db_path' => $result->image,
+                'base_url' => $baseUrl,
+                'final_url' => $originalImageUrl
+            ]);
+        } else {
+            Log::error('❌ NO IMAGE PATH in database', [
+                'scan_id' => $scanId,
+                'result_id' => $result->id
+            ]);
         }
-
-        $originalImageUrl = $result->image ? ($baseUrl . '/' . $result->image) : null;
-
-        Log::info('🖼️ API Response', [
-            'scan_id' => $scanId,
-            'image' => $result->image,
-            'url' => $originalImageUrl,
-            'null?' => $originalImageUrl === null ? 'YES!' : 'NO'
-        ]);
 
         return [
             'status' => $simulationData['status'] ?? 'pending',
@@ -67,7 +78,7 @@ class SimulationStatusController extends Controller
                 '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                 '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
             ],
-            'original_image' => $originalImageUrl,
+            'original_image' => $originalImageUrl,  // ✅ Now returns full URL
             'breed' => $result->breed,
             'scan_id' => $scanId,
             'timestamp' => now()->timestamp,

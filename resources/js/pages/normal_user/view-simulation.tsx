@@ -206,7 +206,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-6 lg:px-8">
+            <main className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-10 lg:px-8">
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />

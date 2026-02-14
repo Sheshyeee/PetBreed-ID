@@ -51,23 +51,30 @@ class SimulationController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? [];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        if (!$result->image) {
-            Log::error('❌ NO IMAGE PATH', ['scan_id' => $result->scan_id, 'result' => $result->toArray()]);
+        // ✅ FIX: Build complete URL for original image
+        $originalImageUrl = null;
+        if ($result->image) {
+            // Check if image already has full URL
+            if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
+                $originalImageUrl = $result->image;
+            } else {
+                // Build full URL
+                $originalImageUrl = $baseUrl . '/' . $result->image;
+            }
         }
-
-        $originalImageUrl = $result->image ? ($baseUrl . '/' . $result->image) : null;
 
         Log::info('🖼️ View Data', [
             'scan_id' => $result->scan_id,
             'image_db' => $result->image,
-            'url' => $originalImageUrl,
-            'null?' => $originalImageUrl === null ? 'YES!' : 'NO'
+            'base_url' => $baseUrl,
+            'original_image_url' => $originalImageUrl,
+            'url_null' => $originalImageUrl === null ? 'YES!' : 'NO'
         ]);
 
         return [
             'scan_id' => $result->scan_id,
             'breed' => $result->breed,
-            'original_image' => $originalImageUrl,
+            'originalImage' => $originalImageUrl,  // ✅ Changed from 'original_image' to match React prop
             'simulations' => [
                 '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                 '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
@@ -112,12 +119,21 @@ class SimulationController extends Controller
             $result = Results::where('scan_id', $scanId)->firstOrFail();
             $simulationData = json_decode($result->simulation_data, true) ?? [];
             $baseUrl = config('filesystems.disks.object-storage.url');
-            $originalImageUrl = $result->image ? ($baseUrl . '/' . $result->image) : null;
+
+            // ✅ FIX: Build complete URL for original image
+            $originalImageUrl = null;
+            if ($result->image) {
+                if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
+                    $originalImageUrl = $result->image;
+                } else {
+                    $originalImageUrl = $baseUrl . '/' . $result->image;
+                }
+            }
 
             return response()->json([
-                'success' => true,
+            'success' => true,
                 'status' => $simulationData['status'] ?? 'pending',
-                'original_image' => $originalImageUrl,
+                'original_image' => $originalImageUrl,  // ✅ Now has full URL
                 'simulations' => [
                     '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                     '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
