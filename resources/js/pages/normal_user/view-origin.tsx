@@ -80,9 +80,9 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 pb-10 dark:bg-gray-950">
             <Header />
-            <main className="container mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 md:px-8">
+            <main className="mx-auto w-full max-w-5xl px-4 pt-4 pb-8 sm:px-6 md:px-8">
                 {/* --- Header Section --- */}
-                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
+                <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
@@ -97,7 +97,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                 </div>
 
                 {/* --- Geographic Origin Card --- */}
-                <Card className="flex flex-col border-cyan-200 bg-cyan-50 p-8 sm:p-10 md:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
+                <Card className="mt-6 flex flex-col border-cyan-200 bg-cyan-50 p-8 sm:p-10 md:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
                     <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Geographic Origin
                     </h2>
@@ -145,7 +145,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                 </Card>
 
                 {/* --- History Timeline Card --- */}
-                <Card className="border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
+                <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
                     <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         History Timeline
                     </h2>
@@ -176,7 +176,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                 </Card>
 
                 {/* --- Detailed History Accordion --- */}
-                <Card className="border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
+                <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
                     <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Detailed History
                     </h2>

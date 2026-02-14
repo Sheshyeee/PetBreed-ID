@@ -100,9 +100,9 @@ const ScanResults = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <main className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-6 lg:px-8">
                 {/* Page Header */}
-                <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Scan Results
@@ -198,7 +198,7 @@ const ScanResults = () => {
 
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
-                    <Card className="mt-8 border-gray-200 bg-white p-8 sm:p-10 lg:p-12 dark:border-gray-800 dark:bg-gray-900">
+                    <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 lg:p-12 dark:border-gray-800 dark:bg-gray-900">
                         <h2 className="mb-6 text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Other Possible Breeds
                         </h2>
@@ -242,7 +242,7 @@ const ScanResults = () => {
                 {topAlternatives.length === 0 &&
                     results?.confidence &&
                     results.confidence >= 80 && (
-                        <Card className="mt-8 border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-gray-900">
+                        <Card className="mt-6 border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex items-center justify-center gap-3 text-center">
                                 <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
                                 <p className="text-base text-gray-700 dark:text-gray-300">
@@ -257,7 +257,7 @@ const ScanResults = () => {
                         </Card>
                     )}
 
-                <h2 className="mt-12 mb-6 text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
+                <h2 className="mt-8 mb-6 text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                     Explore More Insights
                 </h2>
 

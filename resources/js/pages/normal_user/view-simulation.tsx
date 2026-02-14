@@ -206,8 +206,8 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
+            <main className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-6 lg:px-8">
+                <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
@@ -222,7 +222,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     </div>
                 </div>
 
-                <Card className="mt-8 border-orange-200 bg-orange-50 p-6 sm:p-8 dark:border-orange-800 dark:bg-orange-950/40">
+                <Card className="mt-6 border-orange-200 bg-orange-50 p-6 sm:p-8 dark:border-orange-800 dark:bg-orange-950/40">
                     <p className="text-sm leading-relaxed sm:text-base">
                         <span className="font-bold text-orange-900 dark:text-orange-200">
                             Note:{' '}
@@ -238,7 +238,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
 
                 {(status === 'pending' || status === 'generating') &&
                     !hasSimulations && (
-                        <Card className="mt-8 border-gray-200 bg-white p-10 sm:p-12 dark:border-gray-800 dark:bg-gray-900">
+                        <Card className="mt-6 border-gray-200 bg-white p-10 sm:p-12 dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex flex-col items-center justify-center gap-6">
                                 <Loader2 className="h-16 w-16 animate-spin text-blue-500 dark:text-blue-400" />
                                 <div className="text-center">
@@ -261,7 +261,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                     )}
 
                 {status === 'failed' && !hasSimulations && (
-                    <Card className="mt-8 border-red-200 bg-red-50 p-10 sm:p-12 dark:border-red-800 dark:bg-red-950/40">
+                    <Card className="mt-6 border-red-200 bg-red-50 p-10 sm:p-12 dark:border-red-800 dark:bg-red-950/40">
                         <div className="flex flex-col items-center justify-center gap-6">
                             <AlertCircle className="h-16 w-16 text-red-600 dark:text-red-400" />
                             <div className="text-center">
@@ -284,7 +284,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                 )}
 
                 {hasSimulations && (
-                    <div className="mt-8 flex w-full flex-col gap-6">
+                    <div className="mt-6 flex w-full flex-col gap-6">
                         {status === 'generating' && (
                             <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/40">
                                 <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />

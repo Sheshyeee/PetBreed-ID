@@ -122,9 +122,9 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="container mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 md:px-8">
+            <main className="mx-auto w-full max-w-5xl px-4 pt-4 pb-8 sm:px-6 md:px-8">
                 {/* --- Top Bar --- */}
-                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
+                <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
@@ -140,7 +140,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </div>
 
                 {/* --- Disclaimer --- */}
-                <Card className="border-red-200 bg-red-50 p-6 sm:p-8 dark:border-red-800 dark:bg-red-950/30">
+                <Card className="mt-6 border-red-200 bg-red-50 p-6 sm:p-8 dark:border-red-800 dark:bg-red-950/30">
                     <div className="flex gap-4">
                         <TriangleAlert className="h-6 w-6 shrink-0 text-red-600 dark:text-red-400" />
                         <div className="flex flex-col gap-2">
@@ -158,7 +158,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </Card>
 
                 {/* --- Breed Risk Profile Chart --- */}
-                <Card className="border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
+                <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
                     <h2 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Breed Risk Profile
                     </h2>
@@ -223,13 +223,13 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                     </p>
                 </Card>
 
-                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
+                <h2 className="mt-6 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                     Common Health Concerns
                 </h2>
 
                 {/* --- Dynamic Health Concerns --- */}
                 {concerns.length > 0 ? (
-                    <div className="flex flex-col gap-6">
+                    <div className="mt-6 flex flex-col gap-6">
                         {concerns.map((concern, index) => (
                             <Card
                                 key={index}
@@ -273,7 +273,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 )}
 
                 {/* --- Recommended Screenings --- */}
-                <Card className="flex flex-col gap-6 border-cyan-200 bg-cyan-50 p-8 sm:p-10 dark:border-cyan-800 dark:bg-cyan-950/40">
+                <Card className="mt-6 flex flex-col gap-6 border-cyan-200 bg-cyan-50 p-8 sm:p-10 dark:border-cyan-800 dark:bg-cyan-950/40">
                     <h3 className="text-xl font-bold text-cyan-900 dark:text-cyan-100">
                         Recommended Health Screenings
                     </h3>
@@ -296,7 +296,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </Card>
 
                 {/* --- Lifespan & Care Tips --- */}
-                <Card className="mb-8 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
+                <Card className="mt-6 mb-8 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
                     <h3 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Typical Lifespan & Care Tips
                     </h3>
