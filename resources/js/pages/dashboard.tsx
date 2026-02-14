@@ -834,7 +834,7 @@ export default function Dashboard() {
                             </Button>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto px-5">
                         <Table>
                             <TableHeader>
                                 <TableRow className="mx-auto">

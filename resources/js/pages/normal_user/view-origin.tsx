@@ -78,47 +78,47 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
         : 'https://via.placeholder.com/150?text=No+Flag';
 
     return (
-        <div className="min-h-screen w-full bg-background pb-10">
+        <div className="min-h-screen w-full bg-gray-50 pb-10 dark:bg-gray-950">
             <Header />
-            <main className="container mx-auto mt-[-10px] flex max-w-5xl flex-col gap-6 px-4 py-6 md:px-8">
+            <main className="container mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 md:px-8">
                 {/* --- Header Section --- */}
-                <div className="flex items-start space-x-4 md:items-center md:space-x-6">
-                    <Link href={`/scan-results`} className="mt-1 md:mt-0">
-                        <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
+                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
+                    <Link href={`/scan-results`} className="mt-1 sm:mt-0">
+                        <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold dark:text-white">
+                        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             {results?.breed || 'Breed'} Origin & History
                         </h1>
-                        <p className="text-sm text-gray-600 dark:text-white/70">
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             Breed heritage and evolution
                         </p>
                     </div>
                 </div>
 
                 {/* --- Geographic Origin Card --- */}
-                <Card className="mt-2 flex flex-col bg-cyan-50 p-6 outline outline-cyan-200 md:p-10">
-                    <h2 className="mb-6 text-lg font-semibold md:mb-8">
+                <Card className="flex flex-col border-cyan-200 bg-cyan-50 p-8 sm:p-10 md:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
+                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Geographic Origin
                     </h2>
 
-                    <div className="flex flex-col gap-8 md:flex-row">
+                    <div className="flex flex-col gap-8 md:flex-row md:gap-12">
                         {/* Text Info */}
                         <div className="w-full md:w-1/2">
-                            <div className="flex gap-4 md:gap-3">
+                            <div className="flex gap-4">
                                 <div className="mt-1 shrink-0">
-                                    <MapPin className="h-6 w-6 text-[#002680]" />
+                                    <MapPin className="h-7 w-7 text-cyan-700 dark:text-cyan-400" />
                                 </div>
-                                <div className="space-y-6 md:space-y-12">
+                                <div className="space-y-6">
                                     <div>
-                                        <h3 className="font-bold text-gray-900">
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                             {country}
                                         </h3>
-                                        <p className="text-sm text-gray-700">
+                                        <p className="mt-1 text-base text-gray-700 dark:text-gray-300">
                                             {region}
                                         </p>
                                     </div>
-                                    <p className="text-sm leading-relaxed text-gray-700 md:text-base">
+                                    <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300">
                                         {description}
                                     </p>
                                 </div>
@@ -126,17 +126,17 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                         </div>
 
                         {/* Right Side: Flag Display */}
-                        <div className="flex w-full flex-col items-center justify-center gap-4 rounded-2xl bg-white/50 p-6 shadow-sm md:w-1/2 md:p-8">
+                        <div className="flex w-full flex-col items-center justify-center gap-4 rounded-2xl border border-cyan-200 bg-white/80 p-8 shadow-sm md:w-1/2 dark:border-cyan-800 dark:bg-gray-800/50">
                             <img
                                 src={flagUrl}
                                 alt={`${country} Flag`}
-                                className="h-auto w-24 rounded-md object-cover shadow-md md:w-32"
+                                className="h-auto w-32 rounded-lg object-cover shadow-md ring-1 ring-black/5 md:w-40 dark:ring-white/10"
                             />
                             <div className="flex flex-col items-center justify-center text-center">
-                                <p className="font-bold text-gray-900">
+                                <p className="text-lg font-bold text-gray-900 dark:text-white">
                                     {country}
                                 </p>
-                                <p className="text-sm text-gray-600">
+                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                                     {region}
                                 </p>
                             </div>
@@ -145,23 +145,23 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                 </Card>
 
                 {/* --- History Timeline Card --- */}
-                <Card className="mt-2 p-6 md:p-10">
-                    <h2 className="mb-6 text-lg font-semibold">
+                <Card className="border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
+                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         History Timeline
                     </h2>
 
                     {timeline.length > 0 ? (
-                        <div className="relative ml-3 space-y-8 border-l-2 border-gray-200">
+                        <div className="relative ml-3 space-y-8 border-l-2 border-gray-300 dark:border-gray-700">
                             {timeline.map((item, index) => (
-                                <div key={index} className="relative pl-6">
+                                <div key={index} className="relative pl-8">
                                     {/* Dot on timeline */}
-                                    <div className="absolute top-1 -left-[9px] h-4 w-4 rounded-full border-2 border-white bg-cyan-500"></div>
+                                    <div className="absolute top-1 -left-[9px] h-4 w-4 rounded-full border-2 border-white bg-cyan-600 shadow-sm dark:border-gray-900 dark:bg-cyan-500"></div>
 
-                                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-4">
-                                        <span className="min-w-[80px] font-bold text-cyan-700">
+                                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-6">
+                                        <span className="min-w-[100px] text-base font-bold text-cyan-700 dark:text-cyan-400">
                                             {item.year}
                                         </span>
-                                        <p className="mt-1 text-sm text-gray-600 sm:mt-0">
+                                        <p className="mt-2 text-base leading-relaxed text-gray-700 sm:mt-0 dark:text-gray-300">
                                             {item.event}
                                         </p>
                                     </div>
@@ -169,15 +169,15 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                             ))}
                         </div>
                     ) : (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                             Timeline data unavailable.
                         </div>
                     )}
                 </Card>
 
                 {/* --- Detailed History Accordion --- */}
-                <Card className="mt-2 p-6 md:p-10">
-                    <h2 className="mb-6 text-lg font-semibold">
+                <Card className="border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
+                    <h2 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Detailed History
                     </h2>
 
@@ -187,18 +187,19 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
                                 <AccordionItem
                                     key={index}
                                     value={`item-${index}`}
+                                    className="border-gray-200 dark:border-gray-800"
                                 >
-                                    <AccordionTrigger className="md:text-md text-left text-base font-bold">
+                                    <AccordionTrigger className="text-left text-base font-bold text-gray-900 hover:text-gray-700 sm:text-lg dark:text-white dark:hover:text-gray-300">
                                         {detail.title}
                                     </AccordionTrigger>
-                                    <AccordionContent className="flex flex-col gap-2 text-sm leading-relaxed text-gray-600 md:text-base">
+                                    <AccordionContent className="flex flex-col gap-2 pt-2 text-base leading-relaxed text-gray-700 dark:text-gray-300">
                                         {detail.content}
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
                         </Accordion>
                     ) : (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                             Detailed history unavailable.
                         </div>
                     )}

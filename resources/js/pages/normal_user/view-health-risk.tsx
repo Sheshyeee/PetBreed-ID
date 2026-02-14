@@ -86,10 +86,10 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
     const getRiskColor = (risk: string) => {
         const r = risk.toLowerCase();
         if (r.includes('high'))
-            return 'bg-red-100 text-red-700 hover:bg-red-200 border-red-200';
+            return 'border-red-200 bg-red-100 text-red-800 hover:bg-red-200 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200';
         if (r.includes('moderate'))
-            return 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200';
-        return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200';
+            return 'border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-200 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200';
+        return 'border-blue-200 bg-blue-100 text-blue-800 hover:bg-blue-200 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200';
     };
 
     // 4. Radar Chart Data Processing - FULLY DYNAMIC
@@ -120,20 +120,19 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
     }, [concerns]);
 
     return (
-        <div className="min-h-screen w-full bg-background">
+        <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="container mx-auto mt-[-15px] flex max-w-5xl flex-col gap-6 px-4 py-6 md:px-8">
+            <main className="container mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 md:px-8">
                 {/* --- Top Bar --- */}
-                <div className="flex items-start space-x-4 md:items-center md:space-x-6">
-                    {/* Link back to the main results page, preserving the ID if needed */}
-                    <Link href={`/scan-results`} className="mt-1 md:mt-0">
-                        <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
+                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
+                    <Link href={`/scan-results`} className="mt-1 sm:mt-0">
+                        <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold dark:text-white">
+                        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Health Risk Visualization
                         </h1>
-                        <p className="text-sm text-gray-600 dark:text-white/70">
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             Breed-specific health considerations for{' '}
                             {results?.breed || 'your dog'}
                         </p>
@@ -141,14 +140,14 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </div>
 
                 {/* --- Disclaimer --- */}
-                <Card className="bg-red-50 p-6 outline outline-red-300">
+                <Card className="border-red-200 bg-red-50 p-6 sm:p-8 dark:border-red-800 dark:bg-red-950/30">
                     <div className="flex gap-4">
-                        <TriangleAlert className="h-6 w-6 shrink-0 text-[#cc0000]" />
+                        <TriangleAlert className="h-6 w-6 shrink-0 text-red-600 dark:text-red-400" />
                         <div className="flex flex-col gap-2">
-                            <span className="text-sm font-bold text-red-700">
+                            <span className="text-base font-bold text-red-800 dark:text-red-200">
                                 Medical Disclaimer
                             </span>
-                            <span className="text-sm text-red-700">
+                            <span className="text-sm leading-relaxed text-red-700 dark:text-red-300">
                                 This information is for educational purposes
                                 only and is not a medical diagnosis. Always
                                 consult with a licensed veterinarian for proper
@@ -159,8 +158,8 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </Card>
 
                 {/* --- Breed Risk Profile Chart --- */}
-                <Card className="p-6">
-                    <h2 className="mb-6 text-lg font-semibold">
+                <Card className="border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
+                    <h2 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Breed Risk Profile
                     </h2>
 
@@ -218,55 +217,64 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                         </ResponsiveContainer>
                     </div>
 
-                    <p className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
                         Risk levels are relative to breed averages • Higher
                         values indicate more common health concerns
                     </p>
                 </Card>
 
-                <h2 className="text-lg font-medium">Common Health Concerns</h2>
+                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    Common Health Concerns
+                </h2>
 
                 {/* --- Dynamic Health Concerns --- */}
                 {concerns.length > 0 ? (
-                    concerns.map((concern, index) => (
-                        <Card key={index} className="flex flex-col gap-4 p-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-medium">{concern.name}</h3>
-                                <Badge
-                                    className={getRiskColor(concern.risk_level)}
-                                >
-                                    {concern.risk_level}
-                                </Badge>
-                            </div>
+                    <div className="flex flex-col gap-6">
+                        {concerns.map((concern, index) => (
+                            <Card
+                                key={index}
+                                className="flex flex-col gap-6 border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-gray-900"
+                            >
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                        {concern.name}
+                                    </h3>
+                                    <Badge
+                                        className={`w-fit ${getRiskColor(concern.risk_level)}`}
+                                    >
+                                        {concern.risk_level}
+                                    </Badge>
+                                </div>
 
-                            <div>
-                                <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    Description
-                                </h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    {concern.description}
-                                </p>
-                            </div>
-                            <div>
-                                <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    Prevention & Management
-                                </h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    {concern.prevention}
-                                </p>
-                            </div>
-                        </Card>
-                    ))
+                                <div>
+                                    <h4 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">
+                                        Description
+                                    </h4>
+                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                                        {concern.description}
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">
+                                        Prevention & Management
+                                    </h4>
+                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                                        {concern.prevention}
+                                    </p>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
                 ) : (
-                    <div className="text-sm text-gray-500 italic">
+                    <div className="text-sm text-gray-600 italic dark:text-gray-400">
                         No specific health concerns were generated for this
                         scan.
                     </div>
                 )}
 
                 {/* --- Recommended Screenings --- */}
-                <Card className="flex flex-col gap-4 bg-cyan-50 p-6 outline outline-cyan-200">
-                    <h3 className="font-medium text-cyan-900">
+                <Card className="flex flex-col gap-6 border-cyan-200 bg-cyan-50 p-8 sm:p-10 dark:border-cyan-800 dark:bg-cyan-950/40">
+                    <h3 className="text-xl font-bold text-cyan-900 dark:text-cyan-100">
                         Recommended Health Screenings
                     </h3>
 
@@ -274,12 +282,12 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                         {screenings.map((screening, index) => (
                             <Card
                                 key={index}
-                                className="flex flex-col gap-1 p-4 shadow-sm"
+                                className="flex flex-col gap-2 border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
                             >
-                                <h4 className="text-sm font-semibold">
+                                <h4 className="text-base font-semibold text-gray-900 dark:text-white">
                                     {screening.name}
                                 </h4>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
                                     {screening.description}
                                 </p>
                             </Card>
@@ -288,26 +296,28 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                 </Card>
 
                 {/* --- Lifespan & Care Tips --- */}
-                <Card className="mb-6 p-6">
-                    <h3 className="mb-6 font-medium">
+                <Card className="mb-8 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
+                    <h3 className="mb-8 text-xl font-bold text-gray-900 sm:text-2xl dark:text-white">
                         Typical Lifespan & Care Tips
                     </h3>
 
                     <div className="flex flex-col items-center gap-8 md:flex-row md:items-start md:justify-evenly">
                         {/* Lifespan Stat */}
                         <div className="flex flex-col items-center justify-center text-center">
-                            <p className="text-4xl font-bold text-cyan-700">
+                            <p className="text-5xl font-bold text-cyan-600 dark:text-cyan-400">
                                 {lifespan}
                             </p>
-                            <p className="font-medium">Years</p>
-                            <p className="text-sm text-gray-500">
+                            <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
+                                Years
+                            </p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                                 Average lifespan
                             </p>
                         </div>
 
                         {/* Tips Column 1 */}
                         <div className="flex flex-col items-center justify-center space-y-2 text-center md:items-start md:text-left">
-                            <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
+                            <ul className="list-inside list-disc space-y-2 text-sm text-gray-700 dark:text-gray-300">
                                 {tipsCol1.map((tip, idx) => (
                                     <li key={idx}>{tip}</li>
                                 ))}
@@ -316,7 +326,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
 
                         {/* Tips Column 2 */}
                         <div className="flex flex-col items-center justify-center space-y-2 text-center md:items-start md:text-left">
-                            <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
+                            <ul className="list-inside list-disc space-y-2 text-sm text-gray-700 dark:text-gray-300">
                                 {tipsCol2.map((tip, idx) => (
                                     <li key={idx}>{tip}</li>
                                 ))}

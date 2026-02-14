@@ -98,97 +98,99 @@ const ScanResults = () => {
     const topAlternatives = sortedPredictions.slice(0, 3);
 
     return (
-        <div className="min-h-screen bg-[#FDFDFC] dark:bg-[#0a0a0a]">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-20px] w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-20 xl:px-32">
+            <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                 {/* Page Header */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-xl font-bold sm:text-xl dark:text-white">
+                        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Scan Results
                         </h1>
-                        <p className="text-sm text-gray-600 dark:text-white/70">
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             Here's what we found about your pet
                         </p>
                     </div>
-                    <Link href="/scan" className="hidden sm:block">
-                        <Button>New Scan</Button>
+                    <Link href="/scan">
+                        <Button className="w-full sm:w-auto">New Scan</Button>
                     </Link>
                 </div>
 
                 {/* Primary Result Card */}
-                <Card className="mt-6 flex flex-col gap-6 bg-cyan-50 p-6 outline-1 outline-cyan-200 sm:p-8 lg:flex-row lg:items-center lg:p-10 dark:bg-cyan-950 dark:outline-cyan-800">
-                    <div className="mx-auto w-full max-w-[200px] shrink-0 sm:max-w-[250px] lg:mx-0 lg:w-[180px] xl:w-[200px]">
+                <Card className="flex flex-col gap-8 border-cyan-200 bg-cyan-50 p-8 sm:p-10 lg:flex-row lg:items-center lg:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
+                    <div className="mx-auto w-full max-w-[220px] shrink-0 sm:max-w-[260px] lg:mx-0 lg:w-[220px] xl:w-[240px]">
                         <img
                             src={results?.image}
                             alt="Pet"
-                            className="h-auto w-full rounded-2xl shadow-lg"
+                            className="h-auto w-full rounded-2xl shadow-xl ring-1 ring-black/5 dark:ring-white/10"
                         />
                     </div>
-                    <div className="flex-1 space-y-3">
+                    <div className="flex-1 space-y-5">
                         <div className="flex flex-wrap items-center gap-2">
                             <Badge
                                 variant="secondary"
-                                className="bg-cyan-700 text-white dark:bg-cyan-600"
+                                className="bg-cyan-600 px-3 py-1 text-sm font-medium text-white hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600"
                             >
                                 Primary Match
                             </Badge>
 
                             {/* Learning Indicator Badges */}
                             {showLearningBadge && (
-                                <Badge className="gap-1 border-0 bg-gradient-to-r from-purple-500 to-pink-600 text-white">
-                                    <Brain className="h-3 w-3" />
+                                <Badge className="gap-1.5 border-0 bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1 text-sm font-medium text-white hover:from-purple-700 hover:to-pink-700">
+                                    <Brain className="h-3.5 w-3.5" />
                                     Learned Recognition
                                 </Badge>
                             )}
 
                             {results?.is_exact_match && !showLearningBadge && (
-                                <Badge className="gap-1 border-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
-                                    <CheckCircle2 className="h-3 w-3" />
+                                <Badge className="gap-1.5 border-0 bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-sm font-medium text-white hover:from-blue-700 hover:to-indigo-700">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
                                     Memory Match
                                 </Badge>
                             )}
                         </div>
 
-                        <h2 className="text-2xl font-bold sm:text-3xl lg:text-xl xl:text-xl dark:text-white">
+                        <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl dark:text-white">
                             {results?.breed}
                         </h2>
 
-                        <div className="flex w-full max-w-md justify-between lg:w-[350px] xl:w-[400px]">
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex w-full max-w-md justify-between lg:w-[400px]">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Confidence Score
                             </p>
-                            <p className="text-sm font-semibold dark:text-white">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">
                                 {Math.round(results?.confidence ?? 0)}%
                             </p>
                         </div>
 
                         <Progress
                             value={results?.confidence ?? 0}
-                            className={`h-3 w-full max-w-md lg:w-[350px] xl:w-[400px] ${
+                            className={`h-3 w-full max-w-md lg:w-[400px] ${
                                 results?.confidence === 100
-                                    ? '[&>div]:bg-gradient-to-r [&>div]:from-purple-500 [&>div]:to-pink-600'
-                                    : '[&>div]:bg-blue-500'
+                                    ? '[&>div]:bg-gradient-to-r [&>div]:from-purple-600 [&>div]:to-pink-600'
+                                    : '[&>div]:bg-cyan-600'
                             }`}
                         />
 
                         {/* Learning Explanation */}
                         {showLearningBadge && (
-                            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20">
-                                <div className="flex items-start gap-2">
-                                    <Sparkles className="mt-0.5 h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                    <p className="text-xs text-purple-800 dark:text-purple-300">
-                                        <strong>Perfect Match!</strong> Our
-                                        system recognized this exact dog from
-                                        previous corrections. This is proof that
-                                        admin corrections are making the AI
+                            <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-950/50">
+                                <div className="flex items-start gap-3">
+                                    <Sparkles className="mt-0.5 h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                    <p className="text-sm leading-relaxed text-purple-900 dark:text-purple-100">
+                                        <strong className="font-semibold">
+                                            Perfect Match!
+                                        </strong>{' '}
+                                        Our system recognized this exact dog
+                                        from previous corrections. This is proof
+                                        that admin corrections are making the AI
                                         smarter!
                                     </p>
                                 </div>
                             </div>
                         )}
 
-                        <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                        <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300">
                             {results?.description}
                         </p>
                     </div>
@@ -196,32 +198,32 @@ const ScanResults = () => {
 
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
-                    <Card className="mt-5 p-6 sm:p-8 lg:p-10">
-                        <h2 className="text-md mb-4 font-bold sm:text-xl dark:text-white">
+                    <Card className="mt-8 border-gray-200 bg-white p-8 sm:p-10 lg:p-12 dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="mb-6 text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                             Other Possible Breeds
                         </h2>
                         <div className="space-y-4">
                             {topAlternatives.map((prediction, index) => (
                                 <Card
                                     key={`${prediction.breed}-${index}`}
-                                    className="bg-violet-50 p-5 outline-1 outline-violet-100 sm:p-6 dark:bg-violet-950 dark:outline-violet-800"
+                                    className="border-violet-200 bg-violet-50 p-6 transition-all hover:border-violet-300 hover:shadow-sm dark:border-violet-800 dark:bg-violet-950/30 dark:hover:border-violet-700"
                                 >
-                                    <div className="flex items-center gap-4 sm:gap-5">
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-white text-base font-bold sm:h-14 sm:w-14 sm:rounded-2xl dark:bg-gray-900 dark:text-white">
+                                    <div className="flex items-center gap-5">
+                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-violet-300 bg-white text-xl font-bold text-violet-700 shadow-sm dark:border-violet-700 dark:bg-gray-800 dark:text-violet-300">
                                             {index + 1}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <h3 className="sm:text-md mb-2 text-base font-semibold dark:text-white">
+                                            <h3 className="mb-3 text-lg font-semibold text-gray-900 sm:text-xl dark:text-white">
                                                 {prediction.breed}
                                             </h3>
-                                            <div className="flex items-center gap-3 sm:gap-4">
+                                            <div className="flex items-center gap-4">
                                                 <Progress
                                                     value={
                                                         prediction.confidence
                                                     }
-                                                    className="h-2 flex-1 lg:max-w-[400px] [&>div]:bg-blue-500"
+                                                    className="h-2.5 flex-1 bg-violet-200 lg:max-w-[450px] dark:bg-violet-900/50 [&>div]:bg-violet-600 dark:[&>div]:bg-violet-500"
                                                 />
-                                                <p className="shrink-0 text-sm font-semibold dark:text-white">
+                                                <p className="shrink-0 text-base font-bold text-gray-900 dark:text-white">
                                                     {Math.round(
                                                         prediction.confidence,
                                                     )}
@@ -240,11 +242,11 @@ const ScanResults = () => {
                 {topAlternatives.length === 0 &&
                     results?.confidence &&
                     results.confidence >= 80 && (
-                        <Card className="mt-5 p-6 sm:p-8 lg:p-10">
+                        <Card className="mt-8 border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex items-center justify-center gap-3 text-center">
-                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    <strong className="text-gray-900 dark:text-white">
+                                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                <p className="text-base text-gray-700 dark:text-gray-300">
+                                    <strong className="font-semibold text-gray-900 dark:text-white">
                                         High Confidence Identification
                                     </strong>
                                     {' - '}
@@ -255,80 +257,93 @@ const ScanResults = () => {
                         </Card>
                     )}
 
-                <h2 className="text-md mt-8 mb-6 font-bold sm:text-xl dark:text-white">
+                <h2 className="mt-12 mb-6 text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
                     Explore More Insights
                 </h2>
 
-                <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    <Card className="flex flex-col gap-6 p-6 transition-all hover:border-blue-400 hover:shadow-md sm:col-span-2 sm:p-8 lg:col-span-1">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-200 p-4">
-                            <Globe color="#042381" size={32} />
+                <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <Card className="flex flex-col gap-6 border-gray-200 bg-white p-8 transition-all hover:border-blue-300 hover:shadow-lg sm:col-span-2 lg:col-span-1 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-600">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+                            <Globe className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <h3 className="text-md font-bold dark:text-white">
-                            Origin History
-                        </h3>
-                        <p className="flex-1 text-sm text-gray-500 dark:text-gray-400">
-                            Discover the history and origin of your pet's breed
-                        </p>
-                        <Button variant="outline" asChild className="w-full">
+                        <div className="flex-1">
+                            <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
+                                Origin History
+                            </h3>
+                            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                Discover the history and origin of your pet's
+                                breed
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="w-full border-gray-300 text-base font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                        >
                             <Link
                                 href={`/origin?id=${results?.scan_id}`}
                                 className="flex items-center justify-center gap-2"
                             >
                                 <span>Explore History</span>
-                                <Sparkles size={16} />
+                                <Sparkles size={18} />
                             </Link>
                         </Button>
                     </Card>
 
-                    <Card className="flex flex-col gap-6 p-6 transition-all hover:border-red-400 hover:shadow-md sm:p-8">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-pink-200 p-4">
-                            <Activity color="#750056" size={32} />
+                    <Card className="flex flex-col gap-6 border-gray-200 bg-white p-8 transition-all hover:border-pink-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-pink-600">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-950 dark:to-pink-900">
+                            <Activity className="h-8 w-8 text-pink-600 dark:text-pink-400" />
                         </div>
-                        <h3 className="text-md font-bold dark:text-white">
-                            Health Risk
-                        </h3>
-                        <p className="flex-1 text-sm text-gray-500 dark:text-gray-400">
-                            Learn about breed-specific health considerations
-                        </p>
-                        <Button variant="outline" asChild className="w-full">
+                        <div className="flex-1">
+                            <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
+                                Health Risk
+                            </h3>
+                            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                Learn about breed-specific health considerations
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="w-full border-gray-300 text-base font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                        >
                             <Link
                                 href={`/health-risk?id=${results?.scan_id}`}
                                 className="flex items-center justify-center gap-2"
                             >
                                 <span>View Risk</span>
-                                <Sparkles size={16} />
+                                <Sparkles size={18} />
                             </Link>
                         </Button>
                     </Card>
 
-                    <Card className="flex flex-col gap-6 p-6 transition-all hover:border-violet-400 hover:shadow-md sm:p-8">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-200 p-4">
-                            <Clock color="#3f005c" size={32} />
+                    <Card className="flex flex-col gap-6 border-gray-200 bg-white p-8 transition-all hover:border-violet-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-violet-600">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950 dark:to-violet-900">
+                            <Clock className="h-8 w-8 text-violet-600 dark:text-violet-400" />
                         </div>
-                        <h3 className="text-md font-bold dark:text-white">
-                            Future Appearance
-                        </h3>
-                        <p className="flex-1 text-sm text-gray-500 dark:text-gray-400">
-                            See how your pet will look as they age over the
-                            years
-                        </p>
-                        <Button variant="outline" asChild className="w-full">
+                        <div className="flex-1">
+                            <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
+                                Future Appearance
+                            </h3>
+                            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                See how your pet will look as they age over the
+                                years
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="w-full border-gray-300 text-base font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                        >
                             <Link
                                 href="/simulation"
                                 className="flex items-center justify-center gap-2"
                             >
                                 <span>View Simulation</span>
-                                <Sparkles size={16} />
+                                <Sparkles size={18} />
                             </Link>
                         </Button>
                     </Card>
-                </div>
-
-                <div className="mb-10 sm:hidden">
-                    <Link href="/scan" className="block">
-                        <Button className="w-full">New Scan</Button>
-                    </Link>
                 </div>
             </main>
         </div>
