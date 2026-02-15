@@ -957,7 +957,9 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                             ]
                         ]
                     ],
-                    'response_format' => ['type' => 'json_object'],
+                    'text' => [
+                        'format' => 'json_object' // ✅ Correct location for /v1/responses API
+                    ],
                     'max_output_tokens' => 1000,
                     'temperature' => 0.3,
                 ]
