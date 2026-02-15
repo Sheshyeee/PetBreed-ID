@@ -379,7 +379,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Teaching the AI
+                                    Teaching the system
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -611,7 +611,7 @@ export default function Dashboard() {
                                                 Breed Name
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
-                                                AI Memory
+                                                System Memory
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
                                                 Your Teaching
@@ -825,12 +825,12 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-gray-900 dark:text-white">
-                                            AI Memory vs Your Teaching
+                                            System Memory vs Your Teaching
                                         </h4>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            AI Memory = patterns learned. Your
-                                            Teaching = corrections made. Both
-                                            improve accuracy!
+                                            System Memory = patterns learned.
+                                            Your Teaching = corrections made.
+                                            Both improve accuracy!
                                         </p>
                                     </div>
                                 </div>

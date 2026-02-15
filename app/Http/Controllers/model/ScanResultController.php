@@ -151,6 +151,12 @@ class ScanResultController extends Controller
         $result = Results::get();
         $resultCount = $result->count();
 
+        // Get scan IDs that have been corrected
+        $correctedScanIds = BreedCorrection::pluck('scan_id');
+
+        // Calculate pending review count (scans not yet corrected)
+        $pendingReviewCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
+
         $lowConfidenceCount = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
@@ -325,6 +331,7 @@ class ScanResultController extends Controller
             'results' => $results,
             'correctedBreedCount' => $correctedBreedCount,
             'resultCount' => $resultCount,
+            'pendingReviewCount' => $pendingReviewCount,
             'lowConfidenceCount' => $lowConfidenceCount,
             'highConfidenceCount' => $highConfidenceCount,
             'totalScansWeeklyTrend' => round($totalScansWeeklyTrend, 1),
@@ -342,8 +349,8 @@ class ScanResultController extends Controller
             'accuracyBeforeCorrections' => round($accuracyBeforeCorrections, 2),
             'accuracyAfterCorrections' => round($accuracyAfterCorrections, 2),
             'lastCorrectionCount' => $lastMilestone,
-            'breedLearningProgress' => $breedLearningProgress, // NEW: Per-breed learning data
-            'learningBreakdown' => $learningBreakdown ?? [], // NEW: Learning score breakdown
+            'breedLearningProgress' => $breedLearningProgress,
+            'learningBreakdown' => $learningBreakdown ?? [],
         ]);
     }
 
