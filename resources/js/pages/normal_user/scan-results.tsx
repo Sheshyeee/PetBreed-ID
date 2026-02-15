@@ -100,7 +100,7 @@ const ScanResults = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-25px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-12">
+            <main className="mx-auto mt-[-20px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-12">
                 {/* Page Header */}
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -150,7 +150,7 @@ const ScanResults = () => {
                             )}
                         </div>
 
-                        <h2 className="text-lg font-bold text-gray-900 sm:text-4xl dark:text-white">
+                        <h2 className="text-lg font-bold text-gray-900 sm:text-xl dark:text-white">
                             {results?.breed}
                         </h2>
 
@@ -198,7 +198,7 @@ const ScanResults = () => {
 
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
-                    <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 lg:p-12 dark:border-gray-800 dark:bg-gray-900">
+                    <Card className="mt-6 border-gray-200 bg-white p-1 sm:p-10  dark:border-gray-800 dark:bg-gray-900">
                         <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Other Possible Breeds
                         </h2>

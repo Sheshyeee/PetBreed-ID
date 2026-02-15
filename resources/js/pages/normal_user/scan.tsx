@@ -523,12 +523,12 @@ const Scan = () => {
                                         </div>
 
                                         {/* Camera Button */}
-                                        <div className="mt-4 flex justify-center">
+                                        <div className="mt-4 flex w-full justify-center">
                                             <Button
                                                 type="button"
                                                 onClick={startCamera}
                                                 variant="outline"
-                                                className="gap-2 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                                className="w-full gap-2 border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                                             >
                                                 <Camera size={20} />
                                                 Use Camera

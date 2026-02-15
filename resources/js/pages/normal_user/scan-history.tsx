@@ -89,8 +89,8 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                 Veterinarian Verification
                             </h3>
                             <p className="text-sm text-blue-800 dark:text-blue-200">
-                                All AI breed identifications can be reviewed by
-                                licensed veterinarians for accuracy. Verified
+                                All system breed identifications can be reviewed
+                                by licensed veterinarians for accuracy. Verified
                                 scans have been confirmed by professional vets,
                                 while pending scans are awaiting review. This
                                 ensures you get the most reliable breed
