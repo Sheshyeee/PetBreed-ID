@@ -59,6 +59,14 @@ type BreedLearning = {
     recent_scans: number;
 };
 
+type LearningBreakdown = {
+    knowledge_base: number;
+    memory_usage: number;
+    breed_coverage: number;
+    avg_corrections_per_day: number;
+    recent_activity: number;
+};
+
 type PageProps = {
     results?: Result[];
     correctedBreedCount: number;
@@ -82,6 +90,7 @@ type PageProps = {
     accuracyAfterCorrections?: number;
     lastCorrectionCount?: number;
     breedLearningProgress?: BreedLearning[];
+    learningBreakdown?: LearningBreakdown;
 };
 
 export default function Dashboard() {
@@ -108,6 +117,13 @@ export default function Dashboard() {
         accuracyAfterCorrections = 0,
         lastCorrectionCount = 0,
         breedLearningProgress = [],
+        learningBreakdown = {
+            knowledge_base: 0,
+            memory_usage: 0,
+            breed_coverage: 0,
+            avg_corrections_per_day: 0,
+            recent_activity: 0,
+        },
     } = usePage<PageProps>().props;
 
     const [isUpdating, setIsUpdating] = useState(false);
@@ -149,10 +165,10 @@ export default function Dashboard() {
         // Breed diversity score (0-20 points)
         const diversityScore = Math.min(20, (uniqueBreedsLearned / 30) * 20);
 
-        // Accuracy improvement score (0-30 points)
-        const accuracyScore = Math.max(
+        // Learning progress score (0-30 points) - use the backend calculated score
+        const progressScore = Math.max(
             0,
-            Math.min(30, accuracyImprovement * 3),
+            Math.min(30, (accuracyImprovement / 100) * 30),
         );
 
         // Confidence trend score (0-25 points)
@@ -163,7 +179,7 @@ export default function Dashboard() {
 
         return Math.min(
             100,
-            memoryScore + diversityScore + accuracyScore + confidenceScore,
+            memoryScore + diversityScore + progressScore + confidenceScore,
         );
     };
 
@@ -241,8 +257,6 @@ export default function Dashboard() {
             <Head title="Learning Analytics Dashboard" />
 
             <div className="flex h-full flex-col gap-6 p-4 md:p-6">
-                {/* Header Section */}
-
                 {/* Learning Health Score - Hero Section */}
                 <Card className="overflow-hidden border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-blue-900 dark:from-blue-950/50 dark:to-indigo-950/50">
                     <div className="p-6">
@@ -365,7 +379,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Teaching the system
+                                    Teaching the AI
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -408,7 +422,7 @@ export default function Dashboard() {
                         </div>
                     </Card>
 
-                    {/* Pending Review - REPLACED Low Confidence */}
+                    {/* Pending Review */}
                     <Card className="p-5 dark:bg-neutral-900">
                         <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -443,24 +457,25 @@ export default function Dashboard() {
 
                 {/* Learning Impact Metrics - 3 Column */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {/* Accuracy Improvement */}
+                    {/* Learning Progress Score - REPLACED Accuracy Improvement */}
                     <Card className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 dark:from-green-950/30 dark:to-emerald-950/30">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                                    Accuracy Improvement
+                                    Learning Progress Score
                                 </p>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <p className="text-4xl font-bold text-green-900 dark:text-green-300">
-                                        {accuracyImprovement >= 0 ? '+' : ''}
-                                        {accuracyImprovement.toFixed(1)}%
+                                        {accuracyImprovement.toFixed(0)}
                                     </p>
+                                    <span className="text-lg text-green-700 dark:text-green-400">
+                                        /100
+                                    </span>
                                 </div>
                                 <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                                    Before:{' '}
-                                    {accuracyBeforeCorrections.toFixed(1)}% →
-                                    After: {accuracyAfterCorrections.toFixed(1)}
-                                    %
+                                    {learningBreakdown.knowledge_base}{' '}
+                                    corrections •{' '}
+                                    {learningBreakdown.breed_coverage} breeds
                                 </p>
                             </div>
                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-200 dark:bg-green-900">
@@ -469,10 +484,18 @@ export default function Dashboard() {
                         </div>
                         <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
                             <p className="text-xs font-medium text-green-800 dark:text-green-200">
-                                💡 <strong>Real Impact:</strong> The system now
-                                makes {accuracyImprovement.toFixed(1)}% more
-                                high-confidence predictions since you started
-                                correcting!
+                                💡 <strong>Learning Health:</strong> Measures
+                                teaching activity, memory growth, and breed
+                                coverage. Score of{' '}
+                                {accuracyImprovement.toFixed(0)} shows{' '}
+                                {accuracyImprovement >= 80
+                                    ? 'excellent'
+                                    : accuracyImprovement >= 60
+                                      ? 'good'
+                                      : accuracyImprovement >= 40
+                                        ? 'fair'
+                                        : 'developing'}{' '}
+                                progress!
                             </p>
                         </div>
                     </Card>
@@ -564,8 +587,8 @@ export default function Dashboard() {
                                             Breed Mastery Levels
                                         </h2>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            Track system learning progress for
-                                            each breed
+                                            Track AI learning progress for each
+                                            breed
                                         </p>
                                     </div>
                                 </div>
@@ -588,7 +611,7 @@ export default function Dashboard() {
                                                 Breed Name
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
-                                                System Memory
+                                                AI Memory
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
                                                 Your Teaching
@@ -802,12 +825,12 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-gray-900 dark:text-white">
-                                            System Memory vs Your Teaching
+                                            AI Memory vs Your Teaching
                                         </h4>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            System Memory = patterns learned.
-                                            Your Teaching = corrections made.
-                                            Both improve accuracy!
+                                            AI Memory = patterns learned. Your
+                                            Teaching = corrections made. Both
+                                            improve accuracy!
                                         </p>
                                     </div>
                                 </div>
@@ -818,7 +841,7 @@ export default function Dashboard() {
 
                 {/* Recent Scans Table */}
                 <Card className="dark:bg-neutral-900">
-                    <div className="border-b border-gray-200 px-6 py-0 dark:border-gray-800">
+                    <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">

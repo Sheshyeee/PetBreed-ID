@@ -111,11 +111,13 @@ const ScanResults = () => {
                             Here's what we found about your pet
                         </p>
                     </div>
-                    <Link href="/scan">
-                        <Button className="w-full border-gray-300 bg-white hover:bg-gray-50 sm:w-auto dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800">
-                            New Scan
-                        </Button>
-                    </Link>
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="w-full shrink-0 border-gray-300 bg-white hover:bg-gray-50 sm:w-auto dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                    >
+                        <Link href="/scan">New Scan</Link>
+                    </Button>
                 </div>
 
                 {/* Primary Result Card */}

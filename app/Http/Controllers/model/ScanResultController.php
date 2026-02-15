@@ -151,13 +151,6 @@ class ScanResultController extends Controller
         $result = Results::get();
         $resultCount = $result->count();
 
-        // Get scan IDs that have been corrected
-        $correctedScanIds = BreedCorrection::pluck('scan_id');
-
-        // Calculate pending review count (scans not yet corrected)
-        $pendingReviewCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
-
-
         $lowConfidenceCount = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
@@ -213,62 +206,71 @@ class ScanResultController extends Controller
         $weeklyScans = $currentWeekResults->count();
         $memoryHitRate = $weeklyScans > 0 ? ($memoryAssistedScans / $weeklyScans) * 100 : 0;
 
+        // ============================================================================
+        // LEARNING PROGRESS SCORE - Reliable metric that doesn't depend on image quality
+        // ============================================================================
+
         $firstCorrection = BreedCorrection::oldest()->first();
 
         if ($firstCorrection) {
-            // Get all breeds that have been corrected
-            $correctedBreeds = BreedCorrection::pluck('corrected_breed')->unique();
+            // 1. Knowledge Base Growth (total corrections made)
+            $knowledgeBaseGrowth = BreedCorrection::count();
 
-            // BEFORE: Average confidence for corrected breeds BEFORE their first correction
-            $confidenceBeforeCorrections = [];
-            foreach ($correctedBreeds as $breed) {
-                $firstBreedCorrection = BreedCorrection::where('corrected_breed', $breed)
-                    ->orderBy('created_at', 'asc')
-                    ->first();
+            // 2. Memory Utilization (how much of the ML memory is being used)
+            // Assuming max capacity of 500 examples for a well-trained system
+            $memoryUtilization = min(100, ($memoryCount / 500) * 100);
 
-                if ($firstBreedCorrection) {
-                    $avgConfidenceBefore = Results::where('breed', $breed)
-                        ->where('created_at', '<', $firstBreedCorrection->created_at)
-                        ->avg('confidence');
+            // 3. Breed Coverage (unique breeds learned)
+            $uniqueBreedsLearned = count($uniqueBreeds);
+            // Assuming 50 common breeds as a baseline for good coverage
+            $breedDiversity = min(100, ($uniqueBreedsLearned / 50) * 100);
 
-                    if ($avgConfidenceBefore !== null) {
-                        $confidenceBeforeCorrections[] = $avgConfidenceBefore;
-                    }
-                }
-            }
+            // 4. Learning Consistency Score (corrections spread over time)
+            $daysSinceLearningStarted = max(1, $firstCorrection->created_at->diffInDays(now()));
+            $avgCorrectionsPerDay = $knowledgeBaseGrowth / $daysSinceLearningStarted;
+            // Score increases with consistency (more corrections per day = better)
+            $learningConsistency = min(100, $avgCorrectionsPerDay * 20);
 
-            // AFTER: Average confidence for corrected breeds AFTER their first correction
-            $confidenceAfterCorrections = [];
-            foreach ($correctedBreeds as $breed) {
-                $firstBreedCorrection = BreedCorrection::where('corrected_breed', $breed)
-                    ->orderBy('created_at', 'asc')
-                    ->first();
+            // 5. Recent Activity Score (how active has learning been recently)
+            $recentCorrections = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
+            $recentActivityScore = min(100, $recentCorrections * 10); // 10 corrections in a week = 100 points
 
-                if ($firstBreedCorrection) {
-                    $avgConfidenceAfter = Results::where('breed', $breed)
-                        ->where('created_at', '>=', $firstBreedCorrection->created_at)
-                        ->avg('confidence');
+            // COMPOSITE LEARNING PROGRESS SCORE (0-100)
+            // Weighted formula for overall learning health
+            $learningProgressScore = (
+                (min(100, ($knowledgeBaseGrowth / 100) * 100) * 0.25) + // 25% weight: knowledge base
+                ($memoryUtilization * 0.20) + // 20% weight: memory usage
+                ($breedDiversity * 0.25) + // 25% weight: breed variety
+                ($learningConsistency * 0.15) + // 15% weight: consistency
+                ($recentActivityScore * 0.15) // 15% weight: recent activity
+            );
 
-                    if ($avgConfidenceAfter !== null) {
-                        $confidenceAfterCorrections[] = $avgConfidenceAfter;
-                    }
-                }
-            }
+            $learningProgressScore = min(100, round($learningProgressScore, 1));
 
-            // Calculate averages
-            $accuracyBeforeCorrections = count($confidenceBeforeCorrections) > 0
-                ? array_sum($confidenceBeforeCorrections) / count($confidenceBeforeCorrections)
-                : 0;
+            // For display purposes
+            $accuracyBeforeCorrections = 0; // Not used anymore
+            $accuracyAfterCorrections = $learningProgressScore; // The main score
+            $accuracyImprovement = $learningProgressScore; // This displays as the hero metric
 
-            $accuracyAfterCorrections = count($confidenceAfterCorrections) > 0
-                ? array_sum($confidenceAfterCorrections) / count($confidenceAfterCorrections)
-                : 0;
-
-            $accuracyImprovement = $accuracyAfterCorrections - $accuracyBeforeCorrections;
+            // Additional breakdown metrics for detailed view
+            $learningBreakdown = [
+                'knowledge_base' => $knowledgeBaseGrowth,
+                'memory_usage' => round($memoryUtilization, 1),
+                'breed_coverage' => $uniqueBreedsLearned,
+                'avg_corrections_per_day' => round($avgCorrectionsPerDay, 1),
+                'recent_activity' => $recentCorrections
+            ];
         } else {
             $accuracyBeforeCorrections = 0;
             $accuracyAfterCorrections = 0;
             $accuracyImprovement = 0;
+            $learningBreakdown = [
+                'knowledge_base' => 0,
+                'memory_usage' => 0,
+                'breed_coverage' => 0,
+                'avg_corrections_per_day' => 0,
+                'recent_activity' => 0
+            ];
         }
 
         $avgConfidence = $currentWeekResults->avg('confidence') ?? 0;
@@ -324,7 +326,6 @@ class ScanResultController extends Controller
             'correctedBreedCount' => $correctedBreedCount,
             'resultCount' => $resultCount,
             'lowConfidenceCount' => $lowConfidenceCount,
-            'pendingReviewCount' => $pendingReviewCount,
             'highConfidenceCount' => $highConfidenceCount,
             'totalScansWeeklyTrend' => round($totalScansWeeklyTrend, 1),
             'correctedWeeklyTrend' => round($correctedWeeklyTrend, 1),
@@ -342,6 +343,7 @@ class ScanResultController extends Controller
             'accuracyAfterCorrections' => round($accuracyAfterCorrections, 2),
             'lastCorrectionCount' => $lastMilestone,
             'breedLearningProgress' => $breedLearningProgress, // NEW: Per-breed learning data
+            'learningBreakdown' => $learningBreakdown ?? [], // NEW: Learning score breakdown
         ]);
     }
 
