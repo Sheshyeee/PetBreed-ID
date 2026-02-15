@@ -151,6 +151,13 @@ class ScanResultController extends Controller
         $result = Results::get();
         $resultCount = $result->count();
 
+        // Get scan IDs that have been corrected
+        $correctedScanIds = BreedCorrection::pluck('scan_id');
+
+        // Calculate pending review count (scans not yet corrected)
+        $pendingReviewCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
+
+
         $lowConfidenceCount = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
@@ -209,22 +216,52 @@ class ScanResultController extends Controller
         $firstCorrection = BreedCorrection::oldest()->first();
 
         if ($firstCorrection) {
-            $scansBeforeCorrections = Results::where('created_at', '<', $firstCorrection->created_at)
-                ->where('confidence', '>=', 80)
-                ->count();
-            $totalBeforeCorrections = Results::where('created_at', '<', $firstCorrection->created_at)->count();
+            // Get all breeds that have been corrected
+            $correctedBreeds = BreedCorrection::pluck('corrected_breed')->unique();
 
-            $accuracyBeforeCorrections = $totalBeforeCorrections > 0
-                ? ($scansBeforeCorrections / $totalBeforeCorrections) * 100
+            // BEFORE: Average confidence for corrected breeds BEFORE their first correction
+            $confidenceBeforeCorrections = [];
+            foreach ($correctedBreeds as $breed) {
+                $firstBreedCorrection = BreedCorrection::where('corrected_breed', $breed)
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+
+                if ($firstBreedCorrection) {
+                    $avgConfidenceBefore = Results::where('breed', $breed)
+                        ->where('created_at', '<', $firstBreedCorrection->created_at)
+                        ->avg('confidence');
+
+                    if ($avgConfidenceBefore !== null) {
+                        $confidenceBeforeCorrections[] = $avgConfidenceBefore;
+                    }
+                }
+            }
+
+            // AFTER: Average confidence for corrected breeds AFTER their first correction
+            $confidenceAfterCorrections = [];
+            foreach ($correctedBreeds as $breed) {
+                $firstBreedCorrection = BreedCorrection::where('corrected_breed', $breed)
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+
+                if ($firstBreedCorrection) {
+                    $avgConfidenceAfter = Results::where('breed', $breed)
+                        ->where('created_at', '>=', $firstBreedCorrection->created_at)
+                        ->avg('confidence');
+
+                    if ($avgConfidenceAfter !== null) {
+                        $confidenceAfterCorrections[] = $avgConfidenceAfter;
+                    }
+                }
+            }
+
+            // Calculate averages
+            $accuracyBeforeCorrections = count($confidenceBeforeCorrections) > 0
+                ? array_sum($confidenceBeforeCorrections) / count($confidenceBeforeCorrections)
                 : 0;
 
-            $scansAfterCorrections = Results::where('created_at', '>=', $firstCorrection->created_at)
-                ->where('confidence', '>=', 80)
-                ->count();
-            $totalAfterCorrections = Results::where('created_at', '>=', $firstCorrection->created_at)->count();
-
-            $accuracyAfterCorrections = $totalAfterCorrections > 0
-                ? ($scansAfterCorrections / $totalAfterCorrections) * 100
+            $accuracyAfterCorrections = count($confidenceAfterCorrections) > 0
+                ? array_sum($confidenceAfterCorrections) / count($confidenceAfterCorrections)
                 : 0;
 
             $accuracyImprovement = $accuracyAfterCorrections - $accuracyBeforeCorrections;
@@ -287,6 +324,7 @@ class ScanResultController extends Controller
             'correctedBreedCount' => $correctedBreedCount,
             'resultCount' => $resultCount,
             'lowConfidenceCount' => $lowConfidenceCount,
+            'pendingReviewCount' => $pendingReviewCount,
             'highConfidenceCount' => $highConfidenceCount,
             'totalScansWeeklyTrend' => round($totalScansWeeklyTrend, 1),
             'correctedWeeklyTrend' => round($correctedWeeklyTrend, 1),

@@ -254,7 +254,7 @@ export default function ReviewDog() {
                                                 Impact on Model:
                                             </span>
                                             Submitting this will instantly
-                                            update the system's memory. The AI
+                                            update the system's memory. The system
                                             will recognize this specific dog as
                                             <span className="mx-1 font-bold">
                                                 "{data.correct_breed || '...'}"

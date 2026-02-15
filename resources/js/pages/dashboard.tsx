@@ -23,6 +23,7 @@ import {
     Brain,
     CheckCircle2,
     ChevronRight,
+    ClipboardList,
     Database,
     GraduationCap,
     LineChart,
@@ -62,6 +63,7 @@ type PageProps = {
     results?: Result[];
     correctedBreedCount: number;
     resultCount: number;
+    pendingReviewCount: number;
     lowConfidenceCount: number;
     highConfidenceCount: number;
     totalScansWeeklyTrend?: number;
@@ -87,6 +89,7 @@ export default function Dashboard() {
         results,
         correctedBreedCount,
         resultCount,
+        pendingReviewCount = 0,
         lowConfidenceCount,
         highConfidenceCount,
         totalScansWeeklyTrend = 0,
@@ -109,6 +112,9 @@ export default function Dashboard() {
 
     const [isUpdating, setIsUpdating] = useState(false);
     const [showLearningInsights, setShowLearningInsights] = useState(true);
+
+    // Calculate weekly trend for pending reviews (inverse of corrections trend)
+    const pendingReviewWeeklyTrend = -correctedWeeklyTrend;
 
     // Format trend with sign
     const formatTrend = (trend: number) => {
@@ -359,7 +365,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Teaching the AI
+                                    Teaching the system
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -402,34 +408,34 @@ export default function Dashboard() {
                         </div>
                     </Card>
 
-                    {/* Low Confidence */}
+                    {/* Pending Review - REPLACED Low Confidence */}
                     <Card className="p-5 dark:bg-neutral-900">
                         <div className="flex items-start justify-between">
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                    Low Confidence
+                                    Pending Review
                                 </p>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                                        {lowConfidenceCount}
+                                        {pendingReviewCount}
                                     </p>
                                     <div
-                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(lowConfidenceWeeklyTrend, true)}`}
+                                        className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(pendingReviewWeeklyTrend, true)}`}
                                     >
-                                        {getTrendIcon(lowConfidenceWeeklyTrend)}
+                                        {getTrendIcon(pendingReviewWeeklyTrend)}
                                         <span>
                                             {formatTrend(
-                                                lowConfidenceWeeklyTrend,
+                                                pendingReviewWeeklyTrend,
                                             )}
                                         </span>
                                     </div>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    ≤40% confidence
+                                    Awaiting correction
                                 </p>
                             </div>
-                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950">
-                                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
+                                <ClipboardList className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                             </div>
                         </div>
                     </Card>
@@ -558,8 +564,8 @@ export default function Dashboard() {
                                             Breed Mastery Levels
                                         </h2>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            Track AI learning progress for each
-                                            breed
+                                            Track system learning progress for
+                                            each breed
                                         </p>
                                     </div>
                                 </div>
@@ -582,7 +588,7 @@ export default function Dashboard() {
                                                 Breed Name
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
-                                                AI Memory
+                                                System Memory
                                             </TableHead>
                                             <TableHead className="text-center font-bold">
                                                 Your Teaching
@@ -796,12 +802,12 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-gray-900 dark:text-white">
-                                            AI Memory vs Your Teaching
+                                            System Memory vs Your Teaching
                                         </h4>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            AI Memory = patterns learned. Your
-                                            Teaching = corrections made. Both
-                                            improve accuracy!
+                                            System Memory = patterns learned.
+                                            Your Teaching = corrections made.
+                                            Both improve accuracy!
                                         </p>
                                     </div>
                                 </div>
