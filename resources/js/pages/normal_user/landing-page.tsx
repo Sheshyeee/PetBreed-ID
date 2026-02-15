@@ -46,7 +46,7 @@ function LandingPage() {
                         </h1>
                         <p className="mx-auto max-w-md text-xs text-white/70 sm:text-sm lg:mx-0">
                             Upload a photo and get accurate breed identification
-                            powered by advanced AI technology
+                            powered by advanced technology
                         </p>
                         <Link href={getScanLink()}>
                             <Button
@@ -136,8 +136,12 @@ function LandingPage() {
                     alt="Dog breed identification"
                 />
 
+                <h2 className="sm:text-md mb-1 text-base font-bold text-white">
+                    Professional Breed Analysis You Can Trust
+                </h2>
+
                 {/* Veterinary Verification Badge */}
-                <div className="mb-4 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
+                <div className="mb-1 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/20">
                         <ShieldCheck className="h-5 w-5 text-green-400" />
                     </div>
@@ -151,20 +155,7 @@ function LandingPage() {
                     </div>
                 </div>
 
-                <h2 className="sm:text-md text-base font-bold text-white">
-                    Professional Breed Analysis You Can Trust
-                </h2>
-
                 {/* Trust Indicators */}
-                <div className="mb-4 space-y-2">
-                    <div className="flex items-start gap-2">
-                        <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
-                        <p className="text-xs text-white/80">
-                            Expert oversight ensures reliable results for
-                            informed pet care decisions
-                        </p>
-                    </div>
-                </div>
 
                 <div className="border-t border-white/20 pt-4">
                     <Link href={login()}>
