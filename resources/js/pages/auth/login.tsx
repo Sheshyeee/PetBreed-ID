@@ -1,6 +1,5 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { usePage } from '@inertiajs/react';
-import { Dog } from 'lucide-react';
 
 interface LoginProps {
     status?: string;
@@ -27,19 +26,6 @@ export default function Login({
             description="Sign in to access your account"
         >
             <div className="flex flex-col gap-6">
-                {/* Welcome Section */}
-                <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                        <Dog className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        Welcome Back
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Sign in to continue to your account
-                    </p>
-                </div>
-
                 {/* Status Message */}
                 {status && (
                     <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
@@ -83,32 +69,16 @@ export default function Login({
                                 fill="#EA4335"
                             />
                         </svg>
-                        <span>Continue with Google</span>
+                        <span>Sign in with Google</span>
                     </button>
 
                     {/* Security & Privacy Note */}
                     <div className="mt-6 text-center">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                            By signing in, you agree to our Terms of Service and
-                            Privacy Policy
+                            Secure connection
                         </p>
                     </div>
                 </div>
-
-                {/* Additional Help */}
-                {canRegister && (
-                    <div className="mt-4 border-t border-gray-200 pt-6 text-center dark:border-gray-700">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Don't have an account?{' '}
-                            <a
-                                href="/register"
-                                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-                            >
-                                Create one now
-                            </a>
-                        </p>
-                    </div>
-                )}
             </div>
         </AuthLayout>
     );
