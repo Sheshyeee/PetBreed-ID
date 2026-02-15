@@ -122,14 +122,14 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-45px] w-full max-w-5xl px-8 pt-4 pb-8 sm:px-10 md:px-8">
+            <main className="mx-auto mt-[-35px] w-full max-w-5xl px-8 pt-4 pb-8 sm:px-10 md:px-8">
                 {/* --- Top Bar --- */}
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
+                        <h1 className="text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Health Risk Visualization
                         </h1>
                         <p className="mt-[-3] text-sm text-gray-600 dark:text-gray-400">
@@ -159,7 +159,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
 
                 {/* --- Breed Risk Profile Chart --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         Breed Risk Profile
                     </h2>
 
@@ -223,7 +223,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                     </p>
                 </Card>
 
-                <h2 className="mt-6 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
+                <h2 className="mt-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                     Common Health Concerns
                 </h2>
 
@@ -297,7 +297,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
 
                 {/* --- Lifespan & Care Tips --- */}
                 <Card className="mt-6 mb-8 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
-                    <h3 className="mb-8 text-lg font-bold text-gray-900 sm:text-2xl dark:text-white">
+                    <h3 className="mb-8 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         Typical Lifespan & Care Tips
                     </h3>
 

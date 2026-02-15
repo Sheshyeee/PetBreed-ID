@@ -100,11 +100,11 @@ const ScanResults = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-45px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-8">
+            <main className="mx-auto mt-[-35px] w-full max-w-7xl px-8 pt-4 pr-4 pb-8 pl-4 sm:px-10 lg:px-8">
                 {/* Page Header */}
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
+                        <h1 className="text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Scan Results
                         </h1>
                         <p className="mt-[-5px] text-sm text-gray-600 dark:text-gray-400">
@@ -199,7 +199,7 @@ const ScanResults = () => {
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
                     <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 lg:p-12 dark:border-gray-800 dark:bg-gray-900">
-                        <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
+                        <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Other Possible Breeds
                         </h2>
                         <div className="space-y-4">
@@ -213,7 +213,7 @@ const ScanResults = () => {
                                             {index + 1}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <h3 className="mb-3 text-lg font-semibold text-gray-900 sm:text-xl dark:text-white">
+                                            <h3 className="mb-3 text-lg font-semibold text-gray-900 sm:text-lg dark:text-white">
                                                 {prediction.breed}
                                             </h3>
                                             <div className="flex items-center gap-4">
@@ -257,7 +257,7 @@ const ScanResults = () => {
                         </Card>
                     )}
 
-                <h2 className="mt-8 mb-6 text-lg font-bold text-gray-900 sm:text-3xl dark:text-white">
+                <h2 className="mt-8 mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                     Explore More Insights
                 </h2>
 
