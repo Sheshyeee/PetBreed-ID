@@ -2,7 +2,14 @@ import { Button } from '@/components/ui/button';
 import { login } from '@/routes';
 import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Calendar, Heart, MapPin, PawPrintIcon } from 'lucide-react';
+import {
+    Calendar,
+    Heart,
+    MapPin,
+    PawPrintIcon,
+    ShieldCheck,
+    Stethoscope,
+} from 'lucide-react';
 import { useState } from 'react';
 
 function LandingPage() {
@@ -122,29 +129,64 @@ function LandingPage() {
                 </div>
             </div>
 
-            {/* Side Card */}
+            {/* Side Card - Updated with Veterinary Verification Message */}
             <div className="w-full rounded-lg bg-[#1D267D] p-4 sm:p-6 lg:w-[400px]">
                 <img
                     src="/dog1.png"
                     className="mb-4 h-[200px] w-full rounded-lg object-cover sm:h-[250px]"
                     alt="Dog breed identification"
                 />
+
+                {/* Veterinary Verification Badge */}
+                <div className="mb-4 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 backdrop-blur-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/20">
+                        <ShieldCheck className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-xs font-semibold text-white">
+                            Veterinary Verified
+                        </p>
+                        <p className="text-xs text-white/60">
+                            Licensed vet reviews all predictions
+                        </p>
+                    </div>
+                </div>
+
                 <h2 className="mb-2 text-base font-bold text-white sm:text-lg">
-                    One platform — complete breed identification
+                    Professional Breed Analysis You Can Trust
                 </h2>
                 <p className="mb-4 text-xs text-white/70 sm:text-sm">
-                    Everything you need to identify and learn about dog breeds
-                    in one place
+                    Our AI-powered predictions are reviewed and verified by
+                    licensed veterinarians to ensure accuracy and reliability
+                    for your peace of mind.
                 </p>
 
-                <div className="border-t pt-4">
+                {/* Trust Indicators */}
+                <div className="mb-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                        <Stethoscope className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-400" />
+                        <p className="text-xs text-white/80">
+                            All breed identifications validated by certified
+                            veterinary professionals
+                        </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
+                        <p className="text-xs text-white/80">
+                            Expert oversight ensures reliable results for
+                            informed pet care decisions
+                        </p>
+                    </div>
+                </div>
+
+                <div className="border-t border-white/20 pt-4">
                     <Link href={login()}>
                         <Button
                             variant="outline"
-                            className="w-full"
+                            className="w-full font-semibold hover:bg-white hover:text-[#1D267D]"
                             onClick={() => setOpen(false)}
                         >
-                            Vet Portal
+                            Get Started Now
                         </Button>
                     </Link>
                 </div>

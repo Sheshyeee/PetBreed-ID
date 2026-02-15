@@ -112,7 +112,9 @@ const ScanResults = () => {
                         </p>
                     </div>
                     <Link href="/scan">
-                        <Button className="w-full sm:w-auto">New Scan</Button>
+                        <Button className="w-full border-gray-300 bg-white hover:bg-gray-50 sm:w-auto dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800">
+                            New Scan
+                        </Button>
                     </Link>
                 </div>
 
@@ -198,7 +200,7 @@ const ScanResults = () => {
 
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
-                    <Card className="mt-6 border-gray-200 bg-white p-1 sm:p-10  dark:border-gray-800 dark:bg-gray-900">
+                    <Card className="mt-6 border-gray-200 bg-white p-1 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
                         <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Other Possible Breeds
                         </h2>
