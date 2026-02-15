@@ -228,7 +228,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                             Note:{' '}
                         </span>
                         <span className="text-orange-800 dark:text-orange-300">
-                            This prediction shows your dog 1 and 3 years from
+                        This prediction shows your dog 1 and 3 years from
                             today based on current age and breed patterns.
                             Actual aging may vary depending on genetics, health,
                             and environment.
