@@ -793,16 +793,6 @@ class ScanResultController extends Controller
      * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
      * ==========================================
      */
-    /**
-     * ==========================================
-     * FIXED: GPT-5.2-PRO BREED IDENTIFICATION - Uses /v1/responses endpoint
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: GPT-5.2-PRO BREED IDENTIFICATION - Correct Responses API format
-     * ==========================================
-     */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -820,7 +810,7 @@ class ScanResultController extends Controller
         Log::info('✓ OpenAI API key is configured');
 
         try {
-            // Load image based on storage type
+            // FIXED: Load image based on storage type
             if ($isObjectStorage) {
                 if (!Storage::disk('object-storage')->exists($imagePath)) {
                     Log::error('✗ Image not found in object storage: ' . $imagePath);
@@ -852,10 +842,11 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // Prompt for breed identification
+            // IMPROVED PROMPT: More general, covers ALL breeds, faster analysis
             $optimizedPrompt = "You are a veterinary breed identification AI. Analyze this dog image and identify the breed.
 
 **PRIMARY ANALYSIS (Do this FIRST):**
+
 1. **Body Structure & Proportions:**
    - Leg length: very short / short / normal / long
    - Body length: long / medium / compact
@@ -872,152 +863,282 @@ class ScanResultController extends Controller
    - Size category: toy / small / medium / large / giant
 
 **BREED IDENTIFICATION COVERAGE:**
-Identify ANY breed including common, Asian, rare/exotic, working, herding, sporting, terrier, toy, hounds, and bully breeds.
+This system must identify ANY dog breed from the 300+ recognized breeds worldwide including:
+
+Common breeds: Labrador, Golden Retriever, German Shepherd, Bulldog, Beagle, Poodle, Rottweiler, Yorkshire Terrier, Boxer, Dachshund
+Asian breeds: Shiba Inu, Akita, Jindo, Shih Tzu, Pekingese, Lhasa Apso, Chow Chow, Shar Pei, Japanese Chin, Tibetan Mastiff
+Rare/Exotic: Azawakh, Bergamasco, Catalburun, Chinook, Kai Ken, Kishu, Norwegian Lundehund, Otterhound, Sloughi, Thai Ridgeback
+Working: Doberman, Great Dane, Mastiff, Saint Bernard, Newfoundland, Bernese Mountain Dog, Alaskan Malamute, Siberian Husky
+Herding: Border Collie, Australian Shepherd, Belgian Malinois, Collie, Old English Sheepdog, Shetland Sheepdog, Cardigan Welsh Corgi, Pembroke Welsh Corgi
+Sporting: Pointer, Setter, Cocker Spaniel, Springer Spaniel, Weimaraner, Vizsla, Brittany, Irish Setter
+Terrier: Jack Russell, Bull Terrier, Fox Terrier, Airedale, Scottish Terrier, West Highland White Terrier, Cairn Terrier
+Toy: Chihuahua, Pomeranian, Maltese, Papillon, Cavalier King Charles Spaniel, Pug, Brussels Griffon, Italian Greyhound
+Hounds: Bloodhound, Basset Hound, Greyhound, Whippet, Afghan Hound, Saluki, Borzoi, Pharaoh Hound
+Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American Bully, Pitbull, Staffordshire Bull Terrier
+
+**REALISTIC CONFIDENCE SCORING - BE HONEST:**
+- 92-97%: Crystal clear purebred with multiple unmistakable features, perfect lighting, clear view
+- 85-91%: Strong purebred match, most defining features clearly visible
+- 75-84%: Good match with key features visible but some minor ambiguity
+- 65-74%: Probable match, several key features present but lighting/angle not ideal
+- 55-64%: Likely match but significant uncertainty due to mixed features or poor image quality
+- 45-54%: Multiple breed possibilities, conflicting features or very mixed breed
+- 35-44%: High uncertainty, severe image quality issues, or extreme mix
+- Below 35%: Cannot confidently identify (use 35% as minimum)
 
 **CRITICAL RULES:**
-- ALWAYS output a SINGLE BREED NAME - NEVER use 'mix' or 'cross'.
-- For mixed breeds, identify the MOST DOMINANT breed.
-- Mixed breeds should typically be in the 45-70% confidence range.
-- Use precise decimal confidence (e.g., 67.4%).
+- ALWAYS output a SINGLE BREED NAME - NEVER use 'mix', 'cross', 'x', or combine breed names
+- For mixed breed dogs, identify the MOST DOMINANT breed visible and use that single breed name
+- Examples: Output 'Corgi' NOT 'Corgi Mix' or 'Corgi x Shih Tzu'
+- Examples: Output 'Labrador Retriever' NOT 'Labrador Mix' or 'Lab x Golden'
+- BE REALISTIC - most real-world photos are NOT perfect purebreds with ideal lighting
+- LOWER confidence for: poor image quality, unclear angles, mixed breed features, unusual coloring
+- NEVER default to high confidence just because you can name a breed
+- Mixed breeds should typically be 45-70% confidence range
+- Only give 90%+ for textbook examples of the breed
+- NEVER confuse short-legged breeds with normal-legged breeds
+- Check body proportions FIRST before breed selection
+- Use precise decimal confidence (e.g., 67.4%, not 67% or 70%)
+- Can identify ANY breed from 300+ recognized breeds worldwide
+
+**FOR ALTERNATIVE BREEDS:**
+- Also must be SINGLE breed names (no mix/cross notation)
+- If primary confidence is 85%+, alternatives should be much lower (30-50% range)
+- If primary confidence is 60-75%, alternatives can be closer (45-60% range)
+- If primary confidence is below 60%, alternatives should be similar (within 10-15%)
+- Alternatives must reflect genuine possibilities based on visible features
+- Don't artificially lower alternatives if breeds genuinely look alike
 
 **OUTPUT (JSON only, no extra text):**
 {
   \"breed\": \"Single Breed Name Only\",
   \"confidence\": 67.4,
-  \"reasoning\": \"Detailed breakdown of body, head, and image quality...\",
-  \"key_identifiers\": [\"feature 1\", \"feature 2\"],
+  \"reasoning\": \"Body: [describe proportions]. Head: [describe]. Image quality: [clear/unclear/poor lighting/etc]. This matches [breed] because [specific reasons]. Confidence is [high/moderate/low] because [explain uncertainty if any].\",
+  \"key_identifiers\": [\"leg length: short\", \"body: long\", \"ears: floppy\"],
   \"alternative_possibilities\": [
-    {\"breed\": \"Alternative Name\", \"confidence\": 48.2, \"reason\": \"...\"}
+    {\"breed\": \"Alternative Single Breed Name\", \"confidence\": 48.2, \"reason\": \"Similar feature but differs in [X]\"},
+    {\"breed\": \"Another Single Breed Name\", \"confidence\": 35.6, \"reason\": \"Could be possible if [Y]\"}
   ]
 }";
 
-            $client = new \GuzzleHttp\Client([
-                'timeout' => 120, // Increased for GPT-5.2 Pro reasoning time
-                'connect_timeout' => 10
-            ]);
-
-            // ✅ FULLY FIXED: Corrected image_url structure for 2026 API
-            $response = $client->post('https://api.openai.com/v1/responses', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => [
-                    'model' => 'gpt-5.2-pro',
-                    'reasoning' => [
-                        'effort' => 'high'
+            // API call with optimized settings for speed
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'You are an expert veterinary breed identifier covering 300+ recognized dog breeds worldwide. CRITICAL: Always output a SINGLE breed name - NEVER use "mix", "cross", or "x" in breed names. For mixed breeds, identify the most dominant breed. Be REALISTIC and HONEST about confidence levels - most real-world photos are not perfect. Analyze body proportions first (leg length, body length, build), then facial features. Consider image quality, lighting, and angle in your confidence score. Mixed breeds or unclear images should have lower confidence. Output only valid JSON.'
                     ],
-                    'text' => [
-                        'format' => [
-                            'type' => 'json_object' // ✓ Nested object structure
-                        ]
-                    ],
-                    'input' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                [
-                                    'type' => 'input_text',
-                                    'text' => $optimizedPrompt
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            ['type' => 'text', 'text' => $optimizedPrompt],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => "data:{$mimeType};base64,{$imageData}",
+                                    'detail' => 'high'
                                 ],
-                                [
-                                    'type' => 'input_image',
-                                    // FIXED: Pass the string directly. Do NOT use ['url' => ...] object here.
-                                    'image_url' => "data:{$mimeType};base64,{$imageData}"
-                                ]
-                            ]
-                        ]
+                            ],
+                        ],
                     ],
-                    'max_output_tokens' => 1500,
-                    'store' => true
-                ]
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'max_tokens' => 1000,
+                'temperature' => 0.3,  // Slightly higher for more natural variance
             ]);
 
             Log::info('✓ OpenAI API response received');
 
-            $result = json_decode($response->getBody()->getContents(), true);
-
-            // Extract content from response
-            $rawContent = null;
-            if (isset($result['output'][0]['content'])) {
-                foreach ($result['output'][0]['content'] as $contentPart) {
-                    if ($contentPart['type'] === 'text') {
-                        $rawContent = $contentPart['text'];
-                        break;
-                    }
-                }
-            }
+            $rawContent = $response->choices[0]->message->content ?? null;
 
             if (empty($rawContent)) {
-                Log::error('Raw API Response: ' . json_encode($result));
-                throw new \Exception('Empty API response - could not find text content');
+                throw new \Exception('Empty API response');
             }
 
             $apiResult = json_decode($rawContent, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('JSON decode error: ' . json_last_error_msg());
-                Log::error('Raw content attempted: ' . $rawContent);
                 throw new \Exception('Invalid JSON response from API');
             }
 
             if (!isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
+                Log::error('Missing required fields in API response');
                 throw new \Exception('Invalid API response structure');
             }
 
-            // Clean breed name
+            // Clean breed name - remove any mix/cross notation
             $cleanedBreed = $this->cleanBreedName($apiResult['breed']);
+
+            Log::info('Breed name cleaned', [
+                'original' => $apiResult['breed'],
+                'cleaned' => $cleanedBreed
+            ]);
 
             // Process confidence with realistic variance
             $rawConfidence = (float)$apiResult['confidence'];
-            if ($rawConfidence > 97) $rawConfidence = 97.0;
-            if ($rawConfidence < 35) $rawConfidence = 35.0;
 
-            $microVariance = (mt_rand(-15, 15) / 10);
+            // Apply max cap at 97%
+            if ($rawConfidence > 97) {
+                $rawConfidence = 97.0;
+            }
+
+            // Apply minimum of 35%
+            if ($rawConfidence < 35) {
+                $rawConfidence = 35.0;
+            }
+
+            // Add natural micro-variance to avoid static numbers
+            // This creates unique values for each scan even of similar breeds
+            $microVariance = (mt_rand(-15, 15) / 10); // -1.5 to +1.5
             $actualConfidence = $rawConfidence + $microVariance;
 
-            if ($actualConfidence > 97) $actualConfidence = 97.0;
-            if ($actualConfidence < 35) $actualConfidence = 35.0;
+            // Re-apply bounds after variance
+            if ($actualConfidence > 97) {
+                $actualConfidence = 97.0;
+            }
+            if ($actualConfidence < 35) {
+                $actualConfidence = 35.0;
+            }
 
             Log::info('✓ API breed identification successful', [
                 'breed' => $cleanedBreed,
-                'final_confidence' => $actualConfidence
+                'raw_confidence' => $rawConfidence,
+                'final_confidence' => $actualConfidence,
+                'reasoning' => substr($apiResult['reasoning'] ?? '', 0, 150)
             ]);
 
-            // Build top predictions with original logic
+            // Build top predictions with realistic variance
             $topPredictions = [];
             $seenBreeds = [];
 
+            // Add primary breed (cleaned)
+            $primaryBreed = $cleanedBreed;
             $topPredictions[] = [
-                'breed' => $cleanedBreed,
+                'breed' => $primaryBreed,
                 'confidence' => round($actualConfidence, 1)
             ];
-            $seenBreeds[] = strtolower(trim($cleanedBreed));
+            $seenBreeds[] = strtolower(trim($primaryBreed));
 
+            // Process alternatives with INTELLIGENT confidence distribution
+            // The AI already provides realistic alternative confidences based on actual similarity
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
+                        // Clean alternative breed name
                         $cleanedAltBreed = $this->cleanBreedName($alt['breed']);
                         $breedKey = strtolower(trim($cleanedAltBreed));
 
                         if (!in_array($breedKey, $seenBreeds)) {
+                            // Use AI's confidence assessment - it knows breed similarity better
                             $altRawConfidence = (float)$alt['confidence'];
 
-                            // Apply original intelligent gap logic
-                            if ($altRawConfidence >= $actualConfidence) {
-                                $altRawConfidence = $actualConfidence - mt_rand(5, 12);
+                            // Cap at 97%
+                            if ($altRawConfidence > 97) {
+                                $altRawConfidence = 97.0;
                             }
 
-                            $altMicroVariance = (mt_rand(-8, 8) / 10);
+                            // Smart adjustment based on primary confidence and AI's assessment
+                            if ($altRawConfidence >= $actualConfidence) {
+                                // Alternative shouldn't be higher than primary
+                                // But respect how close AI thinks they are
+                                $confidenceGap = $altRawConfidence - $actualConfidence;
+
+                                if ($actualConfidence >= 85) {
+                                    // Very confident primary = alternatives must be significantly lower
+                                    // But if AI gave high alt confidence, breeds are genuinely similar
+                                    if ($altRawConfidence >= 75) {
+                                        // AI thinks they're very similar breeds (e.g., Husky vs Malamute)
+                                        $altRawConfidence = $actualConfidence - mt_rand(8, 15);
+                                    } else {
+                                        // Not that similar
+                                        $altRawConfidence = $actualConfidence - mt_rand(20, 35);
+                                    }
+                                } elseif ($actualConfidence >= 65) {
+                                    // Moderate confidence = breeds could be genuinely similar
+                                    if ($altRawConfidence >= 60) {
+                                        // Close competition (mixed breed indicators)
+                                        $altRawConfidence = $actualConfidence - mt_rand(5, 12);
+                                    } else {
+                                        // Clear but not overwhelming difference
+                                        $altRawConfidence = $actualConfidence - mt_rand(12, 20);
+                                    }
+                                } else {
+                                    // Low confidence primary = multiple strong possibilities
+                                    // Alternatives can be very close
+                                    $altRawConfidence = $actualConfidence - mt_rand(3, 10);
+                                }
+                            } else {
+                                // AI already gave lower confidence for alternative
+                                // Trust its assessment but add realism
+
+                                // Calculate how close AI thinks they are
+                                $naturalGap = $actualConfidence - $altRawConfidence;
+
+                                if ($actualConfidence >= 85) {
+                                    // High confidence primary
+                                    if ($naturalGap < 15) {
+                                        // AI thinks breeds are similar (e.g., Golden vs Labrador)
+                                        // Keep relatively close
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-3, 2);
+                                    } else if ($naturalGap < 35) {
+                                        // Moderate difference - maintain it
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
+                                    } else {
+                                        // Large difference - AI is very sure, keep alternatives low
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-5, 0);
+                                    }
+                                } elseif ($actualConfidence >= 65) {
+                                    // Medium confidence
+                                    if ($naturalGap < 10) {
+                                        // Very similar breeds or mixed features
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-1, 3);
+                                    } else if ($naturalGap < 25) {
+                                        // Some similarity
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 2);
+                                    } else {
+                                        // Clear difference
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-4, 1);
+                                    }
+                                } else {
+                                    // Low confidence - uncertain identification
+                                    // Keep alternatives competitive
+                                    if ($naturalGap < 8) {
+                                        // Very close alternatives (genuine uncertainty)
+                                        $altRawConfidence = $altRawConfidence + mt_rand(0, 4);
+                                    } else {
+                                        // Some preference but not strong
+                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
+                                    }
+                                }
+                            }
+
+                            // Add natural micro-variance for uniqueness
+                            $altMicroVariance = (mt_rand(-8, 8) / 10); // -0.8 to +0.8
                             $finalAltConfidence = $altRawConfidence + $altMicroVariance;
 
-                            if ($finalAltConfidence < 25) $finalAltConfidence = 25.0;
+                            // Apply final bounds
+                            if ($finalAltConfidence > 97) {
+                                $finalAltConfidence = 97.0;
+                            }
+                            if ($finalAltConfidence < 25) {
+                                $finalAltConfidence = 25.0;
+                            }
 
-                            $topPredictions[] = [
-                                'breed' => $cleanedAltBreed,
-                                'confidence' => round($finalAltConfidence, 1)
-                            ];
-                            $seenBreeds[] = $breedKey;
+                            // Final safety: never exceed primary
+                            if ($finalAltConfidence >= $actualConfidence) {
+                                $finalAltConfidence = $actualConfidence - mt_rand(3, 8);
+                            }
+
+                            // Only include alternatives with reasonable confidence
+                            if ($finalAltConfidence >= 25) {
+                                $topPredictions[] = [
+                                    'breed' => $cleanedAltBreed,
+                                    'confidence' => round($finalAltConfidence, 1)
+                                ];
+                                $seenBreeds[] = $breedKey;
+                            }
                         }
                     }
                 }
@@ -1034,16 +1155,18 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                     'key_identifiers' => $apiResult['key_identifiers'] ?? [],
                 ]
             ];
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
             Log::error('✗ OpenAI API Error: ' . $e->getMessage());
-            if ($e->hasResponse()) {
-                $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::error('API Error Response: ' . $errorBody);
-            }
-            return ['success' => false, 'error' => 'OpenAI API Error'];
+            return [
+                'success' => false,
+                'error' => 'OpenAI API Error: ' . $e->getMessage()
+            ];
         } catch (\Exception $e) {
             Log::error('✗ API identification failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
         }
     }
     /**
