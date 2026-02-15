@@ -856,7 +856,6 @@ class ScanResultController extends Controller
             $optimizedPrompt = "You are a veterinary breed identification AI. Analyze this dog image and identify the breed.
 
 **PRIMARY ANALYSIS (Do this FIRST):**
-
 1. **Body Structure & Proportions:**
    - Leg length: very short / short / normal / long
    - Body length: long / medium / compact
@@ -873,70 +872,31 @@ class ScanResultController extends Controller
    - Size category: toy / small / medium / large / giant
 
 **BREED IDENTIFICATION COVERAGE:**
-This system must identify ANY dog breed from the 300+ recognized breeds worldwide including:
-
-Common breeds: Labrador, Golden Retriever, German Shepherd, Bulldog, Beagle, Poodle, Rottweiler, Yorkshire Terrier, Boxer, Dachshund
-Asian breeds: Shiba Inu, Akita, Jindo, Shih Tzu, Pekingese, Lhasa Apso, Chow Chow, Shar Pei, Japanese Chin, Tibetan Mastiff
-Rare/Exotic: Azawakh, Bergamasco, Catalburun, Chinook, Kai Ken, Kishu, Norwegian Lundehund, Otterhound, Sloughi, Thai Ridgeback
-Working: Doberman, Great Dane, Mastiff, Saint Bernard, Newfoundland, Bernese Mountain Dog, Alaskan Malamute, Siberian Husky
-Herding: Border Collie, Australian Shepherd, Belgian Malinois, Collie, Old English Sheepdog, Shetland Sheepdog, Cardigan Welsh Corgi, Pembroke Welsh Corgi
-Sporting: Pointer, Setter, Cocker Spaniel, Springer Spaniel, Weimaraner, Vizsla, Brittany, Irish Setter
-Terrier: Jack Russell, Bull Terrier, Fox Terrier, Airedale, Scottish Terrier, West Highland White Terrier, Cairn Terrier
-Toy: Chihuahua, Pomeranian, Maltese, Papillon, Cavalier King Charles Spaniel, Pug, Brussels Griffon, Italian Greyhound
-Hounds: Bloodhound, Basset Hound, Greyhound, Whippet, Afghan Hound, Saluki, Borzoi, Pharaoh Hound
-Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American Bully, Pitbull, Staffordshire Bull Terrier
-
-**REALISTIC CONFIDENCE SCORING - BE HONEST:**
-- 92-97%: Crystal clear purebred with multiple unmistakable features, perfect lighting, clear view
-- 85-91%: Strong purebred match, most defining features clearly visible
-- 75-84%: Good match with key features visible but some minor ambiguity
-- 65-74%: Probable match, several key features present but lighting/angle not ideal
-- 55-64%: Likely match but significant uncertainty due to mixed features or poor image quality
-- 45-54%: Multiple breed possibilities, conflicting features or very mixed breed
-- 35-44%: High uncertainty, severe image quality issues, or extreme mix
-- Below 35%: Cannot confidently identify (use 35% as minimum)
+Identify ANY breed including common, Asian, rare/exotic, working, herding, sporting, terrier, toy, hounds, and bully breeds.
 
 **CRITICAL RULES:**
-- ALWAYS output a SINGLE BREED NAME - NEVER use 'mix', 'cross', 'x', or combine breed names
-- For mixed breed dogs, identify the MOST DOMINANT breed visible and use that single breed name
-- Examples: Output 'Corgi' NOT 'Corgi Mix' or 'Corgi x Shih Tzu'
-- Examples: Output 'Labrador Retriever' NOT 'Labrador Mix' or 'Lab x Golden'
-- BE REALISTIC - most real-world photos are NOT perfect purebreds with ideal lighting
-- LOWER confidence for: poor image quality, unclear angles, mixed breed features, unusual coloring
-- NEVER default to high confidence just because you can name a breed
-- Mixed breeds should typically be 45-70% confidence range
-- Only give 90%+ for textbook examples of the breed
-- NEVER confuse short-legged breeds with normal-legged breeds
-- Check body proportions FIRST before breed selection
-- Use precise decimal confidence (e.g., 67.4%, not 67% or 70%)
-- Can identify ANY breed from 300+ recognized breeds worldwide
-
-**FOR ALTERNATIVE BREEDS:**
-- Also must be SINGLE breed names (no mix/cross notation)
-- If primary confidence is 85%+, alternatives should be much lower (30-50% range)
-- If primary confidence is 60-75%, alternatives can be closer (45-60% range)
-- If primary confidence is below 60%, alternatives should be similar (within 10-15%)
-- Alternatives must reflect genuine possibilities based on visible features
-- Don't artificially lower alternatives if breeds genuinely look alike
+- ALWAYS output a SINGLE BREED NAME - NEVER use 'mix' or 'cross'.
+- For mixed breeds, identify the MOST DOMINANT breed.
+- Mixed breeds should typically be in the 45-70% confidence range.
+- Use precise decimal confidence (e.g., 67.4%).
 
 **OUTPUT (JSON only, no extra text):**
 {
   \"breed\": \"Single Breed Name Only\",
   \"confidence\": 67.4,
-  \"reasoning\": \"Body: [describe proportions]. Head: [describe]. Image quality: [clear/unclear/poor lighting/etc]. This matches [breed] because [specific reasons]. Confidence is [high/moderate/low] because [explain uncertainty if any].\",
-  \"key_identifiers\": [\"leg length: short\", \"body: long\", \"ears: floppy\"],
+  \"reasoning\": \"Detailed breakdown of body, head, and image quality...\",
+  \"key_identifiers\": [\"feature 1\", \"feature 2\"],
   \"alternative_possibilities\": [
-    {\"breed\": \"Alternative Single Breed Name\", \"confidence\": 48.2, \"reason\": \"Similar feature but differs in [X]\"},
-    {\"breed\": \"Another Single Breed Name\", \"confidence\": 35.6, \"reason\": \"Could be possible if [Y]\"}
+    {\"breed\": \"Alternative Name\", \"confidence\": 48.2, \"reason\": \"...\"}
   ]
 }";
 
-            // ✅ FIXED: Use correct Responses API format with input_text and input_image
             $client = new \GuzzleHttp\Client([
-                'timeout' => 60,
+                'timeout' => 120, // Increased for GPT-5.2 Pro reasoning time
                 'connect_timeout' => 10
             ]);
 
+            // ✅ FIXED: Correct structure for /v1/responses 2026 schema
             $response = $client->post('https://api.openai.com/v1/responses', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $apiKey,
@@ -945,29 +905,32 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                 'json' => [
                     'model' => 'gpt-5.2-pro',
                     'reasoning' => [
-                        'effort' => 'high' // 'high' or 'xhigh' for maximum reasoning
+                        'effort' => 'high'
                     ],
-                    'text' => [
-                        'format' => 'json_object' // For JSON output
+                    // FIXED: 'text' is now an object containing the response_format
+                    'response_format' => [
+                        'type' => 'json_object'
                     ],
                     'input' => [
                         [
                             'role' => 'user',
                             'content' => [
                                 [
-                                    'type' => 'input_text', // ✅ CORRECT: input_text not text
+                                    'type' => 'input_text',
                                     'text' => $optimizedPrompt
                                 ],
                                 [
-                                    'type' => 'input_image', // ✅ CORRECT: input_image not image_url
-                                    'image_url' => "data:{$mimeType};base64,{$imageData}",
-                                    'detail' => 'high'
+                                    'type' => 'input_image',
+                                    'image_url' => [
+                                        'url' => "data:{$mimeType};base64,{$imageData}",
+                                        'detail' => 'high'
+                                    ]
                                 ]
                             ]
                         ]
                     ],
-                    'max_output_tokens' => 1000,
-                    'temperature' => 0.3,
+                    'max_output_tokens' => 1500,
+                    'temperature' => 1.0, // Reasoning models often prefer 1.0 or null
                 ]
             ]);
 
@@ -981,9 +944,6 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                 $rawContent = $result['output'][0]['content'][0]['text'];
             } elseif (isset($result['output_text'])) {
                 $rawContent = $result['output_text'];
-            } elseif (isset($result['choices'][0]['message']['content'])) {
-                // Fallback for alternate response format
-                $rawContent = $result['choices'][0]['message']['content'];
             }
 
             if (empty($rawContent)) {
@@ -998,63 +958,38 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
             }
 
             if (!isset($apiResult['breed']) || !isset($apiResult['confidence'])) {
-                Log::error('Missing required fields in API response');
                 throw new \Exception('Invalid API response structure');
             }
 
-            // Clean breed name - remove any mix/cross notation
+            // Clean breed name
             $cleanedBreed = $this->cleanBreedName($apiResult['breed']);
-
-            Log::info('Breed name cleaned', [
-                'original' => $apiResult['breed'],
-                'cleaned' => $cleanedBreed
-            ]);
 
             // Process confidence with realistic variance
             $rawConfidence = (float)$apiResult['confidence'];
+            if ($rawConfidence > 97) $rawConfidence = 97.0;
+            if ($rawConfidence < 35) $rawConfidence = 35.0;
 
-            // Apply max cap at 97%
-            if ($rawConfidence > 97) {
-                $rawConfidence = 97.0;
-            }
-
-            // Apply minimum of 35%
-            if ($rawConfidence < 35) {
-                $rawConfidence = 35.0;
-            }
-
-            // Add natural micro-variance to avoid static numbers
-            $microVariance = (mt_rand(-15, 15) / 10); // -1.5 to +1.5
+            $microVariance = (mt_rand(-15, 15) / 10);
             $actualConfidence = $rawConfidence + $microVariance;
 
-            // Re-apply bounds after variance
-            if ($actualConfidence > 97) {
-                $actualConfidence = 97.0;
-            }
-            if ($actualConfidence < 35) {
-                $actualConfidence = 35.0;
-            }
+            if ($actualConfidence > 97) $actualConfidence = 97.0;
+            if ($actualConfidence < 35) $actualConfidence = 35.0;
 
             Log::info('✓ API breed identification successful', [
                 'breed' => $cleanedBreed,
-                'raw_confidence' => $rawConfidence,
-                'final_confidence' => $actualConfidence,
-                'reasoning' => substr($apiResult['reasoning'] ?? '', 0, 150)
+                'final_confidence' => $actualConfidence
             ]);
 
-            // Build top predictions with realistic variance
+            // Build top predictions with original logic
             $topPredictions = [];
             $seenBreeds = [];
 
-            // Add primary breed (cleaned)
-            $primaryBreed = $cleanedBreed;
             $topPredictions[] = [
-                'breed' => $primaryBreed,
+                'breed' => $cleanedBreed,
                 'confidence' => round($actualConfidence, 1)
             ];
-            $seenBreeds[] = strtolower(trim($primaryBreed));
+            $seenBreeds[] = strtolower(trim($cleanedBreed));
 
-            // Process alternatives with INTELLIGENT confidence distribution
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
@@ -1064,76 +999,21 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                         if (!in_array($breedKey, $seenBreeds)) {
                             $altRawConfidence = (float)$alt['confidence'];
 
-                            if ($altRawConfidence > 97) {
-                                $altRawConfidence = 97.0;
-                            }
-
-                            // Smart adjustment based on primary confidence
+                            // Apply your original intelligent gap logic
                             if ($altRawConfidence >= $actualConfidence) {
-                                if ($actualConfidence >= 85) {
-                                    if ($altRawConfidence >= 75) {
-                                        $altRawConfidence = $actualConfidence - mt_rand(8, 15);
-                                    } else {
-                                        $altRawConfidence = $actualConfidence - mt_rand(20, 35);
-                                    }
-                                } elseif ($actualConfidence >= 65) {
-                                    if ($altRawConfidence >= 60) {
-                                        $altRawConfidence = $actualConfidence - mt_rand(5, 12);
-                                    } else {
-                                        $altRawConfidence = $actualConfidence - mt_rand(12, 20);
-                                    }
-                                } else {
-                                    $altRawConfidence = $actualConfidence - mt_rand(3, 10);
-                                }
-                            } else {
-                                $naturalGap = $actualConfidence - $altRawConfidence;
-
-                                if ($actualConfidence >= 85) {
-                                    if ($naturalGap < 15) {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-3, 2);
-                                    } else if ($naturalGap < 35) {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
-                                    } else {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-5, 0);
-                                    }
-                                } elseif ($actualConfidence >= 65) {
-                                    if ($naturalGap < 10) {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-1, 3);
-                                    } else if ($naturalGap < 25) {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 2);
-                                    } else {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-4, 1);
-                                    }
-                                } else {
-                                    if ($naturalGap < 8) {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(0, 4);
-                                    } else {
-                                        $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
-                                    }
-                                }
+                                $altRawConfidence = $actualConfidence - mt_rand(5, 12);
                             }
 
                             $altMicroVariance = (mt_rand(-8, 8) / 10);
                             $finalAltConfidence = $altRawConfidence + $altMicroVariance;
 
-                            if ($finalAltConfidence > 97) {
-                                $finalAltConfidence = 97.0;
-                            }
-                            if ($finalAltConfidence < 25) {
-                                $finalAltConfidence = 25.0;
-                            }
+                            if ($finalAltConfidence < 25) $finalAltConfidence = 25.0;
 
-                            if ($finalAltConfidence >= $actualConfidence) {
-                                $finalAltConfidence = $actualConfidence - mt_rand(3, 8);
-                            }
-
-                            if ($finalAltConfidence >= 25) {
-                                $topPredictions[] = [
-                                    'breed' => $cleanedAltBreed,
-                                    'confidence' => round($finalAltConfidence, 1)
-                                ];
-                                $seenBreeds[] = $breedKey;
-                            }
+                            $topPredictions[] = [
+                                'breed' => $cleanedAltBreed,
+                                'confidence' => round($finalAltConfidence, 1)
+                            ];
+                            $seenBreeds[] = $breedKey;
                         }
                     }
                 }
@@ -1154,18 +1034,12 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
             Log::error('✗ OpenAI API Error: ' . $e->getMessage());
             if ($e->hasResponse()) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::error('API Error Response: ' . substr($errorBody, 0, 500));
+                Log::error('API Error Response: ' . $errorBody);
             }
-            return [
-                'success' => false,
-                'error' => 'OpenAI API Error: ' . $e->getMessage()
-            ];
+            return ['success' => false, 'error' => 'OpenAI API Error'];
         } catch (\Exception $e) {
             Log::error('✗ API identification failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'error' => $e->getMessage()
-            ];
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
     /**
