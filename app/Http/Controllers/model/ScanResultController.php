@@ -896,7 +896,7 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                 'connect_timeout' => 10
             ]);
 
-            // ✅ FULLY FIXED: Corrected 2026 Responses API Implementation
+            // ✅ FULLY FIXED: Corrected image_url structure for 2026 API
             $response = $client->post('https://api.openai.com/v1/responses', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $apiKey,
@@ -907,7 +907,6 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                     'reasoning' => [
                         'effort' => 'high'
                     ],
-                    // FIXED: 'response_format' moved to 'text.format'
                     'text' => [
                         'format' => 'json_object'
                     ],
@@ -916,21 +915,19 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                             'role' => 'user',
                             'content' => [
                                 [
-                                    'type' => 'input_text', // Updated from 'text'
+                                    'type' => 'input_text',
                                     'text' => $optimizedPrompt
                                 ],
                                 [
-                                    'type' => 'input_image', // Updated from 'image_url'
-                                    'image_url' => [
-                                        'url' => "data:{$mimeType};base64,{$imageData}",
-                                        'detail' => 'high'
-                                    ]
+                                    'type' => 'input_image',
+                                    // FIXED: Pass the string directly. Do NOT use ['url' => ...] object here.
+                                    'image_url' => "data:{$mimeType};base64,{$imageData}"
                                 ]
                             ]
                         ]
                     ],
                     'max_output_tokens' => 1500,
-                    'store' => true // Required for high-reasoning models
+                    'store' => true
                 ]
             ]);
 
@@ -938,7 +935,7 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
 
             $result = json_decode($response->getBody()->getContents(), true);
 
-            // FIXED: Extract content from the new response structure
+            // Extract content from response
             $rawContent = null;
             if (isset($result['output'][0]['content'])) {
                 foreach ($result['output'][0]['content'] as $contentPart) {
