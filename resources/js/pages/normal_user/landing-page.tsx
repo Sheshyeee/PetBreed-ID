@@ -8,7 +8,6 @@ import {
     MapPin,
     PawPrintIcon,
     ShieldCheck,
-    Stethoscope,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -152,24 +151,12 @@ function LandingPage() {
                     </div>
                 </div>
 
-                <h2 className="mb-2 text-base font-bold text-white sm:text-lg">
+                <h2 className="sm:text-md text-base font-bold text-white">
                     Professional Breed Analysis You Can Trust
                 </h2>
-                <p className="mb-4 text-xs text-white/70 sm:text-sm">
-                    Our AI-powered predictions are reviewed and verified by
-                    licensed veterinarians to ensure accuracy and reliability
-                    for your peace of mind.
-                </p>
 
                 {/* Trust Indicators */}
                 <div className="mb-4 space-y-2">
-                    <div className="flex items-start gap-2">
-                        <Stethoscope className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-400" />
-                        <p className="text-xs text-white/80">
-                            All breed identifications validated by certified
-                            veterinary professionals
-                        </p>
-                    </div>
                     <div className="flex items-start gap-2">
                         <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
                         <p className="text-xs text-white/80">

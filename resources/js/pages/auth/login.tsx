@@ -27,26 +27,6 @@ export default function Login({
             description="Sign in to access professional breed analysis"
         >
             <div className="flex flex-col gap-6">
-                {/* Welcome Section */}
-                <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
-                        <svg
-                            className="h-8 w-8 text-white"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path d="M18 10c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM6 10c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-3.5c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm0 1.5c-.73 0-1.37.41-1.71 1.01-.34-.6-.98-1.01-1.71-1.01-.37 0-.7.11-1 .28.15-.4.23-.84.23-1.28 0-2.21-1.79-4-4-4S2 5.79 2 8c0 2.38 2.19 6.92 8 12.5 2.41-2.33 4.12-4.41 5.15-6.14C15.69 14.13 16 13.59 16 13c0-1.66-1.34-3-3-3-.55 0-1.07.15-1.52.39-.17-.24-.35-.46-.56-.66C11.58 9.3 12.27 9 13 9c2.76 0 5 2.24 5 5 0 .57-.12 1.12-.32 1.64C18.97 17.37 20 19.17 20 21v1h2v-1c0-3.95-3.58-7.48-8-7.95z" />
-                        </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        Welcome Back
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Access AI-powered breed identification with veterinary
-                        verification
-                    </p>
-                </div>
-
                 {/* Status Message */}
                 {status && (
                     <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 shadow-sm dark:border-green-900/50 dark:from-green-900/20 dark:to-emerald-900/20">
@@ -127,11 +107,6 @@ export default function Login({
                                 <span>Vet Verified</span>
                             </div>
                         </div>
-
-                        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-                            By continuing, you agree to our Terms of Service and
-                            Privacy Policy
-                        </p>
                     </div>
                 </div>
             </div>
