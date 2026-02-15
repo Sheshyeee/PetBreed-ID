@@ -908,7 +908,9 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                         'effort' => 'high'
                     ],
                     'text' => [
-                        'format' => 'json_object'
+                        'format' => [
+                            'type' => 'json_object' // ✓ Nested object structure
+                        ]
                     ],
                     'input' => [
                         [
