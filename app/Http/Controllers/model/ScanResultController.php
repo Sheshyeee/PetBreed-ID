@@ -798,6 +798,11 @@ class ScanResultController extends Controller
      * FIXED: GPT-5.2-PRO BREED IDENTIFICATION - Uses /v1/responses endpoint
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: GPT-5.2-PRO BREED IDENTIFICATION - Correct Responses API format
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -926,7 +931,7 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
   ]
 }";
 
-            // ✅ FIXED: Use /v1/responses endpoint with GPT-5.2-PRO
+            // ✅ FIXED: Use correct Responses API format with input_text and input_image
             $client = new \GuzzleHttp\Client([
                 'timeout' => 60,
                 'connect_timeout' => 10
@@ -938,27 +943,28 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                     'Content-Type' => 'application/json',
                 ],
                 'json' => [
-                    'model' => 'gpt-5.2-pro', // ✅ CORRECT MODEL
+                    'model' => 'gpt-5.2-pro',
                     'reasoning' => [
-                        'effort' => 'high' // Use 'high' for better quality, 'xhigh' for maximum
+                        'effort' => 'high' // 'high' or 'xhigh' for maximum reasoning
+                    ],
+                    'text' => [
+                        'format' => 'json_object' // For JSON output
                     ],
                     'input' => [
                         [
                             'role' => 'user',
                             'content' => [
-                                ['type' => 'text', 'text' => $optimizedPrompt],
                                 [
-                                    'type' => 'image_url',
-                                    'image_url' => [
-                                        'url' => "data:{$mimeType};base64,{$imageData}",
-                                        'detail' => 'high'
-                                    ]
+                                    'type' => 'input_text', // ✅ CORRECT: input_text not text
+                                    'text' => $optimizedPrompt
+                                ],
+                                [
+                                    'type' => 'input_image', // ✅ CORRECT: input_image not image_url
+                                    'image_url' => "data:{$mimeType};base64,{$imageData}",
+                                    'detail' => 'high'
                                 ]
                             ]
                         ]
-                    ],
-                    'text' => [
-                        'format' => 'json_object' // ✅ Correct location for /v1/responses API
                     ],
                     'max_output_tokens' => 1000,
                     'temperature' => 0.3,
@@ -973,6 +979,8 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
             $rawContent = null;
             if (isset($result['output'][0]['content'][0]['text'])) {
                 $rawContent = $result['output'][0]['content'][0]['text'];
+            } elseif (isset($result['output_text'])) {
+                $rawContent = $result['output_text'];
             } elseif (isset($result['choices'][0]['message']['content'])) {
                 // Fallback for alternate response format
                 $rawContent = $result['choices'][0]['message']['content'];
