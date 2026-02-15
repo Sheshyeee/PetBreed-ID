@@ -793,6 +793,11 @@ class ScanResultController extends Controller
      * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
      * ==========================================
      */
+    /**
+     * ==========================================
+     * FIXED: GPT-5.2-PRO BREED IDENTIFICATION - Uses /v1/responses endpoint
+     * ==========================================
+     */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING API BREED IDENTIFICATION ===');
@@ -810,7 +815,7 @@ class ScanResultController extends Controller
         Log::info('✓ OpenAI API key is configured');
 
         try {
-            // FIXED: Load image based on storage type
+            // Load image based on storage type
             if ($isObjectStorage) {
                 if (!Storage::disk('object-storage')->exists($imagePath)) {
                     Log::error('✗ Image not found in object storage: ' . $imagePath);
@@ -842,7 +847,7 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // IMPROVED PROMPT: More general, covers ALL breeds, faster analysis
+            // Prompt for breed identification
             $optimizedPrompt = "You are a veterinary breed identification AI. Analyze this dog image and identify the breed.
 
 **PRIMARY ANALYSIS (Do this FIRST):**
@@ -921,36 +926,55 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
   ]
 }";
 
-            // API call with optimized settings for speed
-            $response = OpenAI::chat()->create([
-                'model' => 'gpt-5.2-pro',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are an expert veterinary breed identifier covering 300+ recognized dog breeds worldwide. CRITICAL: Always output a SINGLE breed name - NEVER use "mix", "cross", or "x" in breed names. For mixed breeds, identify the most dominant breed. Be REALISTIC and HONEST about confidence levels - most real-world photos are not perfect. Analyze body proportions first (leg length, body length, build), then facial features. Consider image quality, lighting, and angle in your confidence score. Mixed breeds or unclear images should have lower confidence. Output only valid JSON.'
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => [
-                            ['type' => 'text', 'text' => $optimizedPrompt],
-                            [
-                                'type' => 'image_url',
-                                'image_url' => [
-                                    'url' => "data:{$mimeType};base64,{$imageData}",
-                                    'detail' => 'high'
-                                ],
-                            ],
-                        ],
-                    ],
+            // ✅ FIXED: Use /v1/responses endpoint with GPT-5.2-PRO
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 60,
+                'connect_timeout' => 10
+            ]);
+
+            $response = $client->post('https://api.openai.com/v1/responses', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
                 ],
-                'response_format' => ['type' => 'json_object'],
-                'max_tokens' => 1000,
-                'temperature' => 0.3,  // Slightly higher for more natural variance
+                'json' => [
+                    'model' => 'gpt-5.2-pro', // ✅ CORRECT MODEL
+                    'reasoning' => [
+                        'effort' => 'high' // Use 'high' for better quality, 'xhigh' for maximum
+                    ],
+                    'input' => [
+                        [
+                            'role' => 'user',
+                            'content' => [
+                                ['type' => 'text', 'text' => $optimizedPrompt],
+                                [
+                                    'type' => 'image_url',
+                                    'image_url' => [
+                                        'url' => "data:{$mimeType};base64,{$imageData}",
+                                        'detail' => 'high'
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ],
+                    'response_format' => ['type' => 'json_object'],
+                    'max_output_tokens' => 1000,
+                    'temperature' => 0.3,
+                ]
             ]);
 
             Log::info('✓ OpenAI API response received');
 
-            $rawContent = $response->choices[0]->message->content ?? null;
+            $result = json_decode($response->getBody()->getContents(), true);
+
+            // Extract content from /v1/responses format
+            $rawContent = null;
+            if (isset($result['output'][0]['content'][0]['text'])) {
+                $rawContent = $result['output'][0]['content'][0]['text'];
+            } elseif (isset($result['choices'][0]['message']['content'])) {
+                // Fallback for alternate response format
+                $rawContent = $result['choices'][0]['message']['content'];
+            }
 
             if (empty($rawContent)) {
                 throw new \Exception('Empty API response');
@@ -990,7 +1014,6 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
             }
 
             // Add natural micro-variance to avoid static numbers
-            // This creates unique values for each scan even of similar breeds
             $microVariance = (mt_rand(-15, 15) / 10); // -1.5 to +1.5
             $actualConfidence = $rawConfidence + $microVariance;
 
@@ -1022,103 +1045,67 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
             $seenBreeds[] = strtolower(trim($primaryBreed));
 
             // Process alternatives with INTELLIGENT confidence distribution
-            // The AI already provides realistic alternative confidences based on actual similarity
             if (isset($apiResult['alternative_possibilities']) && is_array($apiResult['alternative_possibilities'])) {
                 foreach ($apiResult['alternative_possibilities'] as $alt) {
                     if (isset($alt['breed']) && isset($alt['confidence'])) {
-                        // Clean alternative breed name
                         $cleanedAltBreed = $this->cleanBreedName($alt['breed']);
                         $breedKey = strtolower(trim($cleanedAltBreed));
 
                         if (!in_array($breedKey, $seenBreeds)) {
-                            // Use AI's confidence assessment - it knows breed similarity better
                             $altRawConfidence = (float)$alt['confidence'];
 
-                            // Cap at 97%
                             if ($altRawConfidence > 97) {
                                 $altRawConfidence = 97.0;
                             }
 
-                            // Smart adjustment based on primary confidence and AI's assessment
+                            // Smart adjustment based on primary confidence
                             if ($altRawConfidence >= $actualConfidence) {
-                                // Alternative shouldn't be higher than primary
-                                // But respect how close AI thinks they are
-                                $confidenceGap = $altRawConfidence - $actualConfidence;
-
                                 if ($actualConfidence >= 85) {
-                                    // Very confident primary = alternatives must be significantly lower
-                                    // But if AI gave high alt confidence, breeds are genuinely similar
                                     if ($altRawConfidence >= 75) {
-                                        // AI thinks they're very similar breeds (e.g., Husky vs Malamute)
                                         $altRawConfidence = $actualConfidence - mt_rand(8, 15);
                                     } else {
-                                        // Not that similar
                                         $altRawConfidence = $actualConfidence - mt_rand(20, 35);
                                     }
                                 } elseif ($actualConfidence >= 65) {
-                                    // Moderate confidence = breeds could be genuinely similar
                                     if ($altRawConfidence >= 60) {
-                                        // Close competition (mixed breed indicators)
                                         $altRawConfidence = $actualConfidence - mt_rand(5, 12);
                                     } else {
-                                        // Clear but not overwhelming difference
                                         $altRawConfidence = $actualConfidence - mt_rand(12, 20);
                                     }
                                 } else {
-                                    // Low confidence primary = multiple strong possibilities
-                                    // Alternatives can be very close
                                     $altRawConfidence = $actualConfidence - mt_rand(3, 10);
                                 }
                             } else {
-                                // AI already gave lower confidence for alternative
-                                // Trust its assessment but add realism
-
-                                // Calculate how close AI thinks they are
                                 $naturalGap = $actualConfidence - $altRawConfidence;
 
                                 if ($actualConfidence >= 85) {
-                                    // High confidence primary
                                     if ($naturalGap < 15) {
-                                        // AI thinks breeds are similar (e.g., Golden vs Labrador)
-                                        // Keep relatively close
                                         $altRawConfidence = $altRawConfidence + mt_rand(-3, 2);
                                     } else if ($naturalGap < 35) {
-                                        // Moderate difference - maintain it
                                         $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
                                     } else {
-                                        // Large difference - AI is very sure, keep alternatives low
                                         $altRawConfidence = $altRawConfidence + mt_rand(-5, 0);
                                     }
                                 } elseif ($actualConfidence >= 65) {
-                                    // Medium confidence
                                     if ($naturalGap < 10) {
-                                        // Very similar breeds or mixed features
                                         $altRawConfidence = $altRawConfidence + mt_rand(-1, 3);
                                     } else if ($naturalGap < 25) {
-                                        // Some similarity
                                         $altRawConfidence = $altRawConfidence + mt_rand(-2, 2);
                                     } else {
-                                        // Clear difference
                                         $altRawConfidence = $altRawConfidence + mt_rand(-4, 1);
                                     }
                                 } else {
-                                    // Low confidence - uncertain identification
-                                    // Keep alternatives competitive
                                     if ($naturalGap < 8) {
-                                        // Very close alternatives (genuine uncertainty)
                                         $altRawConfidence = $altRawConfidence + mt_rand(0, 4);
                                     } else {
-                                        // Some preference but not strong
                                         $altRawConfidence = $altRawConfidence + mt_rand(-2, 3);
                                     }
                                 }
                             }
 
-                            // Add natural micro-variance for uniqueness
-                            $altMicroVariance = (mt_rand(-8, 8) / 10); // -0.8 to +0.8
+                            $altMicroVariance = (mt_rand(-8, 8) / 10);
                             $finalAltConfidence = $altRawConfidence + $altMicroVariance;
 
-                            // Apply final bounds
                             if ($finalAltConfidence > 97) {
                                 $finalAltConfidence = 97.0;
                             }
@@ -1126,12 +1113,10 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                                 $finalAltConfidence = 25.0;
                             }
 
-                            // Final safety: never exceed primary
                             if ($finalAltConfidence >= $actualConfidence) {
                                 $finalAltConfidence = $actualConfidence - mt_rand(3, 8);
                             }
 
-                            // Only include alternatives with reasonable confidence
                             if ($finalAltConfidence >= 25) {
                                 $topPredictions[] = [
                                     'breed' => $cleanedAltBreed,
@@ -1155,8 +1140,12 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
                     'key_identifiers' => $apiResult['key_identifiers'] ?? [],
                 ]
             ];
-        } catch (\OpenAI\Exceptions\ErrorException $e) {
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
             Log::error('✗ OpenAI API Error: ' . $e->getMessage());
+            if ($e->hasResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                Log::error('API Error Response: ' . substr($errorBody, 0, 500));
+            }
             return [
                 'success' => false,
                 'error' => 'OpenAI API Error: ' . $e->getMessage()
