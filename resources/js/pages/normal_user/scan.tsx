@@ -559,7 +559,7 @@ const Scan = () => {
                                                 <Camera size={20} />
                                                 Use Camera
                                             </Button>
-                                            <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                                            <p className="mt-2 text-center text-[9px] text-gray-500 dark:text-gray-400">
                                                 Use Chrome, Edge, Safari, or
                                                 Firefox for camera
                                             </p>
