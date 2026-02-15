@@ -923,7 +923,7 @@ Bully/Brachycephalic: French Bulldog, English Bulldog, Boston Terrier, American 
 
             // API call with optimized settings for speed
             $response = OpenAI::chat()->create([
-                'model' => 'gpt-4o',
+                'model' => 'gpt-5.2-pro',
                 'messages' => [
                     [
                         'role' => 'system',
