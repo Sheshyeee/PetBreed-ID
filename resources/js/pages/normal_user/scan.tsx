@@ -57,7 +57,6 @@ const Scan = () => {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [localError, setLocalError] = useState<ErrorFlash | null>(null);
     const [showLocalError, setShowLocalError] = useState(false);
-    const [showPlatformWarning, setShowPlatformWarning] = useState(false);
 
     // Check if camera is supported on current platform
     const isCameraSupported = () => {
@@ -68,17 +67,12 @@ const Scan = () => {
 
         // Check for supported browsers
         const userAgent = navigator.userAgent.toLowerCase();
-        const isChrome =
-            /chrome|chromium|crios/.test(userAgent) && !/edg/.test(userAgent);
+        const isChrome = /chrome|chromium|crios/.test(userAgent) && !/edg/.test(userAgent);
         const isEdge = /edg/.test(userAgent);
         const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent);
         const isFirefox = /firefox|fxios/.test(userAgent);
-
+        
         return isChrome || isEdge || isSafari || isFirefox;
-    };
-
-    const getSupportedPlatforms = () => {
-        return ['Google Chrome', 'Microsoft Edge', 'Safari', 'Mozilla Firefox'];
     };
 
     // Handle flash error messages with timeout
@@ -117,17 +111,6 @@ const Scan = () => {
             return () => clearTimeout(timer);
         }
     }, [cameraError]);
-
-    // Auto-dismiss platform warning
-    useEffect(() => {
-        if (showPlatformWarning) {
-            const timer = setTimeout(() => {
-                setShowPlatformWarning(false);
-            }, 8000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [showPlatformWarning]);
 
     // Cleanup camera stream on unmount
     useEffect(() => {
@@ -214,7 +197,7 @@ const Scan = () => {
     const startCamera = async () => {
         // Check platform support first
         if (!isCameraSupported()) {
-            setShowPlatformWarning(true);
+            alert('Camera feature is only available on Chrome, Edge, Safari, and Firefox browsers. Please use one of these browsers or upload an image file instead.');
             return;
         }
 
@@ -456,50 +439,6 @@ const Scan = () => {
                         </Button>
                     </div>
 
-                    {/* Platform Warning */}
-                    {showPlatformWarning && (
-                        <Card className="mb-6 border-purple-300 bg-purple-50 shadow-sm transition-opacity duration-500 dark:border-purple-900 dark:bg-purple-950/50">
-                            <CardContent className="p-4 sm:p-6">
-                                <div className="flex items-start gap-3">
-                                    <CircleAlert
-                                        size={22}
-                                        className="mt-0.5 shrink-0 text-purple-600 dark:text-purple-400"
-                                    />
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-purple-900 dark:text-purple-400">
-                                            Camera Not Supported
-                                        </p>
-                                        <p className="mt-1 text-sm text-purple-700 dark:text-purple-300">
-                                            The camera feature is only available
-                                            on supported platforms. Please use
-                                            one of the following browsers:
-                                        </p>
-                                        <ul className="mt-2 space-y-1 pl-4">
-                                            {getSupportedPlatforms().map(
-                                                (platform) => (
-                                                    <li
-                                                        key={platform}
-                                                        className="text-sm text-purple-700 dark:text-purple-300"
-                                                    >
-                                                        • {platform}
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                        <p className="mt-3 text-sm font-medium text-purple-800 dark:text-purple-200">
-                                            You can still upload images using
-                                            the file upload option above.
-                                        </p>
-                                        <p className="mt-2 text-xs text-purple-600 dark:text-purple-400">
-                                            This message will disappear in 8
-                                            seconds
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     {/* Error Message with Auto-dismiss */}
                     {localError && showLocalError && (
                         <Card
@@ -607,7 +546,7 @@ const Scan = () => {
                                         </div>
 
                                         {/* Camera Button */}
-                                        <div className="mt-4 flex w-full justify-center">
+                                        <div className="mt-4 w-full">
                                             <Button
                                                 type="button"
                                                 onClick={startCamera}
@@ -617,6 +556,9 @@ const Scan = () => {
                                                 <Camera size={20} />
                                                 Use Camera
                                             </Button>
+                                            <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                                                Camera is only available on Chrome, Edge, Safari, and Firefox
+                                            </p>
                                         </div>
 
                                         {errors.image && (
