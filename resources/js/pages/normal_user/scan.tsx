@@ -67,11 +67,12 @@ const Scan = () => {
 
         // Check for supported browsers
         const userAgent = navigator.userAgent.toLowerCase();
-        const isChrome = /chrome|chromium|crios/.test(userAgent) && !/edg/.test(userAgent);
+        const isChrome =
+            /chrome|chromium|crios/.test(userAgent) && !/edg/.test(userAgent);
         const isEdge = /edg/.test(userAgent);
         const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent);
         const isFirefox = /firefox|fxios/.test(userAgent);
-        
+
         return isChrome || isEdge || isSafari || isFirefox;
     };
 
@@ -197,7 +198,9 @@ const Scan = () => {
     const startCamera = async () => {
         // Check platform support first
         if (!isCameraSupported()) {
-            alert('Camera feature is only available on Chrome, Edge, Safari, and Firefox browsers. Please use one of these browsers or upload an image file instead.');
+            alert(
+                'Camera feature is only available on Chrome, Edge, Safari, and Firefox browsers. Please use one of these browsers or upload an image file instead.',
+            );
             return;
         }
 
@@ -557,7 +560,8 @@ const Scan = () => {
                                                 Use Camera
                                             </Button>
                                             <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-                                                Camera is only available on Chrome, Edge, Safari, and Firefox
+                                                Use Chrome, Edge, Safari, or
+                                                Firefox for camera
                                             </p>
                                         </div>
 
