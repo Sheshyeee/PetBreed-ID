@@ -215,7 +215,7 @@ export default function Header() {
                         </div>
                         <div className="ml-1 grid min-w-0 flex-1 text-left">
                             <span className="mb-0.5 truncate text-sm leading-tight font-semibold sm:text-base">
-                                Pet Breed ID
+                                DogLens
                             </span>
                         </div>
                     </div>

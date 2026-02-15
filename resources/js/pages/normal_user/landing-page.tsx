@@ -150,7 +150,7 @@ function LandingPage() {
                             Veterinary Verified
                         </p>
                         <p className="text-xs text-white/60">
-                            Licensed vet reviews all predictions
+                            Licensed vet reviews predictions
                         </p>
                     </div>
                 </div>
