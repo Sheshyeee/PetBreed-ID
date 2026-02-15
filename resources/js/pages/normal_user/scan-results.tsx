@@ -100,11 +100,11 @@ const ScanResults = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-35px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-12">
+            <main className="mx-auto mt-[-25px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-12">
                 {/* Page Header */}
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                        <h1 className="text-xl font-bold text-gray-900 sm:text-lg dark:text-white">
                             Scan Results
                         </h1>
                         <p className="mt-[-5px] text-sm text-gray-600 dark:text-gray-400">

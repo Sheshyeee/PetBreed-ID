@@ -122,14 +122,14 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
     return (
         <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-35px] w-full max-w-5xl px-8 pt-4 pb-8 sm:px-10 md:px-8">
+            <main className="mx-auto mt-[-35px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 md:px-8">
                 {/* --- Top Bar --- */}
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href={`/scan-results`} className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                        <h1 className="text-xl font-bold text-gray-900 sm:text-lg dark:text-white">
                             Health Risk Visualization
                         </h1>
                         <p className="mt-[-3] text-sm text-gray-600 dark:text-gray-400">
