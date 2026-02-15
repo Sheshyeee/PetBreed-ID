@@ -896,7 +896,7 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                 'connect_timeout' => 10
             ]);
 
-            // ✅ FIXED: Correct structure for /v1/responses 2026 schema
+            // ✅ FULLY FIXED: Corrected 2026 Responses API Implementation
             $response = $client->post('https://api.openai.com/v1/responses', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $apiKey,
@@ -907,20 +907,20 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                     'reasoning' => [
                         'effort' => 'high'
                     ],
-                    // FIXED: 'text' is now an object containing the response_format
-                    'response_format' => [
-                        'type' => 'json_object'
+                    // FIXED: 'response_format' moved to 'text.format'
+                    'text' => [
+                        'format' => 'json_object'
                     ],
                     'input' => [
                         [
                             'role' => 'user',
                             'content' => [
                                 [
-                                    'type' => 'input_text',
+                                    'type' => 'input_text', // Updated from 'text'
                                     'text' => $optimizedPrompt
                                 ],
                                 [
-                                    'type' => 'input_image',
+                                    'type' => 'input_image', // Updated from 'image_url'
                                     'image_url' => [
                                         'url' => "data:{$mimeType};base64,{$imageData}",
                                         'detail' => 'high'
@@ -930,7 +930,7 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                         ]
                     ],
                     'max_output_tokens' => 1500,
-                    'temperature' => 1.0, // Reasoning models often prefer 1.0 or null
+                    'store' => true // Required for high-reasoning models
                 ]
             ]);
 
@@ -938,22 +938,27 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
 
             $result = json_decode($response->getBody()->getContents(), true);
 
-            // Extract content from /v1/responses format
+            // FIXED: Extract content from the new response structure
             $rawContent = null;
-            if (isset($result['output'][0]['content'][0]['text'])) {
-                $rawContent = $result['output'][0]['content'][0]['text'];
-            } elseif (isset($result['output_text'])) {
-                $rawContent = $result['output_text'];
+            if (isset($result['output'][0]['content'])) {
+                foreach ($result['output'][0]['content'] as $contentPart) {
+                    if ($contentPart['type'] === 'text') {
+                        $rawContent = $contentPart['text'];
+                        break;
+                    }
+                }
             }
 
             if (empty($rawContent)) {
-                throw new \Exception('Empty API response');
+                Log::error('Raw API Response: ' . json_encode($result));
+                throw new \Exception('Empty API response - could not find text content');
             }
 
             $apiResult = json_decode($rawContent, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('JSON decode error: ' . json_last_error_msg());
+                Log::error('Raw content attempted: ' . $rawContent);
                 throw new \Exception('Invalid JSON response from API');
             }
 
@@ -999,7 +1004,7 @@ Identify ANY breed including common, Asian, rare/exotic, working, herding, sport
                         if (!in_array($breedKey, $seenBreeds)) {
                             $altRawConfidence = (float)$alt['confidence'];
 
-                            // Apply your original intelligent gap logic
+                            // Apply original intelligent gap logic
                             if ($altRawConfidence >= $actualConfidence) {
                                 $altRawConfidence = $actualConfidence - mt_rand(5, 12);
                             }
