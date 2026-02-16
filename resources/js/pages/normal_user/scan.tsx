@@ -423,14 +423,14 @@ const Scan = () => {
             <div className="mt-[-45px] p-4 text-gray-900 sm:mt-[-20px] sm:p-0 dark:text-white">
                 <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
                     {/* Page Header */}
-                    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex-1">
                             <h1 className="text-lg font-bold tracking-tight text-gray-900 sm:text-lg dark:text-white">
                                 Scan Your Dog
                             </h1>
                             <p className="mt-[-5px] text-sm text-gray-600 sm:text-sm dark:text-gray-400">
                                 Upload a photo or use your camera to identify
-                                your dog's breed with AI-powered analysis.
+                                your dog's breed.
                             </p>
                         </div>
                         <Button

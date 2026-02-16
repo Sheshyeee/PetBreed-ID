@@ -202,8 +202,8 @@ const ScanResults = () => {
 
                 {/* FIXED: Top Possible Breeds - Only show if there are valid alternatives */}
                 {topAlternatives.length > 0 && (
-                    <Card className="mt-6 border-gray-200 bg-white p-1 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
-                        <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                    <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
+                        <h2 className="mb-1 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                             Other Possible Breeds
                         </h2>
                         <div className="space-y-4">

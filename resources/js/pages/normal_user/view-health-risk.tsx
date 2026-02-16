@@ -159,7 +159,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
 
                 {/* --- Breed Risk Profile Chart --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-6 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                    <h2 className="mb-2 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         Breed Risk Profile
                     </h2>
 
@@ -217,7 +217,7 @@ const ViewHealthRisk: FC<ViewHealthRiskProps> = ({ results }) => {
                         </ResponsiveContainer>
                     </div>
 
-                    <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
                         Risk levels are relative to breed averages • Higher
                         values indicate more common health concerns
                     </p>

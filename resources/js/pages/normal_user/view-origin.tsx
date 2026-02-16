@@ -98,7 +98,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- Geographic Origin Card --- */}
                 <Card className="mt-6 flex flex-col border-cyan-200 bg-cyan-50 p-8 sm:p-10 md:p-12 dark:border-cyan-800 dark:bg-cyan-950/40">
-                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                    <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         Geographic Origin
                     </h2>
 
@@ -146,7 +146,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- History Timeline Card --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                    <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         History Timeline
                     </h2>
 
@@ -177,7 +177,7 @@ const ViewOrigin: FC<ViewOriginProps> = ({ results }) => {
 
                 {/* --- Detailed History Accordion --- */}
                 <Card className="mt-6 border-gray-200 bg-white p-8 sm:p-10 md:p-12 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="mb-8 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
+                    <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-lg dark:text-white">
                         Detailed History
                     </h2>
 

@@ -206,7 +206,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Header />
-            <main className="mx-auto mt-[-25px] w-full max-w-7xl px-8 pt-4 pr-4 pb-8 pl-4 sm:px-10 lg:px-8">
+            <main className="mx-auto mt-[-25px] w-full max-w-7xl px-8 pt-4 pb-8 sm:px-10 lg:px-8">
                 <div className="mb-6 flex items-start gap-4 sm:items-center sm:gap-6">
                     <Link href="/scan-results" className="mt-1 sm:mt-0">
                         <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
@@ -228,7 +228,7 @@ const ViewSimulation: React.FC<ViewSimulationProps> = ({
                             Note:{' '}
                         </span>
                         <span className="text-orange-800 dark:text-orange-300">
-                        This prediction shows your dog 1 and 3 years from
+                            This prediction shows your dog 1 and 3 years from
                             today based on current age and breed patterns.
                             Actual aging may vary depending on genetics, health,
                             and environment.
