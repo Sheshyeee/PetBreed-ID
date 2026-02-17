@@ -74,7 +74,7 @@ function LandingPage() {
                         <div className="mb-6 flex justify-center">
                             <div className="rounded-2xl bg-white p-4 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
                                 <img
-                                    src="/doglens_apk_qr.jpeg"
+                                    src="/qr-code.png"
                                     alt="QR Code for App Installation"
                                     className="h-48 w-48"
                                 />
