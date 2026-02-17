@@ -58,10 +58,10 @@ function LandingPage() {
 
                         {/* Header */}
                         <div className="mb-6 text-center">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 via-pink-500 to-rose-500 shadow-lg">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#5C469C] to-[#0C134F]">
                                 <Smartphone size={32} className="text-white" />
                             </div>
-                            <h2 className="bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-2xl font-bold text-transparent">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                                 Install Mobile App
                             </h2>
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -74,7 +74,7 @@ function LandingPage() {
                         <div className="mb-6 flex justify-center">
                             <div className="rounded-2xl bg-white p-4 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
                                 <img
-                                    src="/qr-code.png"
+                                    src="/doglens_apk_qr.jpeg"
                                     alt="QR Code for App Installation"
                                     className="h-48 w-48"
                                 />
@@ -82,9 +82,9 @@ function LandingPage() {
                         </div>
 
                         {/* Instructions */}
-                        <div className="space-y-3 rounded-xl bg-gradient-to-br from-orange-50 to-rose-50 p-4 dark:from-orange-950/20 dark:to-rose-950/20">
+                        <div className="space-y-3 rounded-xl bg-gradient-to-br from-[#0C134F]/5 to-[#5C469C]/5 p-4 dark:from-[#0C134F]/20 dark:to-[#5C469C]/20">
                             <div className="flex items-start gap-3">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-sm font-semibold text-white shadow-md">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
                                     1
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
@@ -92,7 +92,7 @@ function LandingPage() {
                                 </p>
                             </div>
                             <div className="flex items-start gap-3">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-sm font-semibold text-white shadow-md">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
                                     2
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
@@ -100,7 +100,7 @@ function LandingPage() {
                                 </p>
                             </div>
                             <div className="flex items-start gap-3">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-sm font-semibold text-white shadow-md">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
                                     3
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
@@ -115,19 +115,19 @@ function LandingPage() {
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <Download
                                     size={16}
-                                    className="text-orange-600"
+                                    className="text-[#5C469C]"
                                 />
                                 <span>Fast & Easy Installation</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <Smartphone
                                     size={16}
-                                    className="text-pink-600"
+                                    className="text-[#5C469C]"
                                 />
                                 <span>Available on iOS & Android</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                <Camera size={16} className="text-rose-600" />
+                                <Camera size={16} className="text-[#5C469C]" />
                                 <span>Access All Features On-The-Go</span>
                             </div>
                         </div>
@@ -135,7 +135,7 @@ function LandingPage() {
                         {/* Action Button */}
                         <Button
                             onClick={() => setShowQRModal(false)}
-                            className="mt-6 w-full bg-gradient-to-r from-orange-500 via-pink-500 to-rose-500 font-semibold hover:from-orange-600 hover:via-pink-600 hover:to-rose-600"
+                            className="mt-6 w-full bg-gradient-to-r from-[#5C469C] to-[#0C134F] hover:from-[#4a3880] hover:to-[#0a0f3d]"
                         >
                             Close
                         </Button>
@@ -143,46 +143,14 @@ function LandingPage() {
                 </div>
             )}
 
-            {/* Eye-Catching QR Banner - Top Position */}
-            <div
+            {/* Floating QR Button */}
+            <button
                 onClick={() => setShowQRModal(true)}
-                className="group relative mb-4 animate-pulse cursor-pointer overflow-hidden rounded-xl bg-gradient-to-r from-orange-500 via-pink-500 to-rose-500 p-1 shadow-2xl transition-all hover:scale-[1.02] hover:shadow-orange-500/50"
+                className="fixed right-6 bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#FF7070] to-[#EB4C4C] text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
+                title="Install Mobile App"
             >
-                <div className="flex items-center justify-between gap-4 rounded-lg bg-gradient-to-r from-orange-600 to-rose-600 p-4 sm:p-5">
-                    <div className="flex flex-1 items-center gap-3 sm:gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm sm:h-14 sm:w-14">
-                            <QrCode
-                                size={28}
-                                className="text-white sm:h-8 sm:w-8"
-                            />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-base font-bold text-white sm:text-lg">
-                                    📱 Download Our Mobile App!
-                                </h3>
-                                <span className="rounded-full bg-white/30 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
-                                    NEW
-                                </span>
-                            </div>
-                            <p className="mt-1 text-xs text-white/90 sm:text-sm">
-                                Scan QR code • Install instantly • Identify dogs
-                                anywhere
-                            </p>
-                        </div>
-                    </div>
-                    <div className="hidden items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-bold text-rose-600 transition-all group-hover:gap-3 sm:flex">
-                        <Smartphone size={18} />
-                        <span>Get App</span>
-                    </div>
-                    {/* Mobile button */}
-                    <div className="flex shrink-0 items-center justify-center rounded-lg bg-white p-2 sm:hidden">
-                        <Smartphone size={20} className="text-rose-600" />
-                    </div>
-                </div>
-                {/* Animated border glow */}
-                <div className="absolute inset-0 -z-10 animate-pulse rounded-xl bg-gradient-to-r from-orange-400 via-pink-400 to-rose-400 opacity-50 blur-xl"></div>
-            </div>
+                <QrCode size={24} />
+            </button>
 
             <div className="flex w-full flex-col gap-4 lg:flex-row">
                 <div className="flex w-full flex-col gap-4">
