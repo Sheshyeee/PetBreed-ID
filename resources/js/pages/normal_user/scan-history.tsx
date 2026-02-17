@@ -3,7 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Link, router } from '@inertiajs/react';
-import { Calendar, Camera, Download, QrCode, Smartphone, Trash2, X } from 'lucide-react';
+import {
+    Calendar,
+    Camera,
+    Download,
+    QrCode,
+    Smartphone,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 // Define the Scan interface
@@ -99,20 +107,12 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                     1
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    Open your camera app or QR code scanner
+                                    Scan the QR code above
                                 </p>
                             </div>
                             <div className="flex items-start gap-3">
                                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
                                     2
-                                </div>
-                                <p className="text-sm text-gray-700 dark:text-gray-300">
-                                    Point your camera at the QR code above
-                                </p>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
-                                    3
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
                                     Follow the link to download and install the
@@ -135,7 +135,7 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
                                     size={16}
                                     className="text-[#5C469C]"
                                 />
-                                <span>Available on iOS & Android</span>
+                                <span>Available on Android</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <Camera size={16} className="text-[#5C469C]" />
