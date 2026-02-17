@@ -3,7 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Link, router } from '@inertiajs/react';
-import { Calendar, Trash2 } from 'lucide-react';
+import { Calendar, Camera, Download, QrCode, Smartphone, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 
 // Define the Scan interface
 interface Scan {
@@ -42,9 +43,125 @@ const ScanHistory: React.FC<ScanHistoryProps> = ({ mockScans, user }) => {
         });
     };
 
+    const [open, setOpen] = useState(false);
+    const [showQRModal, setShowQRModal] = useState(false);
+
     return (
         <div className="min-h-screen w-full bg-background">
             <Header />
+
+            {showQRModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+                    onClick={() => setShowQRModal(false)}
+                >
+                    <div
+                        className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl dark:bg-gray-900"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setShowQRModal(false)}
+                            className="absolute top-4 right-4 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        {/* Header */}
+                        <div className="mb-6 text-center">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#5C469C] to-[#0C134F]">
+                                <Smartphone size={32} className="text-white" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                Install Mobile App
+                            </h2>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                Scan the QR code with your mobile device to
+                                download and install the app
+                            </p>
+                        </div>
+
+                        {/* QR Code */}
+                        <div className="mb-6 flex justify-center">
+                            <div className="rounded-2xl bg-white p-4 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
+                                <img
+                                    src="/doglens_apk_qr.jpeg"
+                                    alt="QR Code for App Installation"
+                                    className="h-48 w-48"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="space-y-3 rounded-xl bg-gradient-to-br from-[#0C134F]/5 to-[#5C469C]/5 p-4 dark:from-[#0C134F]/20 dark:to-[#5C469C]/20">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
+                                    1
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                    Open your camera app or QR code scanner
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
+                                    2
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                    Point your camera at the QR code above
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5C469C] text-sm font-semibold text-white">
+                                    3
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                    Follow the link to download and install the
+                                    app
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Features */}
+                        <div className="mt-6 space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <Download
+                                    size={16}
+                                    className="text-[#5C469C]"
+                                />
+                                <span>Fast & Easy Installation</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <Smartphone
+                                    size={16}
+                                    className="text-[#5C469C]"
+                                />
+                                <span>Available on iOS & Android</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <Camera size={16} className="text-[#5C469C]" />
+                                <span>Access All Features On-The-Go</span>
+                            </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <Button
+                            onClick={() => setShowQRModal(false)}
+                            className="mt-6 w-full bg-gradient-to-r from-[#5C469C] to-[#0C134F] hover:from-[#4a3880] hover:to-[#0a0f3d]"
+                        >
+                            Close
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Floating QR Button */}
+            <button
+                onClick={() => setShowQRModal(true)}
+                className="fixed right-6 bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#FF7070] to-[#EB4C4C] text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
+                title="Install Mobile App"
+            >
+                <QrCode size={24} />
+            </button>
 
             <div className="container mx-auto mt-[-30px] max-w-7xl px-8 py-8 sm:mt-[-20px] lg:px-10">
                 {/* Header Section */}
