@@ -183,7 +183,7 @@ export default function Header() {
     const page = usePage();
 
     // Check if user is admin
-    const allowedEmails = ['modeltraining2000@gmail.com'];
+    const allowedEmails = ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com'];
     const isAdmin = auth.user && allowedEmails.includes(auth.user.email);
 
     const handleLogout = () => {

@@ -51,7 +51,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(function (Request $request) {
             // Check if user is already authenticated
             if (Auth::check()) {
-                $allowedEmails = ['modeltraining2000@gmail.com'];
+                $allowedEmails = ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com'];
                 if (in_array(Auth::user()->email, $allowedEmails)) {
                     return redirect('/dashboard');
                 }
@@ -81,7 +81,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::registerView(function (Request $request) {
             // Check if user is already authenticated
             if (Auth::check()) {
-                $allowedEmails = ['modeltraining2000@gmail.com'];
+                $allowedEmails = ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com'];
                 if (in_array(Auth::user()->email, $allowedEmails)) {
                     return redirect('/dashboard');
                 }
