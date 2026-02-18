@@ -92,7 +92,7 @@ class GoogleController extends Controller
         Auth::login($user);
 
         // Check if admin
-        $allowedEmail = ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com'];
+        $allowedEmail = ['modeltraining2000@gmail.com', 'jrbd2022-8800-57025@bicol-u.edu.ph'];
         if (in_array($googleUser->email, $allowedEmail)) {
             return redirect('/dashboard');
         }

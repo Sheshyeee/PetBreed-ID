@@ -82,7 +82,7 @@ class MobileAuthController extends Controller
             $token = $user->createToken('mobile-app')->plainTextToken;
 
             // Admin Logic
-            $allowedEmail = ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com'];
+            $allowedEmail = ['modeltraining2000@gmail.com', 'jrbd2022-8800-57025@bicol-u.edu.ph'];
             $isAdmin = in_array($user->email, $allowedEmail);
 
             return response()->json([
@@ -115,7 +115,7 @@ class MobileAuthController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
         }
 
-        $isAdmin = in_array($user->email, ['modeltraining2000@gmail.com', 'jakerovicdalde1@gmail.com']);
+        $isAdmin = in_array($user->email, ['modeltraining2000@gmail.com', 'jrbd2022-8800-57025@bicol-u.edu.ph']);
 
         return response()->json([
             'success' => true,
