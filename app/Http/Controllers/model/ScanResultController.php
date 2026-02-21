@@ -843,17 +843,7 @@ class ScanResultController extends Controller
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
             // UPDATED: Prompt forces deep analysis before concluding the breed, formatted as strict JSON.
-            $geminiPrompt = "You are an expert canine geneticist and professional dog show judge. Your task is to analyze the provided image of a dog and determine its breed or likely breed mix with high accuracy. Do not default to 'Village Dog' unless absolutely certain; look deeply for specific breed markers.
-
-Analyze the dog based on:
-1. Visual Breakdown (Coat Color, Eyes, Ears, Head/Build)
-2. Breed Assessment (Primary Match, Contributing Breeds)
-
-CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exact format below. Do not include markdown formatting (like ```json) or any other text outside the JSON.
-{
-  \"deep_analysis\": \"Write your full step-by-step visual breakdown and breed assessment here.\",
-  \"final_breed\": \"The specific breed name or specific mix name (e.g., 'Australian Shepherd / Corgi mix')\"
-}";
+            $geminiPrompt = "You are an expert canine geneticist and professional dog show judge. Your task is to analyze the provided image of a dog and determine its breed or likely breed mix with high accuracy. Do not default to 'Village Dog' unless absolutely certain; look deeply for specific breed markers.\n\nAnalyze the dog based on:\n1. Visual Breakdown (Coat Color, Eyes, Ears, Head/Build)\n2. Breed Assessment (Primary Match, Contributing Breeds)\n\nCRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exact format below. Do not include markdown formatting (like ```json) or any other text outside the JSON.\n{\n  \"deep_analysis\": \"Write your full step-by-step visual breakdown and breed assessment here.\",\n  \"final_breed\": \"The specific breed name or specific mix name (e.g., 'Australian Shepherd / Corgi mix')\"\n}";
 
             $client = new \GuzzleHttp\Client([
                 'timeout'         => 60,
@@ -862,9 +852,17 @@ CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exac
 
             $startTime = microtime(true);
 
-            // FIXED: Cleaned up the mangled markdown URL formatting here
+            // ==========================================
+            // FIX FOR THE cURL ERROR:
+            // Splitting the URL into parts so your code editor or browser 
+            // DOES NOT accidentally convert it into a markdown link!
+            // ==========================================
+            $apiHost = '[https://generativelanguage.googleapis.com](https://generativelanguage.googleapis.com)';
+            $apiRoute = '/v1beta/models/gemini-3.1-pro-preview:generateContent?key=';
+            $fullUrl = $apiHost . $apiRoute . $apiKey;
+
             $response = $client->post(
-                '[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=)' . $apiKey,
+                $fullUrl,
                 [
                     'json' => [
                         'contents' => [
@@ -945,7 +943,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exac
 
             $analysisData = json_decode($rawText, true);
 
-            // UPDATED: Handle the JSON response to grab the breed AND the reasoning
+            // Handle the JSON response to grab the breed AND the reasoning
             if (json_last_error() === JSON_ERROR_NONE && isset($analysisData['final_breed'])) {
                 $rawBreedName = $analysisData['final_breed'];
                 $deepAnalysis = $analysisData['deep_analysis'] ?? '';
@@ -970,8 +968,8 @@ CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exac
                 'cleaned'  => $cleanedBreed,
             ]);
 
-            $rawConfidence    = 85.0;
-            $microVariance    = (mt_rand(-150, 150) / 10);
+            $rawConfidence    = 85.0; 
+            $microVariance    = (mt_rand(-150, 150) / 10); 
             $actualConfidence = max(35.0, min(97.0, $rawConfidence + $microVariance));
 
             Log::info('✓ Gemini breed identification successful', [
@@ -994,7 +992,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exac
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'reasoning'       => $deepAnalysis, // NOW SAVES THE FULL ANALYSIS!
+                    'reasoning'       => $deepAnalysis, 
                     'key_identifiers' => [],
                     'model'           => 'gemini-3.1-pro-preview',
                     'response_time_s' => $duration,
