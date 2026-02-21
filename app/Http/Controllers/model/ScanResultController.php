@@ -971,7 +971,7 @@ Rules:
 - Assign a realistic similarity confidence score to each (must be lower than the primary match, must honestly reflect visual similarity)
 - If the primary is Aspin, list the closest Southeast Asian primitive-type or pariah-type breeds
 - Use the complete official breed name — no abbreviations, no truncation
-- Confidence scores must be realistic: 60-80% for very similar breeds, 40-60% for moderately similar, 20-40% for loosely similar
+- Confidence scores must be realistic: 50-70% for very similar breeds, 30-50% for moderately similar,
 
 Output ONLY valid JSON in exactly this format — no markdown fences, no extra text, nothing else:
 {\"alternatives\":[{\"breed\":\"Full Official Breed Name\",\"confidence\":72.5}, {\"breed\":\"Full Official Breed Name\",\"confidence\":58.0}]}";
