@@ -899,7 +899,7 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                             'temperature'    => 0.1,
                             'maxOutputTokens' => 50,
                             'thinkingConfig'  => [
-                                'thinkingBudget' => 4048,
+                                'thinkingBudget' => 6048,
                             ],
                         ],
                         'safetySettings' => [
