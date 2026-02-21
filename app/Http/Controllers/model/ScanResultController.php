@@ -795,8 +795,6 @@ class ScanResultController extends Controller
      */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
-        set_time_limit(120);
-
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
         Log::info('Is object storage: ' . ($isObjectStorage ? 'YES' : 'NO'));
@@ -843,31 +841,55 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            $geminiPrompt = "You are a master canine geneticist and professional dog show judge with encyclopedic knowledge of 400+ AKC, FCI, UKC, and PHBA recognized breeds, designer hybrids, and Southeast Asian landraces.
+            $geminiPrompt = "You are a world-class canine geneticist, FCI international dog show judge, and breed historian with complete forensic-level knowledge of every dog breed ever recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including common breeds, rare breeds, ancient landraces, regional breeds, and Southeast Asian native dogs.
 
-Perform a deep forensic visual analysis of every visible physical trait:
-- COAT: texture (smooth/wire/curly/double), length, density, color, pattern (solid/brindle/merle/parti/sable/ticking)
-- HEAD: skull shape (domed/flat/wedge/broad), stop definition, muzzle ratio, jowls, lip type
-- EARS: set position (high/low), shape (erect/semi-erect/button/rose/pendant/cropped), size relative to head
-- EYES: shape (almond/round/triangular), set (close/wide), color
-- BODY: topline (level/roached/sloping), chest depth, rib spring, tuck-up, loin length
-- LIMBS: bone density (fine/moderate/heavy), leg length ratio, angulation, feet (cat/hare/round)
-- TAIL: set, carriage (sickle/curled/otter/whip/bobtail), feathering
-- SIZE & WEIGHT ESTIMATE: toy/small/medium/large/giant
-- OVERALL SILHOUETTE: Compare against known breed standards
+STEP 1 — FORENSIC TRAIT ANALYSIS (perform silently and completely before deciding):
+Examine every visible physical trait with expert precision:
+- COAT: exact texture (smooth/short/wire/wavy/curly/double/silky/harsh), length, density, color, and pattern (solid/spotted/ticked/merle/parti/saddle/blanket/sable/brindle/tricolor)
+- HEAD & SKULL: shape (domed/flat/wedge/chiseled/broad/narrow/blocky/refined), occiput prominence, stop angle (pronounced/moderate/slight/absent), muzzle-to-skull length ratio, flews, lip tightness, cheek muscles
+- EARS: attachment point (high/mid/low-set), shape (erect/semi-erect/rose/button/pendant/folded/lobular/cropped), leather thickness, length relative to muzzle
+- EYES: shape (almond/oval/round/triangular/deep-set/prominent), spacing (close/wide), color, expression
+- NECK: length, arch, presence of dewlap or throatiness
+- BODY: length-to-height ratio, chest width and depth, forechest development, rib spring, degree of tuck-up, back length, loin strength, coupling
+- LIMBS: bone substance (fine/moderate/heavy), front leg straightness, hindquarter angulation, stifle bend, hock length and angle, feet type (cat/hare/oval/round), pad thickness
+- TAIL: set (high/low), length, natural carriage at rest and alert (sabre/sickle/curled/otter/whip/bobtail/gay/plume), feathering or brush
+- SIZE: estimate shoulder height and weight category (toy under 5kg / small 5-10kg / medium 10-25kg / large 25-45kg / giant over 45kg)
+- OVERALL TYPE: Match the full silhouette and proportions to FCI breed group types (sighthound/scenthound/gundog/terrier/spitz/molosser/herding/primitive/companion)
 
-Cross-reference ALL traits simultaneously against breed standards. Penalize breeds that do not match multiple traits. Reward the breed with the highest number of matching trait clusters.
+STEP 2 — BREED DIFFERENTIATION (mandatory before finalizing):
+This step is critical. Do not jump to the most common or obvious breed.
+- Identify the FCI group or type this dog belongs to based on overall silhouette and structure
+- Within that group, mentally shortlist the top 3-5 candidate breeds that share the same general type
+- Cross-reference each candidate breed against EVERY trait you identified in Step 1
+- Eliminate candidates that fail to match even one or two critical structural traits
+- Commit only to the breed that matches the HIGHEST number of traits simultaneously
+- Never base your decision on a single feature (coat color, spots, or face shape alone)
+- Always consider rare, regional, and uncommon breeds as valid candidates — do not default to the most popular breed of a similar type
 
-CLASSIFICATION RULES (apply in strict order):
-1. PHILIPPINE/SEA NATIVE: If the dog presents the phenotype of a Southeast Asian or Philippine street dog — lean build, short smooth coat, almond eyes, semi-erect or erect ears, sickle or curled tail, medium size — classify EXACTLY as: Aspin
-2. PUREBRED: If 80%+ of traits match a single recognized breed standard, name that exact breed.
-3. DESIGNER CROSSBREED: If it matches a known hybrid (e.g., Goldendoodle, Cockapoo, Maltipoo), name that hybrid.
-4. MIXED: If dominant traits point to two breeds, write: [Dominant Breed] / [Secondary Breed] mix
+STEP 3 — ASPIN IDENTIFICATION (apply with high sensitivity — this is the most important rule):
+The Aspin is the Philippine native dog and the most common dog in Southeast Asia. It must be identified correctly and must NEVER be mislabeled as another breed.
+Key Aspin traits to check — if the majority of these are present, classify as Aspin regardless of any superficial similarity to a foreign breed:
+- Lean, lightly muscled body with visible tuck-up
+- Short, smooth, close-lying coat (any color — tan, black, spotted, brindle, white are all valid Aspin colors)
+- Wedge-shaped or slightly rounded head with a moderate stop
+- Almond-shaped eyes, often dark
+- Semi-erect, erect, or slightly tipped ears (not fully pendant/lobular)
+- Sickle-shaped, curled, or low-carried tail
+- Medium size, fine to moderate bone
+- Overall primitive/pariah dog appearance — not refined, not heavily muscled, not exaggerated in any feature
+If these traits are present, output exactly: Aspin
+Do NOT label an Aspin as: Village Dog, Mixed Breed, Mutt, Philippine Dog, Street Dog, or any foreign breed name.
 
-STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanation. No punctuation except what belongs in the breed name. One line only.";
+STEP 4 — FINAL CLASSIFICATION (apply in strict order after Steps 1-3):
+1. ASPIN: If Step 3 criteria are met → output exactly: Aspin
+2. PUREBRED: If 80%+ of all visible traits match one recognized breed standard → output the COMPLETE official registered breed name with no abbreviations (e.g., 'Dalmatian' not 'Dalmat', 'English Foxhound' not 'English Fox', 'Billy' for the French hound, 'Grand Bleu de Gascogne' in full)
+3. DESIGNER CROSSBREED: If it matches a recognized named hybrid (Goldendoodle, Cockapoo, Labradoodle, Maltipoo, Schnoodle, etc.) → output that full hybrid name
+4. MIXED BREED: If two breed influences are clearly dominant but it is not a named hybrid → output: [Full Breed Name] / [Full Breed Name] mix
+
+FINAL OUTPUT RULE: Output ONLY the single breed name on one line. No explanation. No reasoning. No JSON. No extra punctuation. No abbreviations. Complete official name only.";
 
             $client = new \GuzzleHttp\Client([
-                'timeout'         => 120,
+                'timeout'         => 150,
                 'connect_timeout' => 15,
             ]);
 
@@ -896,10 +918,10 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                             ],
                         ],
                         'generationConfig' => [
-                            'temperature'    => 0.1,
-                            'maxOutputTokens' => 50,
+                            'temperature'     => 0.1,
+                            'maxOutputTokens' => 100,
                             'thinkingConfig'  => [
-                                'thinkingBudget' => 6048,
+                                'thinkingBudget' => 8192,
                             ],
                         ],
                         'safetySettings' => [
@@ -917,7 +939,7 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
 
             $responseBody = $response->getBody()->getContents();
 
-            // Always log the raw response for debugging unexpected structures
+            // Always log the raw response for debugging
             Log::info('📥 Raw Gemini response: ' . substr($responseBody, 0, 1000));
 
             $result = json_decode($responseBody, true);
@@ -939,7 +961,6 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
 
             // Check candidates exist
             if (empty($result['candidates']) || !is_array($result['candidates'])) {
-                // Sometimes Gemini returns promptFeedback with a block reason instead of candidates
                 $blockReason = $result['promptFeedback']['blockReason'] ?? null;
                 if ($blockReason) {
                     throw new \Exception('Gemini blocked the request: ' . $blockReason);
@@ -947,26 +968,22 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                 throw new \Exception('Gemini returned no candidates in response.');
             }
 
-            $candidate = $result['candidates'][0];
-
-            // Check finish reason — SAFETY blocks sometimes return a candidate with no content
+            $candidate    = $result['candidates'][0];
             $finishReason = $candidate['finishReason'] ?? 'STOP';
             Log::info('Gemini finish reason: ' . $finishReason);
 
             if ($finishReason === 'SAFETY') {
                 Log::warning('⚠️ Gemini blocked response due to SAFETY filters');
-                // Fallback: return a generic safe default rather than crashing
                 $rawBreedName = 'Unknown';
             } elseif ($finishReason === 'RECITATION') {
                 Log::warning('⚠️ Gemini blocked response due to RECITATION');
                 $rawBreedName = 'Unknown';
             } elseif (!isset($candidate['content']['parts']) || !is_array($candidate['content']['parts'])) {
-                // Candidate exists but has no content/parts (can happen on some blocks)
                 Log::warning('⚠️ Candidate has no content parts. Finish reason: ' . $finishReason);
                 Log::warning('⚠️ Full candidate: ' . json_encode($candidate));
                 $rawBreedName = 'Unknown';
             } else {
-                // Normal path: extract text from parts, skipping thought blocks
+                // Normal path: skip thought blocks, grab only final output text
                 foreach ($candidate['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
                         $rawBreedName = trim($part['text']);
@@ -974,7 +991,7 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                     }
                 }
 
-                // If all parts were thought blocks and we got nothing, try grabbing any text
+                // Fallback: if all parts were thought blocks, grab any text
                 if (empty($rawBreedName)) {
                     foreach ($candidate['content']['parts'] as $part) {
                         if (isset($part['text'])) {
@@ -985,9 +1002,7 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                 }
             }
 
-            // ============================================================
-            // SANITIZE: Handle edge cases where output is still JSON
-            // ============================================================
+            // Safety net: if output is still JSON somehow, extract breed key
             if (!empty($rawBreedName) && str_starts_with($rawBreedName, '{')) {
                 Log::warning('⚠️ Output is JSON, extracting breed key.');
                 $decoded = json_decode($rawBreedName, true);
@@ -998,11 +1013,15 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                 }
             }
 
-            // Strip stray quotes, backticks, newlines
+            // Strip stray quotes, backticks, newlines only
             $rawBreedName = trim($rawBreedName, " \t\n\r\0\x0B\"'`");
 
-            // Hard cap at 60 chars for DB safety
-            $rawBreedName = substr($rawBreedName, 0, 60);
+            // Take only the first line in case model outputs multiple lines
+            $lines        = explode("\n", $rawBreedName);
+            $rawBreedName = trim($lines[0]);
+
+            // Hard cap at 100 chars for DB safety
+            $rawBreedName = substr($rawBreedName, 0, 100);
 
             // Final fallback
             if (empty($rawBreedName)) {
@@ -1011,11 +1030,26 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
 
             Log::info('✓ Gemini raw breed name: ' . $rawBreedName);
 
-            $cleanedBreed = $this->cleanBreedName($rawBreedName);
+            // ============================================================
+            // BREED NAME CLEANUP
+            // Only apply cleanBreedName() for mixed/cross notation.
+            // Pure breeds and designer hybrids are used as-is to prevent
+            // stripping legitimate parts of the name (e.g. "hound", "ian")
+            // ============================================================
+            if (
+                str_contains(strtolower($rawBreedName), ' / ') ||
+                str_contains(strtolower($rawBreedName), ' mix') ||
+                str_contains(strtolower($rawBreedName), ' cross')
+            ) {
+                $cleanedBreed = $this->cleanBreedName($rawBreedName);
+            } else {
+                // Pure breed or designer hybrid — normalize spaces only
+                $cleanedBreed = preg_replace('/\s+/', ' ', trim($rawBreedName));
+            }
 
-            Log::info('Breed name cleaned', [
-                'original' => $rawBreedName,
-                'cleaned'  => $cleanedBreed,
+            Log::info('Breed name finalized', [
+                'raw'   => $rawBreedName,
+                'final' => $cleanedBreed,
             ]);
 
             $rawConfidence    = 88.0;
