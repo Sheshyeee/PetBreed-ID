@@ -793,7 +793,7 @@ class ScanResultController extends Controller
      * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
      * ==========================================
      */
-   private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
+    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
@@ -852,11 +852,7 @@ class ScanResultController extends Controller
 
             $startTime = microtime(true);
 
-            // ==========================================
-            // ULTIMATE FIX FOR cURL ERROR 3:
-            // Hiding the URL in base64 so your editor cannot auto-format it into a markdown link!
-            // This decodes safely back to: [https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=)
-            // ==========================================
+            // Using base64 to prevent markdown auto-formatting errors
             $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
             $fullUrl = base64_decode($encodedUrl) . $apiKey;
 
@@ -880,8 +876,10 @@ class ScanResultController extends Controller
                             ],
                         ],
                         'generationConfig' => [
-                            'temperature'     => 0.2,
-                            'maxOutputTokens' => 2048, 
+                            'temperature'      => 0.2,
+                            'maxOutputTokens'  => 2048,
+                            // FIXED: This strictly forces the AI to output valid JSON so parsing never fails
+                            'responseMimeType' => 'application/json',
                         ],
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
@@ -936,21 +934,29 @@ class ScanResultController extends Controller
                 }
             }
 
-            // Clean up potential markdown formatting just in case the AI ignores the "no markdown" rule
-            $rawText = preg_replace('/^```json\s*|```$/i', '', trim($rawText));
             $rawText = trim($rawText);
 
-            $analysisData = json_decode($rawText, true);
+            // FIXED: Securely extract only the JSON block in case the AI added conversational text
+            $jsonStr = $rawText;
+            $startPos = strpos($rawText, '{');
+            $endPos = strrpos($rawText, '}');
+            if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
+                $jsonStr = substr($rawText, $startPos, $endPos - $startPos + 1);
+            }
+
+            $analysisData = json_decode($jsonStr, true);
 
             // Handle the JSON response to grab the breed AND the reasoning
             if (json_last_error() === JSON_ERROR_NONE && isset($analysisData['final_breed'])) {
                 $rawBreedName = $analysisData['final_breed'];
                 $deepAnalysis = $analysisData['deep_analysis'] ?? '';
             } else {
-                // Fallback just in case it outputs raw text instead of JSON
-                $rawBreedName = $rawText;
+                // FIXED: If parsing fails, do NOT dump 2000 characters into the DB (prevents SQL crash)
+                Log::warning('⚠️ Failed to parse JSON from Gemini response. Raw text snippet: ' . substr($rawText, 0, 100));
+
+                // Truncate to 50 chars to guarantee it fits in the 'breed' database column safely
+                $rawBreedName = substr(strip_tags($rawText), 0, 50);
                 $deepAnalysis = 'Analysis parsing failed.';
-                Log::warning('⚠️ Failed to parse JSON from Gemini response, using raw text fallback.');
             }
 
             if (empty($rawBreedName)) {
@@ -967,8 +973,8 @@ class ScanResultController extends Controller
                 'cleaned'  => $cleanedBreed,
             ]);
 
-            $rawConfidence    = 85.0; 
-            $microVariance    = (mt_rand(-150, 150) / 10); 
+            $rawConfidence    = 85.0;
+            $microVariance    = (mt_rand(-150, 150) / 10);
             $actualConfidence = max(35.0, min(97.0, $rawConfidence + $microVariance));
 
             Log::info('✓ Gemini breed identification successful', [
@@ -991,7 +997,7 @@ class ScanResultController extends Controller
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'reasoning'       => $deepAnalysis, 
+                    'reasoning'       => $deepAnalysis,
                     'key_identifiers' => [],
                     'model'           => 'gemini-3.1-pro-preview',
                     'response_time_s' => $duration,
