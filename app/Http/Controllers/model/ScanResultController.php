@@ -963,7 +963,7 @@ CRITICAL OUTPUT RULE:
 
 The dog in this image has been identified as: \"{$primaryBreedRaw}\".
 
-Your task: Look at this same dog image and identify the 3 CLOSEST alternative breeds — breeds that share the most visible physical or structural similarities with \"{$primaryBreedRaw}\" based on what you can actually see in this image.
+Your task: Look at this same dog image and identify the 2 CLOSEST alternative breeds — breeds that share the most visible physical or structural similarities with \"{$primaryBreedRaw}\" based on what you can actually see in this image.
 
 Rules:
 - Do NOT include \"{$primaryBreedRaw}\" in the alternatives list
