@@ -795,6 +795,9 @@ class ScanResultController extends Controller
      */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
+        // Increase PHP execution time to allow deep analysis without timing out
+        set_time_limit(120);
+
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
         Log::info('Is object storage: ' . ($isObjectStorage ? 'YES' : 'NO'));
@@ -817,14 +820,12 @@ class ScanResultController extends Controller
                     return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = Storage::disk('object-storage')->get($imagePath);
-                Log::info('✓ Image loaded from object storage');
             } else {
                 if (!file_exists($imagePath)) {
                     Log::error('✗ Image not found locally: ' . $imagePath);
                     return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = file_get_contents($imagePath);
-                Log::info('✓ Image loaded from local filesystem');
             }
 
             if (empty($imageContents)) {
@@ -842,23 +843,25 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // THE PRO-LEVEL PROMPT: This mimics how the web chatbot thinks.
-            // It allows the AI to perform deep analysis to reach the right conclusion,
-            // explicitly reminding it to consider Philippine Aspins.
-            $geminiPrompt = "You are an expert canine geneticist. Your goal is to identify the breed of the dog in the image with the same accuracy as a professional assessment.
+            // INTELLIGENT PROMPT: Taxonomy Forcing
+            // This forces the AI to prioritize the local term 'Aspin' over the global term 'Village Dog'
+            $geminiPrompt = "You are a master canine geneticist specializing in global landraces and Philippine native breeds. 
 
-Take a deep breath and think step-by-step:
-1. Analyze the dog's physical traits: coat type, body build, ear shape, and tail carriage.
-2. Consider geographic origin and common village dog phenotypes. If the dog presents as a lean, short-coated dog with traits typical of a Philippine native dog, recognize the 'Aspin' phenotype rather than mistakenly guessing a Terrier or Hound mix.
+Conduct a deep visual analysis of this dog (coat, tail, ears, snout, build). 
 
-You must output your response STRICTLY as a JSON object with exactly two keys:
+CRITICAL TAXONOMY RULES:
+1. If this dog presents the phenotype of a Southeast Asian Village Dog, a Philippine street dog, or a native mixed landrace (e.g., short coat, lean build, curled/sickle tail), you MUST classify it exactly as 'Aspin'. 
+2. Do NOT use generic terms like 'Village Dog', 'Mixed Breed', or 'Mutt' for this phenotype. Use 'Aspin'.
+3. If it is clearly a purebred (like a pure Husky) or a recognized designer breed, name that specific breed.
+
+You MUST respond strictly in valid JSON format with exactly two keys:
 {
-  \"reasoning\": \"Write your step-by-step visual analysis here. Thinking through this helps you arrive at the correct breed.\",
-  \"breed\": \"The final short breed name ONLY (e.g., 'Aspin', 'Labrador Retriever', 'Spitz mix').\"
+  \"reasoning\": \"Your step-by-step physical breakdown explaining your choice.\",
+  \"breed\": \"The exact final breed name ONLY (e.g., 'Aspin'). Do not include parentheses or alternative names.\"
 }";
 
             $client = new \GuzzleHttp\Client([
-                'timeout'         => 60,
+                'timeout'         => 120, // Increased to 2 minutes
                 'connect_timeout' => 15,
             ]);
 
@@ -887,10 +890,10 @@ You must output your response STRICTLY as a JSON object with exactly two keys:
                             ],
                         ],
                         'generationConfig' => [
-                            // INCREASED TEMPERATURE: 0.4 allows the AI to "think" more like the web chatbot
-                            'temperature'      => 0.4,
+                            // Temperature lowered to 0.1 to FORCE strict adherence to the Taxonomy Rules
+                            'temperature'      => 0.1,
                             'maxOutputTokens'  => 600,
-                            'responseMimeType' => 'application/json', // Guarantees the AI formats it as JSON
+                            'responseMimeType' => 'application/json', // Guarantees JSON output
                         ],
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
@@ -931,14 +934,12 @@ You must output your response STRICTLY as a JSON object with exactly two keys:
             // EXTRACT ONLY THE BREED NAME
             if (json_last_error() === JSON_ERROR_NONE && isset($analysisData['breed'])) {
                 $rawBreedName = $analysisData['breed'];
-                // We let the AI think, but we discard the 'reasoning' here so it never touches your DB or frontend.
             } else {
                 Log::warning('⚠️ Failed to extract breed key, falling back to raw text parsing.');
                 $rawBreedName = substr(strip_tags($rawText), 0, 50);
             }
 
-            // FINAL DATABASE SAFETY CHECK: 
-            // Force the string to be maximum 50 characters so your database absolutely cannot crash.
+            // Database Safeguard: Force maximum 50 characters to prevent crashes
             $rawBreedName = substr(trim($rawBreedName), 0, 50);
 
             if (empty($rawBreedName)) {
@@ -947,7 +948,7 @@ You must output your response STRICTLY as a JSON object with exactly two keys:
 
             Log::info('✓ Gemini raw breed name: ' . $rawBreedName);
 
-            // Clean breed name
+            // Clean breed name using your helper method
             $cleanedBreed = $this->cleanBreedName($rawBreedName);
 
             Log::info('Breed name cleaned', [
@@ -969,7 +970,7 @@ You must output your response STRICTLY as a JSON object with exactly two keys:
             return [
                 'success'         => true,
                 'method'          => 'gemini_vision',
-                'breed'           => $cleanedBreed, // Only the pure breed name goes out!
+                'breed'           => $cleanedBreed,
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
