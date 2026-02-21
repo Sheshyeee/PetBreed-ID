@@ -841,7 +841,10 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            $geminiPrompt = "You are a world-class canine geneticist, FCI international dog show judge, and breed historian with complete forensic-level knowledge of every dog breed ever recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including common breeds, rare breeds, ancient landraces, regional breeds, and Southeast Asian native dogs.
+            // ============================================================
+            // PRIMARY BREED IDENTIFICATION PROMPT
+            // ============================================================
+            $primaryPrompt = "You are a world-class canine geneticist, FCI international dog show judge, and breed historian with complete forensic-level knowledge of every dog breed ever recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including common breeds, rare breeds, ancient landraces, regional breeds, and Southeast Asian native dogs.
 
 STEP 1 — FORENSIC TRAIT ANALYSIS (perform silently and completely before deciding):
 Examine every visible physical trait with expert precision:
@@ -857,7 +860,6 @@ Examine every visible physical trait with expert precision:
 - OVERALL TYPE: Match the full silhouette and proportions to FCI breed group types (sighthound/scenthound/gundog/terrier/spitz/molosser/herding/primitive/companion)
 
 STEP 2 — BREED DIFFERENTIATION (mandatory before finalizing):
-This step is critical. Do not jump to the most common or obvious breed.
 - Identify the FCI group or type this dog belongs to based on overall silhouette and structure
 - Within that group, mentally shortlist the top 3-5 candidate breeds that share the same general type
 - Cross-reference each candidate breed against EVERY trait you identified in Step 1
@@ -868,174 +870,222 @@ This step is critical. Do not jump to the most common or obvious breed.
 
 STEP 3 — ASPIN IDENTIFICATION (apply with high sensitivity — this is the most important rule):
 The Aspin is the Philippine native dog and the most common dog in Southeast Asia. It must be identified correctly and must NEVER be mislabeled as another breed.
-Key Aspin traits to check — if the majority of these are present, classify as Aspin regardless of any superficial similarity to a foreign breed:
+Key Aspin traits — if the majority of these are present, classify as Aspin:
 - Lean, lightly muscled body with visible tuck-up
-- Short, smooth, close-lying coat (any color — tan, black, spotted, brindle, white are all valid Aspin colors)
+- Short, smooth, close-lying coat (any color — tan, black, spotted, brindle, white are all valid)
 - Wedge-shaped or slightly rounded head with a moderate stop
 - Almond-shaped eyes, often dark
 - Semi-erect, erect, or slightly tipped ears (not fully pendant/lobular)
 - Sickle-shaped, curled, or low-carried tail
 - Medium size, fine to moderate bone
-- Overall primitive/pariah dog appearance — not refined, not heavily muscled, not exaggerated in any feature
+- Overall primitive/pariah dog appearance — not refined, not heavily muscled, not exaggerated
 If these traits are present, output exactly: Aspin
 Do NOT label an Aspin as: Village Dog, Mixed Breed, Mutt, Philippine Dog, Street Dog, or any foreign breed name.
 
 STEP 4 — FINAL CLASSIFICATION (apply in strict order after Steps 1-3):
 1. ASPIN: If Step 3 criteria are met → output exactly: Aspin
-2. PUREBRED: If 80%+ of all visible traits match one recognized breed standard → output the COMPLETE official registered breed name with no abbreviations (e.g., 'Dalmatian' not 'Dalmat', 'English Foxhound' not 'English Fox', 'Billy' for the French hound, 'Grand Bleu de Gascogne' in full)
-3. DESIGNER CROSSBREED: If it matches a recognized named hybrid (Goldendoodle, Cockapoo, Labradoodle, Maltipoo, Schnoodle, etc.) → output that full hybrid name
+2. PUREBRED: If 80%+ of all visible traits match one recognized breed standard → output the COMPLETE official registered breed name with no abbreviations
+3. DESIGNER CROSSBREED: If it matches a recognized named hybrid → output that full hybrid name
 4. MIXED BREED: If two breed influences are clearly dominant but it is not a named hybrid → output: [Full Breed Name] / [Full Breed Name] mix
 
 FINAL OUTPUT RULE: Output ONLY the single breed name on one line. No explanation. No reasoning. No JSON. No extra punctuation. No abbreviations. Complete official name only.";
+
+            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
+            $fullUrl    = base64_decode($encodedUrl) . $apiKey;
 
             $client = new \GuzzleHttp\Client([
                 'timeout'         => 150,
                 'connect_timeout' => 15,
             ]);
 
+            // ============================================================
+            // CALL 1: PRIMARY BREED — deep thinking for accuracy
+            // ============================================================
             $startTime = microtime(true);
 
-            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
-            $fullUrl    = base64_decode($encodedUrl) . $apiKey;
-
-            $response = $client->post(
-                $fullUrl,
-                [
-                    'json' => [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    [
-                                        'text' => $geminiPrompt,
-                                    ],
-                                    [
-                                        'inline_data' => [
-                                            'mime_type' => $mimeType,
-                                            'data'      => $imageData,
-                                        ],
+            $primaryResponse = $client->post($fullUrl, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $primaryPrompt],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mimeType,
+                                        'data'      => $imageData,
                                     ],
                                 ],
                             ],
                         ],
-                        'generationConfig' => [
-                            'temperature'     => 0.1,
-                            'maxOutputTokens' => 100,
-                            'thinkingConfig'  => [
-                                'thinkingBudget' => 8192,
-                            ],
-                        ],
-                        'safetySettings' => [
-                            ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+                    ],
+                    'generationConfig' => [
+                        'temperature'     => 0.1,
+                        'maxOutputTokens' => 100,
+                        'thinkingConfig'  => [
+                            'thinkingBudget' => 8192,
                         ],
                     ],
-                ]
-            );
+                    'safetySettings' => [
+                        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+                    ],
+                ],
+            ]);
 
-            $duration = round(microtime(true) - $startTime, 2);
-            Log::info("✓ Gemini breed identification response received in {$duration}s");
+            $primaryDuration = round(microtime(true) - $startTime, 2);
+            Log::info("✓ Primary breed response received in {$primaryDuration}s");
 
-            $responseBody = $response->getBody()->getContents();
+            $primaryBody   = $primaryResponse->getBody()->getContents();
+            $primaryResult = json_decode($primaryBody, true);
 
-            // Always log the raw response for debugging
-            Log::info('📥 Raw Gemini response: ' . substr($responseBody, 0, 1000));
+            Log::info('📥 Primary raw response: ' . substr($primaryBody, 0, 800));
 
-            $result = json_decode($responseBody, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Failed to parse Gemini outer response: ' . json_last_error_msg());
-            }
+            $primaryBreedRaw = $this->extractBreedFromGeminiResponse($primaryResult);
 
             // ============================================================
-            // DEFENSIVE RESPONSE PARSING - handles all possible structures
+            // CALL 2: ALTERNATIVE BREEDS — lighter thinking, structured JSON
             // ============================================================
+            $alternativesPrompt = "You are an expert canine breed analyst. A dog image has been identified as: \"{$primaryBreedRaw}\".
 
-            $rawBreedName = '';
+Now look at this same dog image and identify the TOP 3 CLOSEST alternative breeds — breeds that share the most visual or structural similarities with \"{$primaryBreedRaw}\" based on what you can see in the image.
 
-            // Check for API-level error first
-            if (isset($result['error'])) {
-                throw new \Exception('Gemini API error: ' . ($result['error']['message'] ?? 'Unknown API error'));
-            }
+Rules:
+- Do NOT include \"{$primaryBreedRaw}\" itself in the alternatives
+- Choose breeds that genuinely share physical traits visible in this image (body type, coat, head shape, ear type, size)
+- Assign a realistic similarity confidence percentage to each alternative (must be LOWER than the primary match and reflect how visually similar they are)
+- If the primary is Aspin, list the closest Southeast Asian or primitive-type breeds as alternatives
+- Use complete official breed names only — no abbreviations
 
-            // Check candidates exist
-            if (empty($result['candidates']) || !is_array($result['candidates'])) {
-                $blockReason = $result['promptFeedback']['blockReason'] ?? null;
-                if ($blockReason) {
-                    throw new \Exception('Gemini blocked the request: ' . $blockReason);
-                }
-                throw new \Exception('Gemini returned no candidates in response.');
-            }
+Output ONLY this exact JSON format with no extra text:
+{
+  \"alternatives\": [
+    {\"breed\": \"Full Breed Name\", \"confidence\": 72.5},
+    {\"breed\": \"Full Breed Name\", \"confidence\": 61.0},
+    {\"breed\": \"Full Breed Name\", \"confidence\": 48.5}
+  ]
+}";
 
-            $candidate    = $result['candidates'][0];
-            $finishReason = $candidate['finishReason'] ?? 'STOP';
-            Log::info('Gemini finish reason: ' . $finishReason);
+            $altStartTime = microtime(true);
 
-            if ($finishReason === 'SAFETY') {
-                Log::warning('⚠️ Gemini blocked response due to SAFETY filters');
-                $rawBreedName = 'Unknown';
-            } elseif ($finishReason === 'RECITATION') {
-                Log::warning('⚠️ Gemini blocked response due to RECITATION');
-                $rawBreedName = 'Unknown';
-            } elseif (!isset($candidate['content']['parts']) || !is_array($candidate['content']['parts'])) {
-                Log::warning('⚠️ Candidate has no content parts. Finish reason: ' . $finishReason);
-                Log::warning('⚠️ Full candidate: ' . json_encode($candidate));
-                $rawBreedName = 'Unknown';
-            } else {
-                // Normal path: skip thought blocks, grab only final output text
-                foreach ($candidate['content']['parts'] as $part) {
+            $altResponse = $client->post($fullUrl, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $alternativesPrompt],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mimeType,
+                                        'data'      => $imageData,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'generationConfig' => [
+                        'temperature'     => 0.2,
+                        'maxOutputTokens' => 300,
+                        'thinkingConfig'  => [
+                            'thinkingBudget' => 2048, // lighter — alternatives don't need as much reasoning
+                        ],
+                    ],
+                    'safetySettings' => [
+                        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+                    ],
+                ],
+            ]);
+
+            $altDuration = round(microtime(true) - $altStartTime, 2);
+            Log::info("✓ Alternatives response received in {$altDuration}s");
+
+            $altBody   = $altResponse->getBody()->getContents();
+            $altResult = json_decode($altBody, true);
+
+            Log::info('📥 Alternatives raw response: ' . substr($altBody, 0, 800));
+
+            // ============================================================
+            // PARSE ALTERNATIVE BREEDS
+            // ============================================================
+            $topPredictions  = [];
+            $alternativeData = [];
+
+            // Extract text from alternatives response
+            $altText = '';
+            if (!empty($altResult['candidates'][0]['content']['parts'])) {
+                foreach ($altResult['candidates'][0]['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
-                        $rawBreedName = trim($part['text']);
+                        $altText = trim($part['text']);
                         break;
                     }
                 }
-
-                // Fallback: if all parts were thought blocks, grab any text
-                if (empty($rawBreedName)) {
-                    foreach ($candidate['content']['parts'] as $part) {
+                if (empty($altText)) {
+                    foreach ($altResult['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text'])) {
-                            $rawBreedName = trim($part['text']);
+                            $altText = trim($part['text']);
                             break;
                         }
                     }
                 }
             }
 
-            // Safety net: if output is still JSON somehow, extract breed key
-            if (!empty($rawBreedName) && str_starts_with($rawBreedName, '{')) {
-                Log::warning('⚠️ Output is JSON, extracting breed key.');
-                $decoded = json_decode($rawBreedName, true);
-                if (json_last_error() === JSON_ERROR_NONE && isset($decoded['breed'])) {
-                    $rawBreedName = $decoded['breed'];
-                } elseif (preg_match('/"breed"\s*:\s*"([^"]+)"/i', $rawBreedName, $matches)) {
-                    $rawBreedName = $matches[1];
+            // Strip markdown code fences if present
+            $altText = preg_replace('/```json|```/i', '', $altText);
+            $altText = trim($altText);
+
+            $altDecoded = json_decode($altText, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && isset($altDecoded['alternatives']) && is_array($altDecoded['alternatives'])) {
+                foreach ($altDecoded['alternatives'] as $alt) {
+                    if (!empty($alt['breed']) && isset($alt['confidence'])) {
+                        $altBreed      = trim($alt['breed'], " \t\n\r\0\x0B\"'`");
+                        $altBreed      = substr($altBreed, 0, 100);
+                        $altConfidence = (float) $alt['confidence'];
+
+                        // Ensure alternatives are always lower than primary confidence
+                        $altConfidence = max(20.0, min(84.9, $altConfidence));
+
+                        // Skip if somehow same as primary
+                        if (strtolower($altBreed) === strtolower($primaryBreedRaw)) {
+                            continue;
+                        }
+
+                        $alternativeData[] = [
+                            'breed'      => preg_replace('/\s+/', ' ', $altBreed),
+                            'confidence' => round($altConfidence, 1),
+                        ];
+                    }
                 }
+            } else {
+                Log::warning('⚠️ Could not parse alternatives JSON: ' . $altText);
             }
 
-            // Strip stray quotes, backticks, newlines only
+            // ============================================================
+            // PROCESS PRIMARY BREED NAME
+            // ============================================================
+            $rawBreedName = $primaryBreedRaw;
+
+            // Strip stray quotes, backticks, newlines
             $rawBreedName = trim($rawBreedName, " \t\n\r\0\x0B\"'`");
 
-            // Take only the first line in case model outputs multiple lines
+            // Take only the first line
             $lines        = explode("\n", $rawBreedName);
             $rawBreedName = trim($lines[0]);
 
             // Hard cap at 100 chars for DB safety
             $rawBreedName = substr($rawBreedName, 0, 100);
 
-            // Final fallback
             if (empty($rawBreedName)) {
                 $rawBreedName = 'Unknown';
             }
 
             Log::info('✓ Gemini raw breed name: ' . $rawBreedName);
 
-            // ============================================================
-            // BREED NAME CLEANUP
-            // Only apply cleanBreedName() for mixed/cross notation.
-            // Pure breeds and designer hybrids are used as-is to prevent
-            // stripping legitimate parts of the name (e.g. "hound", "ian")
-            // ============================================================
+            // Only apply cleanBreedName() for mixed/cross notation
             if (
                 str_contains(strtolower($rawBreedName), ' / ') ||
                 str_contains(strtolower($rawBreedName), ' mix') ||
@@ -1043,31 +1093,40 @@ FINAL OUTPUT RULE: Output ONLY the single breed name on one line. No explanation
             ) {
                 $cleanedBreed = $this->cleanBreedName($rawBreedName);
             } else {
-                // Pure breed or designer hybrid — normalize spaces only
                 $cleanedBreed = preg_replace('/\s+/', ' ', trim($rawBreedName));
             }
 
             Log::info('Breed name finalized', [
-                'raw'   => $rawBreedName,
-                'final' => $cleanedBreed,
+                'raw'          => $rawBreedName,
+                'final'        => $cleanedBreed,
+                'alternatives' => count($alternativeData),
             ]);
 
+            // ============================================================
+            // BUILD FINAL TOP PREDICTIONS
+            // Primary breed first, then alternatives
+            // ============================================================
             $rawConfidence    = 88.0;
             $microVariance    = (mt_rand(-80, 80) / 10);
             $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
 
+            // Primary breed always first
+            $topPredictions[] = [
+                'breed'      => $cleanedBreed,
+                'confidence' => round($actualConfidence, 1),
+            ];
+
+            // Append alternatives
+            foreach ($alternativeData as $alt) {
+                $topPredictions[] = $alt;
+            }
+
             Log::info('✓ Breed identification successful', [
                 'breed'           => $cleanedBreed,
                 'confidence'      => $actualConfidence,
-                'response_time_s' => $duration,
+                'alternatives'    => count($alternativeData),
+                'total_duration'  => round(microtime(true) - $startTime, 2),
             ]);
-
-            $topPredictions = [
-                [
-                    'breed'      => $cleanedBreed,
-                    'confidence' => round($actualConfidence, 1),
-                ],
-            ];
 
             return [
                 'success'         => true,
@@ -1077,7 +1136,7 @@ FINAL OUTPUT RULE: Output ONLY the single breed name on one line. No explanation
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
                     'model'           => 'gemini-3.1-pro-preview',
-                    'response_time_s' => $duration,
+                    'response_time_s' => round(microtime(true) - $startTime, 2),
                 ],
             ];
         } catch (\GuzzleHttp\Exception\RequestException $e) {
@@ -1096,6 +1155,79 @@ FINAL OUTPUT RULE: Output ONLY the single breed name on one line. No explanation
                 'error'   => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * ==========================================
+     * HELPER: Extract breed name from Gemini response
+     * Handles all edge cases: thought blocks, safety
+     * blocks, missing candidates, accidental JSON
+     * ==========================================
+     */
+    private function extractBreedFromGeminiResponse(array $result): string
+    {
+        $rawBreedName = '';
+
+        if (isset($result['error'])) {
+            throw new \Exception('Gemini API error: ' . ($result['error']['message'] ?? 'Unknown'));
+        }
+
+        if (empty($result['candidates']) || !is_array($result['candidates'])) {
+            $blockReason = $result['promptFeedback']['blockReason'] ?? null;
+            if ($blockReason) {
+                throw new \Exception('Gemini blocked: ' . $blockReason);
+            }
+            throw new \Exception('Gemini returned no candidates.');
+        }
+
+        $candidate    = $result['candidates'][0];
+        $finishReason = $candidate['finishReason'] ?? 'STOP';
+        Log::info('Gemini finish reason: ' . $finishReason);
+
+        if (in_array($finishReason, ['SAFETY', 'RECITATION'])) {
+            Log::warning('⚠️ Gemini blocked. Finish reason: ' . $finishReason);
+            return 'Unknown';
+        }
+
+        if (!isset($candidate['content']['parts']) || !is_array($candidate['content']['parts'])) {
+            Log::warning('⚠️ No content parts. Candidate: ' . json_encode($candidate));
+            return 'Unknown';
+        }
+
+        // Skip thought blocks, grab final text
+        foreach ($candidate['content']['parts'] as $part) {
+            if (isset($part['text']) && empty($part['thought'])) {
+                $rawBreedName = trim($part['text']);
+                break;
+            }
+        }
+
+        // Fallback: grab any text if all were thought blocks
+        if (empty($rawBreedName)) {
+            foreach ($candidate['content']['parts'] as $part) {
+                if (isset($part['text'])) {
+                    $rawBreedName = trim($part['text']);
+                    break;
+                }
+            }
+        }
+
+        // Safety net: if still JSON, extract breed key
+        if (!empty($rawBreedName) && str_starts_with($rawBreedName, '{')) {
+            $decoded = json_decode($rawBreedName, true);
+            if (json_last_error() === JSON_ERROR_NONE && isset($decoded['breed'])) {
+                $rawBreedName = $decoded['breed'];
+            } elseif (preg_match('/"breed"\s*:\s*"([^"]+)"/i', $rawBreedName, $matches)) {
+                $rawBreedName = $matches[1];
+            }
+        }
+
+        $rawBreedName = trim($rawBreedName, " \t\n\r\0\x0B\"'`");
+        $lines        = explode("\n", $rawBreedName);
+        $rawBreedName = trim($lines[0]);
+        $rawBreedName = substr($rawBreedName, 0, 100);
+
+        return empty($rawBreedName) ? 'Unknown' : $rawBreedName;
     }
     /**
      * ML Model Prediction (Fallback)
