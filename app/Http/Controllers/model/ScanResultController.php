@@ -931,7 +931,7 @@ CRITICAL OUTPUT RULE:
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 200, // Generous — no breed name should ever exceed this
+                        'maxOutputTokens' => 200,
                         'thinkingConfig'  => [
                             'thinkingBudget' => 8192,
                         ],
@@ -956,8 +956,8 @@ CRITICAL OUTPUT RULE:
 
             // ============================================================
             // CALL 2: ALTERNATIVE BREEDS
-            // Lighter budget — just needs to find visually similar breeds
-            // Returns structured JSON with breed names + confidence scores
+            // NO thinkingConfig — prevents JSON from landing in thought blocks
+            // responseMimeType forces clean JSON output directly
             // ============================================================
             $alternativesPrompt = "You are an expert canine breed analyst with encyclopedic knowledge of all kennel club registered breeds worldwide.
 
@@ -993,11 +993,9 @@ Output ONLY valid JSON in exactly this format — no markdown fences, no extra t
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature'     => 0.2,
-                        'maxOutputTokens' => 400,
-                        'thinkingConfig'  => [
-                            'thinkingBudget' => 2048,
-                        ],
+                        'temperature'        => 0.2,
+                        'maxOutputTokens'    => 400,
+                        'responseMimeType'   => 'application/json', // FIX: forces pure JSON, no thought blocks
                     ],
                     'safetySettings' => [
                         ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
@@ -1021,15 +1019,26 @@ Output ONLY valid JSON in exactly this format — no markdown fences, no extra t
             $altText         = '';
 
             if (!empty($altResult['candidates'][0]['content']['parts'])) {
+                // Pass 1: prefer non-thought text parts
                 foreach ($altResult['candidates'][0]['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
                         $altText = trim($part['text']);
                         break;
                     }
                 }
+                // Pass 2: fallback — grab any text part
                 if (empty($altText)) {
                     foreach ($altResult['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text'])) {
+                            $altText = trim($part['text']);
+                            break;
+                        }
+                    }
+                }
+                // Pass 3: last resort — find any part containing the alternatives key
+                if (empty($altText)) {
+                    foreach ($altResult['candidates'][0]['content']['parts'] as $part) {
+                        if (isset($part['text']) && str_contains($part['text'], '"alternatives"')) {
                             $altText = trim($part['text']);
                             break;
                         }
@@ -1053,7 +1062,7 @@ Output ONLY valid JSON in exactly this format — no markdown fences, no extra t
 
                     $altBreed      = trim($alt['breed'], " \t\n\r\0\x0B\"'`");
                     $altBreed      = preg_replace('/\s+/', ' ', $altBreed);
-                    $altBreed      = substr($altBreed, 0, 120); // generous cap — no breed name is 120 chars
+                    $altBreed      = substr($altBreed, 0, 120);
                     $altConfidence = (float) $alt['confidence'];
                     $altConfidence = max(15.0, min(84.0, $altConfidence));
 
@@ -1073,8 +1082,7 @@ Output ONLY valid JSON in exactly this format — no markdown fences, no extra t
             }
 
             // ============================================================
-            // PROCESS PRIMARY BREED NAME — no truncation, no cleanBreedName
-            // for pure breeds, just normalize whitespace
+            // PROCESS PRIMARY BREED NAME
             // ============================================================
             $rawBreedName = trim($primaryBreedRaw, " \t\n\r\0\x0B\"'`");
             $lines        = explode("\n", $rawBreedName);
