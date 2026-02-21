@@ -843,9 +843,6 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // TWO-TURN PROMPT STRATEGY:
-            // Turn 1 (system): Silent deep analysis (thinking budget handles this internally)
-            // Turn 2 (user):   Forces final output to be ONLY the breed name — no JSON, no explanation
             $geminiPrompt = "You are a master canine geneticist and professional dog show judge specializing in global breeds and Philippine native landraces.
 
 Silently analyze these physical traits of the dog in the image:
@@ -894,17 +891,17 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                             ],
                         ],
                         'generationConfig' => [
-                            'temperature'     => 0.1,
-                            'maxOutputTokens' => 50,  // Breed name only — no need for more tokens
+                            'temperature'    => 0.1,
+                            'maxOutputTokens' => 50,
                             'thinkingConfig'  => [
-                                'thinkingBudget' => 2048, // Deep silent analysis happens here
+                                'thinkingBudget' => 2048,
                             ],
                         ],
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
                             ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_HATE_SPEECH',        'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',  'threshold' => 'BLOCK_NONE'],
+                            ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+                            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
                         ],
                     ],
                 ]
@@ -914,36 +911,80 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
             Log::info("✓ Gemini breed identification response received in {$duration}s");
 
             $responseBody = $response->getBody()->getContents();
-            $result       = json_decode($responseBody, true);
+
+            // Always log the raw response for debugging unexpected structures
+            Log::info('📥 Raw Gemini response: ' . substr($responseBody, 0, 1000));
+
+            $result = json_decode($responseBody, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Failed to parse Gemini response: ' . json_last_error_msg());
+                throw new \Exception('Failed to parse Gemini outer response: ' . json_last_error_msg());
             }
 
-            $candidate = $result['candidates'][0] ?? null;
+            // ============================================================
+            // DEFENSIVE RESPONSE PARSING - handles all possible structures
+            // ============================================================
 
-            if (!$candidate || !isset($candidate['content']['parts'])) {
-                Log::error('❌ Unexpected Gemini response structure', [
-                    'response' => substr($responseBody, 0, 500),
-                ]);
-                throw new \Exception('Unexpected Gemini API response structure.');
-            }
-
-            // Gemini thinking models return multiple parts:
-            // part[0] = thought block (has 'thought' => true) — SKIP
-            // part[1] = actual text output — USE THIS
             $rawBreedName = '';
-            foreach ($candidate['content']['parts'] as $part) {
-                // Skip internal thinking parts, only grab the final output text
-                if (isset($part['text']) && empty($part['thought'])) {
-                    $rawBreedName = trim($part['text']);
-                    break;
+
+            // Check for API-level error first
+            if (isset($result['error'])) {
+                throw new \Exception('Gemini API error: ' . ($result['error']['message'] ?? 'Unknown API error'));
+            }
+
+            // Check candidates exist
+            if (empty($result['candidates']) || !is_array($result['candidates'])) {
+                // Sometimes Gemini returns promptFeedback with a block reason instead of candidates
+                $blockReason = $result['promptFeedback']['blockReason'] ?? null;
+                if ($blockReason) {
+                    throw new \Exception('Gemini blocked the request: ' . $blockReason);
+                }
+                throw new \Exception('Gemini returned no candidates in response.');
+            }
+
+            $candidate = $result['candidates'][0];
+
+            // Check finish reason — SAFETY blocks sometimes return a candidate with no content
+            $finishReason = $candidate['finishReason'] ?? 'STOP';
+            Log::info('Gemini finish reason: ' . $finishReason);
+
+            if ($finishReason === 'SAFETY') {
+                Log::warning('⚠️ Gemini blocked response due to SAFETY filters');
+                // Fallback: return a generic safe default rather than crashing
+                $rawBreedName = 'Unknown';
+            } elseif ($finishReason === 'RECITATION') {
+                Log::warning('⚠️ Gemini blocked response due to RECITATION');
+                $rawBreedName = 'Unknown';
+            } elseif (!isset($candidate['content']['parts']) || !is_array($candidate['content']['parts'])) {
+                // Candidate exists but has no content/parts (can happen on some blocks)
+                Log::warning('⚠️ Candidate has no content parts. Finish reason: ' . $finishReason);
+                Log::warning('⚠️ Full candidate: ' . json_encode($candidate));
+                $rawBreedName = 'Unknown';
+            } else {
+                // Normal path: extract text from parts, skipping thought blocks
+                foreach ($candidate['content']['parts'] as $part) {
+                    if (isset($part['text']) && empty($part['thought'])) {
+                        $rawBreedName = trim($part['text']);
+                        break;
+                    }
+                }
+
+                // If all parts were thought blocks and we got nothing, try grabbing any text
+                if (empty($rawBreedName)) {
+                    foreach ($candidate['content']['parts'] as $part) {
+                        if (isset($part['text'])) {
+                            $rawBreedName = trim($part['text']);
+                            break;
+                        }
+                    }
                 }
             }
 
-            // Safety net: if somehow we got JSON anyway, try to extract breed key
-            if (empty($rawBreedName) || str_starts_with($rawBreedName, '{')) {
-                Log::warning('⚠️ Output appears to be JSON, attempting breed key extraction.');
+            // ============================================================
+            // SANITIZE: Handle edge cases where output is still JSON
+            // ============================================================
+            if (!empty($rawBreedName) && str_starts_with($rawBreedName, '{')) {
+                Log::warning('⚠️ Output is JSON, extracting breed key.');
                 $decoded = json_decode($rawBreedName, true);
                 if (json_last_error() === JSON_ERROR_NONE && isset($decoded['breed'])) {
                     $rawBreedName = $decoded['breed'];
@@ -952,14 +993,15 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                 }
             }
 
-            // Strip any leftover quotes, backticks, or newlines
+            // Strip stray quotes, backticks, newlines
             $rawBreedName = trim($rawBreedName, " \t\n\r\0\x0B\"'`");
 
-            // Hard cap at 60 characters for DB safety
+            // Hard cap at 60 chars for DB safety
             $rawBreedName = substr($rawBreedName, 0, 60);
 
+            // Final fallback
             if (empty($rawBreedName)) {
-                throw new \Exception('Empty breed name returned from Gemini');
+                $rawBreedName = 'Unknown';
             }
 
             Log::info('✓ Gemini raw breed name: ' . $rawBreedName);
