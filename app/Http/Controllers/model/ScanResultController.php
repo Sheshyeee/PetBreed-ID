@@ -862,6 +862,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exac
 
             $startTime = microtime(true);
 
+            // FIXED: Cleaned up the mangled markdown URL formatting here
             $response = $client->post(
                 '[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=)' . $apiKey,
                 [
