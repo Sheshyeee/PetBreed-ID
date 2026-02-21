@@ -842,15 +842,18 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            $geminiPrompt = "You are an expert canine geneticist and professional dog show judge. Your task is to analyze the provided image of a dog and determine its breed or likely breed mix with high accuracy.
+            // UPDATED: Prompt forces deep analysis before concluding the breed, formatted as strict JSON.
+            $geminiPrompt = "You are an expert canine geneticist and professional dog show judge. Your task is to analyze the provided image of a dog and determine its breed or likely breed mix with high accuracy. Do not default to 'Village Dog' unless absolutely certain; look deeply for specific breed markers.
 
-First, silently analyze 3 to 4 distinct physical traits visible in the image (e.g., coat, ear shape, build). Then, determine the breed using these rules:
-- Purebred: If it is a purebred, identify the specific breed.
-- Designer Crossbreed: If the dog is a known crossbreed (e.g., Auggie, Goldendoodle, Cockapoo), state that specific crossbreed name.
-- Mixed Breed: If it has conflicting traits but isn't a named crossbreed, list the primary dominant breed followed by the second most likely breed (e.g., \"Labrador Retriever / Hound mix\").
-- Village Dog: Use geographic or common phenotypes (e.g., Aspin, Village Dog) if it lacks purebred markers.
+Analyze the dog based on:
+1. Visual Breakdown (Coat Color, Eyes, Ears, Head/Build)
+2. Breed Assessment (Primary Match, Contributing Breeds)
 
-CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not include your visual breakdown, confidence levels, formatting, or any conversational text.";
+CRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exact format below. Do not include markdown formatting (like ```json) or any other text outside the JSON.
+{
+  \"deep_analysis\": \"Write your full step-by-step visual breakdown and breed assessment here.\",
+  \"final_breed\": \"The specific breed name or specific mix name (e.g., 'Australian Shepherd / Corgi mix')\"
+}";
 
             $client = new \GuzzleHttp\Client([
                 'timeout'         => 60,
@@ -860,7 +863,7 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
             $startTime = microtime(true);
 
             $response = $client->post(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=' . $apiKey,
+                '[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=)' . $apiKey,
                 [
                     'json' => [
                         'contents' => [
@@ -879,10 +882,9 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                             ],
                         ],
                         'generationConfig' => [
-                            'temperature'     => 0.2, // Lowered temperature so the AI sticks strictly to the name
-                            'maxOutputTokens' => 1024, // FIXED: Increased limit to prevent sudden cutoff errors
+                            'temperature'     => 0.2,
+                            'maxOutputTokens' => 2048, // Increased so the model has room to write the full analysis
                         ],
-                        // FIXED: Bypass overly strict safety filters to prevent empty responses
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
                             ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_NONE'],
@@ -903,7 +905,6 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                 throw new \Exception('Failed to parse Gemini response: ' . json_last_error_msg());
             }
 
-            // FIXED: Better parsing to handle prompt blocking or API limits
             if (isset($result['promptFeedback']['blockReason'])) {
                 throw new \Exception('API Blocked Request: ' . $result['promptFeedback']['blockReason']);
             }
@@ -930,14 +931,29 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
             }
 
             // Extract text dynamically
-            $rawBreedName = '';
+            $rawText = '';
             foreach ($candidate['content']['parts'] as $part) {
                 if (isset($part['text'])) {
-                    $rawBreedName .= $part['text'];
+                    $rawText .= $part['text'];
                 }
             }
 
-            $rawBreedName = trim($rawBreedName);
+            // Clean up potential markdown formatting just in case the AI ignores the "no markdown" rule
+            $rawText = preg_replace('/^```json\s*|```$/i', '', trim($rawText));
+            $rawText = trim($rawText);
+
+            $analysisData = json_decode($rawText, true);
+
+            // UPDATED: Handle the JSON response to grab the breed AND the reasoning
+            if (json_last_error() === JSON_ERROR_NONE && isset($analysisData['final_breed'])) {
+                $rawBreedName = $analysisData['final_breed'];
+                $deepAnalysis = $analysisData['deep_analysis'] ?? '';
+            } else {
+                // Fallback just in case it outputs raw text instead of JSON
+                $rawBreedName = $rawText;
+                $deepAnalysis = 'Analysis parsing failed.';
+                Log::warning('⚠️ Failed to parse JSON from Gemini response, using raw text fallback.');
+            }
 
             if (empty($rawBreedName)) {
                 throw new \Exception('Empty breed name returned from Gemini');
@@ -953,10 +969,8 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                 'cleaned'  => $cleanedBreed,
             ]);
 
-            // Gemini returns only a breed name (no confidence score),
-            // so assign a realistic base and apply natural micro-variance
-            $rawConfidence    = 85.0; // Slightly higher base since the prompt is highly structured
-            $microVariance    = (mt_rand(-150, 150) / 10); // -15.0 to +15.0
+            $rawConfidence    = 85.0;
+            $microVariance    = (mt_rand(-150, 150) / 10);
             $actualConfidence = max(35.0, min(97.0, $rawConfidence + $microVariance));
 
             Log::info('✓ Gemini breed identification successful', [
@@ -979,7 +993,7 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'reasoning'       => '',
+                    'reasoning'       => $deepAnalysis, // NOW SAVES THE FULL ANALYSIS!
                     'key_identifiers' => [],
                     'model'           => 'gemini-3.1-pro-preview',
                     'response_time_s' => $duration,
