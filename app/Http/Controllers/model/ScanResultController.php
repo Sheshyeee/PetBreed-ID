@@ -974,7 +974,7 @@ Rules:
 - Confidence scores must be realistic: 60-80% for very similar breeds, 40-60% for moderately similar, 20-40% for loosely similar
 
 Output ONLY valid JSON in exactly this format — no markdown fences, no extra text, nothing else:
-{\"alternatives\":[{\"breed\":\"Full Official Breed Name\",\"confidence\":72.5},{\"breed\":\"Full Official Breed Name\",\"confidence\":58.0},{\"breed\":\"Full Official Breed Name\",\"confidence\":43.5}]}";
+{\"alternatives\":[{\"breed\":\"Full Official Breed Name\",\"confidence\":72.5}, {\"breed\":\"Full Official Breed Name\",\"confidence\":58.0}]}";
 
             $call2Start  = microtime(true);
             $altResponse = $client->post($fullUrl, [
