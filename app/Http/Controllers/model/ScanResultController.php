@@ -799,9 +799,9 @@ class ScanResultController extends Controller
         Log::info('Image path: ' . $imagePath);
         Log::info('Is object storage: ' . ($isObjectStorage ? 'YES' : 'NO'));
 
-        $apiKey = config('services.gemini.api_key');
+        $apiKey = env('GEMINI_API_KEY');
         if (empty($apiKey)) {
-            Log::error('✗ Gemini API key not configured');
+            Log::error('✗ GEMINI_API_KEY not configured in environment');
             return [
                 'success' => false,
                 'error'   => 'Gemini API key not configured'
@@ -853,8 +853,8 @@ First, silently analyze 3 to 4 distinct physical traits visible in the image (e.
 CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not include your visual breakdown, confidence levels, formatting, or any conversational text.";
 
             $client = new \GuzzleHttp\Client([
-                'timeout'         => 30,
-                'connect_timeout' => 10,
+                'timeout'         => 60,
+                'connect_timeout' => 15,
             ]);
 
             $startTime = microtime(true);
@@ -882,7 +882,7 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                             'temperature'     => 1.0,
                             'maxOutputTokens' => 50,
                             'thinkingConfig'  => [
-                                'thinkingBudget' => 0, // thinking_level: "low" - skip deep reasoning for fast response
+                                'thinkingBudget' => 1024, // "low" thinking - minimum valid budget for thinking-required models
                             ],
                         ],
                     ],
@@ -899,14 +899,23 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
                 throw new \Exception('Failed to parse Gemini response: ' . json_last_error_msg());
             }
 
-            if (!isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+            if (!isset($result['candidates'][0]['content']['parts'])) {
                 Log::error('❌ Unexpected Gemini response structure', [
                     'response' => substr($responseBody, 0, 500),
                 ]);
                 throw new \Exception('Unexpected Gemini API response structure');
             }
 
-            $rawBreedName = trim($result['candidates'][0]['content']['parts'][0]['text']);
+            // With thinking enabled, the response parts may include a thinking part and a text part.
+            // We need to find the actual text output (not the thinking block).
+            $rawBreedName = '';
+            foreach ($result['candidates'][0]['content']['parts'] as $part) {
+                // Skip thinking parts, grab only the final text response
+                if (isset($part['text']) && !isset($part['thought'])) {
+                    $rawBreedName = trim($part['text']);
+                    break;
+                }
+            }
 
             if (empty($rawBreedName)) {
                 throw new \Exception('Empty breed name returned from Gemini');
@@ -971,7 +980,6 @@ CRITICAL INSTRUCTION: Output ONLY the final breed name or mix name. Do not inclu
             ];
         }
     }
-
     /**
      * ML Model Prediction (Fallback)
      */
