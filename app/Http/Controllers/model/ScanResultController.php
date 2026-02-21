@@ -795,7 +795,6 @@ class ScanResultController extends Controller
      */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
-        // Increase PHP execution time to allow deep analysis without timing out
         set_time_limit(120);
 
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION ===');
@@ -820,19 +819,20 @@ class ScanResultController extends Controller
                     return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = Storage::disk('object-storage')->get($imagePath);
+                Log::info('✓ Image loaded from object storage');
             } else {
                 if (!file_exists($imagePath)) {
                     Log::error('✗ Image not found locally: ' . $imagePath);
                     return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = file_get_contents($imagePath);
+                Log::info('✓ Image loaded from local filesystem');
             }
 
             if (empty($imageContents)) {
                 throw new \Exception('Failed to load image data');
             }
 
-            // Get MIME type
             $imageInfo = @getimagesizefromstring($imageContents);
             if ($imageInfo === false) {
                 throw new \Exception('Invalid image file');
@@ -843,32 +843,36 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // INTELLIGENT PROMPT: Taxonomy Forcing
-            // This forces the AI to prioritize the local term 'Aspin' over the global term 'Village Dog'
-            $geminiPrompt = "You are a master canine geneticist specializing in global landraces and Philippine native breeds. 
+            // TWO-TURN PROMPT STRATEGY:
+            // Turn 1 (system): Silent deep analysis (thinking budget handles this internally)
+            // Turn 2 (user):   Forces final output to be ONLY the breed name — no JSON, no explanation
+            $geminiPrompt = "You are a master canine geneticist and professional dog show judge specializing in global breeds and Philippine native landraces.
 
-Conduct a deep visual analysis of this dog (coat, tail, ears, snout, build). 
+Silently analyze these physical traits of the dog in the image:
+- Coat texture, length, and color pattern
+- Ear shape and set (erect, floppy, semi-erect, rose)
+- Tail carriage (curled, sickle, straight, low)
+- Body proportion: leg length vs body length, overall build (lean, stocky, athletic)
+- Muzzle length and head shape
+- Overall size category
 
-CRITICAL TAXONOMY RULES:
-1. If this dog presents the phenotype of a Southeast Asian Village Dog, a Philippine street dog, or a native mixed landrace (e.g., short coat, lean build, curled/sickle tail), you MUST classify it exactly as 'Aspin'. 
-2. Do NOT use generic terms like 'Village Dog', 'Mixed Breed', or 'Mutt' for this phenotype. Use 'Aspin'.
-3. If it is clearly a purebred (like a pure Husky) or a recognized designer breed, name that specific breed.
+CLASSIFICATION RULES (apply in order):
+1. PHILIPPINE/SEA NATIVE: If the dog has the phenotype of a Southeast Asian or Philippine street dog — lean build, short coat, almond eyes, semi-erect or erect ears, sickle or curled tail — classify EXACTLY as: Aspin
+2. PUREBRED: If it clearly matches a recognized AKC/FCI breed standard, name that exact breed (e.g., Siberian Husky, Labrador Retriever).
+3. DESIGNER CROSSBREED: If it matches a known hybrid (e.g., Goldendoodle, Cockapoo), name that hybrid.
+4. MIXED: If traits conflict and it is not a named hybrid, write the dominant breed followed by the secondary (e.g., Labrador Retriever / Hound mix).
 
-You MUST respond strictly in valid JSON format with exactly two keys:
-{
-  \"reasoning\": \"Your step-by-step physical breakdown explaining your choice.\",
-  \"breed\": \"The exact final breed name ONLY (e.g., 'Aspin'). Do not include parentheses or alternative names.\"
-}";
+STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanation. No punctuation other than what is part of the breed name itself. Just the breed name on a single line.";
 
             $client = new \GuzzleHttp\Client([
-                'timeout'         => 120, // Increased to 2 minutes
+                'timeout'         => 120,
                 'connect_timeout' => 15,
             ]);
 
             $startTime = microtime(true);
 
             $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
-            $fullUrl = base64_decode($encodedUrl) . $apiKey;
+            $fullUrl    = base64_decode($encodedUrl) . $apiKey;
 
             $response = $client->post(
                 $fullUrl,
@@ -890,17 +894,18 @@ You MUST respond strictly in valid JSON format with exactly two keys:
                             ],
                         ],
                         'generationConfig' => [
-                            // Temperature lowered to 0.1 to FORCE strict adherence to the Taxonomy Rules
-                            'temperature'      => 0.1,
-                            'maxOutputTokens'  => 600,
-                            'responseMimeType' => 'application/json', // Guarantees JSON output
+                            'temperature'     => 0.1,
+                            'maxOutputTokens' => 50,  // Breed name only — no need for more tokens
+                            'thinkingConfig'  => [
+                                'thinkingBudget' => 2048, // Deep silent analysis happens here
+                            ],
                         ],
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_HATE_SPEECH', 'threshold' => 'BLOCK_NONE'],
-                            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
-                        ]
+                            ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+                            ['category' => 'HARM_CATEGORY_HATE_SPEECH',        'threshold' => 'BLOCK_NONE'],
+                            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',  'threshold' => 'BLOCK_NONE'],
+                        ],
                     ],
                 ]
             );
@@ -918,29 +923,40 @@ You MUST respond strictly in valid JSON format with exactly two keys:
             $candidate = $result['candidates'][0] ?? null;
 
             if (!$candidate || !isset($candidate['content']['parts'])) {
+                Log::error('❌ Unexpected Gemini response structure', [
+                    'response' => substr($responseBody, 0, 500),
+                ]);
                 throw new \Exception('Unexpected Gemini API response structure.');
             }
 
-            $rawText = '';
+            // Gemini thinking models return multiple parts:
+            // part[0] = thought block (has 'thought' => true) — SKIP
+            // part[1] = actual text output — USE THIS
+            $rawBreedName = '';
             foreach ($candidate['content']['parts'] as $part) {
-                if (isset($part['text'])) {
-                    $rawText .= $part['text'];
+                // Skip internal thinking parts, only grab the final output text
+                if (isset($part['text']) && empty($part['thought'])) {
+                    $rawBreedName = trim($part['text']);
+                    break;
                 }
             }
 
-            // Decode the JSON generated by the AI
-            $analysisData = json_decode(trim($rawText), true);
-
-            // EXTRACT ONLY THE BREED NAME
-            if (json_last_error() === JSON_ERROR_NONE && isset($analysisData['breed'])) {
-                $rawBreedName = $analysisData['breed'];
-            } else {
-                Log::warning('⚠️ Failed to extract breed key, falling back to raw text parsing.');
-                $rawBreedName = substr(strip_tags($rawText), 0, 50);
+            // Safety net: if somehow we got JSON anyway, try to extract breed key
+            if (empty($rawBreedName) || str_starts_with($rawBreedName, '{')) {
+                Log::warning('⚠️ Output appears to be JSON, attempting breed key extraction.');
+                $decoded = json_decode($rawBreedName, true);
+                if (json_last_error() === JSON_ERROR_NONE && isset($decoded['breed'])) {
+                    $rawBreedName = $decoded['breed'];
+                } elseif (preg_match('/"breed"\s*:\s*"([^"]+)"/i', $rawBreedName, $matches)) {
+                    $rawBreedName = $matches[1];
+                }
             }
 
-            // Database Safeguard: Force maximum 50 characters to prevent crashes
-            $rawBreedName = substr(trim($rawBreedName), 0, 50);
+            // Strip any leftover quotes, backticks, or newlines
+            $rawBreedName = trim($rawBreedName, " \t\n\r\0\x0B\"'`");
+
+            // Hard cap at 60 characters for DB safety
+            $rawBreedName = substr($rawBreedName, 0, 60);
 
             if (empty($rawBreedName)) {
                 throw new \Exception('Empty breed name returned from Gemini');
@@ -948,7 +964,6 @@ You MUST respond strictly in valid JSON format with exactly two keys:
 
             Log::info('✓ Gemini raw breed name: ' . $rawBreedName);
 
-            // Clean breed name using your helper method
             $cleanedBreed = $this->cleanBreedName($rawBreedName);
 
             Log::info('Breed name cleaned', [
@@ -959,6 +974,12 @@ You MUST respond strictly in valid JSON format with exactly two keys:
             $rawConfidence    = 88.0;
             $microVariance    = (mt_rand(-80, 80) / 10);
             $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
+
+            Log::info('✓ Breed identification successful', [
+                'breed'           => $cleanedBreed,
+                'confidence'      => $actualConfidence,
+                'response_time_s' => $duration,
+            ]);
 
             $topPredictions = [
                 [
@@ -977,6 +998,15 @@ You MUST respond strictly in valid JSON format with exactly two keys:
                     'model'           => 'gemini-3.1-pro-preview',
                     'response_time_s' => $duration,
                 ],
+            ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $errorBody = $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : '';
+            Log::error('✗ Gemini API Request Error: ' . $e->getMessage(), [
+                'response_body' => substr($errorBody, 0, 500),
+            ]);
+            return [
+                'success' => false,
+                'error'   => 'Gemini API Error: ' . $e->getMessage(),
             ];
         } catch (\Exception $e) {
             Log::error('✗ Gemini breed identification failed: ' . $e->getMessage());
