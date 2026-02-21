@@ -793,7 +793,7 @@ class ScanResultController extends Controller
      * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
      * ==========================================
      */
-    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
+   private function identifyBreedWithAPI($imagePath, $isObjectStorage = false)
     {
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION ===');
         Log::info('Image path: ' . $imagePath);
@@ -842,7 +842,7 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            // UPDATED: Prompt forces deep analysis before concluding the breed, formatted as strict JSON.
+            // Prompt forces deep analysis before concluding the breed, formatted as strict JSON.
             $geminiPrompt = "You are an expert canine geneticist and professional dog show judge. Your task is to analyze the provided image of a dog and determine its breed or likely breed mix with high accuracy. Do not default to 'Village Dog' unless absolutely certain; look deeply for specific breed markers.\n\nAnalyze the dog based on:\n1. Visual Breakdown (Coat Color, Eyes, Ears, Head/Build)\n2. Breed Assessment (Primary Match, Contributing Breeds)\n\nCRITICAL INSTRUCTION: You must respond ONLY with a valid JSON object in the exact format below. Do not include markdown formatting (like ```json) or any other text outside the JSON.\n{\n  \"deep_analysis\": \"Write your full step-by-step visual breakdown and breed assessment here.\",\n  \"final_breed\": \"The specific breed name or specific mix name (e.g., 'Australian Shepherd / Corgi mix')\"\n}";
 
             $client = new \GuzzleHttp\Client([
@@ -853,13 +853,12 @@ class ScanResultController extends Controller
             $startTime = microtime(true);
 
             // ==========================================
-            // FIX FOR THE cURL ERROR:
-            // Splitting the URL into parts so your code editor or browser 
-            // DOES NOT accidentally convert it into a markdown link!
+            // ULTIMATE FIX FOR cURL ERROR 3:
+            // Hiding the URL in base64 so your editor cannot auto-format it into a markdown link!
+            // This decodes safely back to: [https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=)
             // ==========================================
-            $apiHost = '[https://generativelanguage.googleapis.com](https://generativelanguage.googleapis.com)';
-            $apiRoute = '/v1beta/models/gemini-3.1-pro-preview:generateContent?key=';
-            $fullUrl = $apiHost . $apiRoute . $apiKey;
+            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
+            $fullUrl = base64_decode($encodedUrl) . $apiKey;
 
             $response = $client->post(
                 $fullUrl,
@@ -882,7 +881,7 @@ class ScanResultController extends Controller
                         ],
                         'generationConfig' => [
                             'temperature'     => 0.2,
-                            'maxOutputTokens' => 2048, // Increased so the model has room to write the full analysis
+                            'maxOutputTokens' => 2048, 
                         ],
                         'safetySettings' => [
                             ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
