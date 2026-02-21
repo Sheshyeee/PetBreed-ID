@@ -994,7 +994,7 @@ Output ONLY valid JSON in exactly this format — no markdown fences, no extra t
                     ],
                     'generationConfig' => [
                         'temperature'        => 0.2,
-                        'maxOutputTokens'    => 400,
+                        'maxOutputTokens'    => 2000,
                         'responseMimeType'   => 'application/json', // FIX: forces pure JSON, no thought blocks
                     ],
                     'safetySettings' => [
