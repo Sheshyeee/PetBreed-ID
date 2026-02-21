@@ -843,23 +843,28 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded - Size: ' . strlen($imageContents) . ' bytes');
 
-            $geminiPrompt = "You are a master canine geneticist and professional dog show judge specializing in global breeds and Philippine native landraces.
+            $geminiPrompt = "You are a master canine geneticist and professional dog show judge with encyclopedic knowledge of 400+ AKC, FCI, UKC, and PHBA recognized breeds, designer hybrids, and Southeast Asian landraces.
 
-Silently analyze these physical traits of the dog in the image:
-- Coat texture, length, and color pattern
-- Ear shape and set (erect, floppy, semi-erect, rose)
-- Tail carriage (curled, sickle, straight, low)
-- Body proportion: leg length vs body length, overall build (lean, stocky, athletic)
-- Muzzle length and head shape
-- Overall size category
+Perform a deep forensic visual analysis of every visible physical trait:
+- COAT: texture (smooth/wire/curly/double), length, density, color, pattern (solid/brindle/merle/parti/sable/ticking)
+- HEAD: skull shape (domed/flat/wedge/broad), stop definition, muzzle ratio, jowls, lip type
+- EARS: set position (high/low), shape (erect/semi-erect/button/rose/pendant/cropped), size relative to head
+- EYES: shape (almond/round/triangular), set (close/wide), color
+- BODY: topline (level/roached/sloping), chest depth, rib spring, tuck-up, loin length
+- LIMBS: bone density (fine/moderate/heavy), leg length ratio, angulation, feet (cat/hare/round)
+- TAIL: set, carriage (sickle/curled/otter/whip/bobtail), feathering
+- SIZE & WEIGHT ESTIMATE: toy/small/medium/large/giant
+- OVERALL SILHOUETTE: Compare against known breed standards
 
-CLASSIFICATION RULES (apply in order):
-1. PHILIPPINE/SEA NATIVE: If the dog has the phenotype of a Southeast Asian or Philippine street dog — lean build, short coat, almond eyes, semi-erect or erect ears, sickle or curled tail — classify EXACTLY as: Aspin
-2. PUREBRED: If it clearly matches a recognized AKC/FCI breed standard, name that exact breed (e.g., Siberian Husky, Labrador Retriever).
-3. DESIGNER CROSSBREED: If it matches a known hybrid (e.g., Goldendoodle, Cockapoo), name that hybrid.
-4. MIXED: If traits conflict and it is not a named hybrid, write the dominant breed followed by the secondary (e.g., Labrador Retriever / Hound mix).
+Cross-reference ALL traits simultaneously against breed standards. Penalize breeds that do not match multiple traits. Reward the breed with the highest number of matching trait clusters.
 
-STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanation. No punctuation other than what is part of the breed name itself. Just the breed name on a single line.";
+CLASSIFICATION RULES (apply in strict order):
+1. PHILIPPINE/SEA NATIVE: If the dog presents the phenotype of a Southeast Asian or Philippine street dog — lean build, short smooth coat, almond eyes, semi-erect or erect ears, sickle or curled tail, medium size — classify EXACTLY as: Aspin
+2. PUREBRED: If 80%+ of traits match a single recognized breed standard, name that exact breed.
+3. DESIGNER CROSSBREED: If it matches a known hybrid (e.g., Goldendoodle, Cockapoo, Maltipoo), name that hybrid.
+4. MIXED: If dominant traits point to two breeds, write: [Dominant Breed] / [Secondary Breed] mix
+
+STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanation. No punctuation except what belongs in the breed name. One line only.";
 
             $client = new \GuzzleHttp\Client([
                 'timeout'         => 120,
@@ -894,7 +899,7 @@ STRICT OUTPUT RULE: Reply with ONLY the final breed name. No JSON. No explanatio
                             'temperature'    => 0.1,
                             'maxOutputTokens' => 50,
                             'thinkingConfig'  => [
-                                'thinkingBudget' => 2048,
+                                'thinkingBudget' => 4048,
                             ],
                         ],
                         'safetySettings' => [
