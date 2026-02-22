@@ -860,9 +860,6 @@ class ScanResultController extends Controller
 
             $overallStart = microtime(true);
 
-            // ----------------------------------------------------------------
-            // SINGLE COMBINED PROMPT — all logic/rules UNCHANGED from v2
-            // ----------------------------------------------------------------
             $combinedPrompt = <<<'PROMPT'
 You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs, and ALL recognized designer/hybrid breeds (Puggle, Goldendoodle, Labradoodle, Cockapoo, Maltipoo, Affenhuahua, Schnoodle, Cavapoo, Yorkipoo, Shorkie, Pomsky, Aussiedoodle, Bernedoodle, Sheepadoodle, Whoodle, and hundreds more).
 
@@ -1050,16 +1047,14 @@ PROMPT;
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature'     => 0.1,    // Low = deterministic, accurate
-                        'maxOutputTokens' => 1200,   // FIX: was 400 — too low, caused truncation
-                        // NOTE: responseMimeType intentionally REMOVED
-                        // It conflicts with thinkingConfig on this model and causes
-                        // the JSON to be embedded inside thoughtSignature blobs,
-                        // making it unparseable. The 3-pass text extractor below
-                        // handles clean extraction without needing JSON mode.
-                        'thinkingConfig'  => [
-                            'thinkingBudget' => 8192, // UNCHANGED — full thinking for accuracy
-                        ],
+                        'temperature'     => 0.1,  // Low = deterministic, accurate
+                        'maxOutputTokens' => 1200, // Enough for full JSON with any breed names
+                        // thinkingConfig REMOVED — this was the root cause of all failures.
+                        // On gemini-3.1-pro-preview, thinkingConfig injects a thoughtSignature
+                        // blob INTO the same text part as the JSON output, truncating it mid-string
+                        // (confirmed in logs: text cuts at `{"` then thoughtSignature begins).
+                        // The 5-step structured prompt enforces deep reasoning without needing it.
+                        // responseMimeType also removed — conflicts with thinking mode.
                     ],
                     'safetySettings' => [
                         ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
@@ -1078,21 +1073,19 @@ PROMPT;
             Log::info('📥 Raw Gemini response: ' . substr($body, 0, 1000));
 
             // ----------------------------------------------------------------
-            // EXTRACT JSON TEXT FROM RESPONSE PARTS
-            // 3-pass defensive extraction — handles thought blocks,
-            // thoughtSignature blobs, and empty parts safely
+            // EXTRACT JSON TEXT FROM RESPONSE PARTS — 3-pass defensive extraction
             // ----------------------------------------------------------------
             $jsonText = '';
 
             if (!empty($result['candidates'][0]['content']['parts'])) {
-                // Pass 1: prefer non-thought text parts (skip thought/thoughtSignature blocks)
+                // Pass 1: prefer non-thought text parts
                 foreach ($result['candidates'][0]['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
                         $jsonText = trim($part['text']);
                         break;
                     }
                 }
-                // Pass 2: fallback — grab any text part if pass 1 found nothing
+                // Pass 2: fallback — grab any text part
                 if (empty($jsonText)) {
                     foreach ($result['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text'])) {
@@ -1123,11 +1116,9 @@ PROMPT;
             if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
                 Log::error('✗ Failed to parse combined Gemini JSON. Raw: ' . $jsonText);
 
-                // Check for Gemini-level API errors
                 if (isset($result['error'])) {
                     return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
                 }
-                // Check for safety/recitation blocks
                 $finishReason = $result['candidates'][0]['finishReason'] ?? '';
                 if (in_array($finishReason, ['SAFETY', 'RECITATION'])) {
                     return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
@@ -1144,18 +1135,14 @@ PROMPT;
                 ? trim((string) $parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
                 : null;
 
-            // Empty string or literal "null" string → treat as null
             if (empty($recognizedHybridName) || strtolower($recognizedHybridName) === 'null') {
                 $recognizedHybridName = null;
             }
 
-            // Raw primary from Gemini
             $primaryBreedRaw = trim($parsed['primary_breed'], " \t\n\r\0\x0B\"'`");
             $primaryBreedRaw = preg_replace('/\s+/', ' ', $primaryBreedRaw);
             $primaryBreedRaw = substr($primaryBreedRaw, 0, 120);
 
-            // Designer hybrids: keep name exactly as returned (Puggle, Goldendoodle, etc.)
-            // Everything else: run through cleanBreedName to strip any slash/mix/cross notation
             if ($classType === 'designer_hybrid') {
                 $cleanedBreed = $primaryBreedRaw;
             } else {
@@ -1167,16 +1154,14 @@ PROMPT;
             }
 
             // ----------------------------------------------------------------
-            // CONFIDENCE — from Gemini, clamped to safe display range
+            // CONFIDENCE
             // ----------------------------------------------------------------
             $rawConfidence    = isset($parsed['primary_confidence']) ? (float) $parsed['primary_confidence'] : 85.0;
-            $microVariance    = (mt_rand(-30, 30) / 10); // ±3 micro-variance keeps number feeling natural
+            $microVariance    = (mt_rand(-30, 30) / 10);
             $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
 
             // ----------------------------------------------------------------
             // BUILD top_predictions
-            // [0] = primary breed (hybrid name, purebred, dominant parent, or Aspin)
-            // [1+] = alternatives from Gemini
             // ----------------------------------------------------------------
             $topPredictions = [
                 [
@@ -1185,7 +1170,6 @@ PROMPT;
                 ],
             ];
 
-            // Parse and append alternatives
             if (!empty($parsed['alternatives']) && is_array($parsed['alternatives'])) {
                 foreach ($parsed['alternatives'] as $alt) {
                     if (empty($alt['breed']) || !isset($alt['confidence'])) {
@@ -1200,7 +1184,6 @@ PROMPT;
                         continue;
                     }
 
-                    // Skip duplicates of primary
                     if (strtolower($altBreed) === strtolower($cleanedBreed)) {
                         continue;
                     }
@@ -1217,13 +1200,13 @@ PROMPT;
             $totalTime = round(microtime(true) - $overallStart, 2);
 
             Log::info('Breed name finalized', [
-                'raw'                   => $primaryBreedRaw,
-                'final'                 => $cleanedBreed,
-                'classification_type'   => $classType,
-                'recognized_hybrid'     => $recognizedHybridName,
-                'confidence'            => $actualConfidence,
-                'alternatives_count'    => count($topPredictions) - 1,
-                'total_time_s'          => $totalTime,
+                'raw'                 => $primaryBreedRaw,
+                'final'               => $cleanedBreed,
+                'classification_type' => $classType,
+                'recognized_hybrid'   => $recognizedHybridName,
+                'confidence'          => $actualConfidence,
+                'alternatives_count'  => count($topPredictions) - 1,
+                'total_time_s'        => $totalTime,
             ]);
 
             Log::info('✓ Breed identification complete', [
@@ -1257,6 +1240,17 @@ PROMPT;
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+
+
+
+
+
+
+
+
+
+
+
 
 
     // ============================================================
