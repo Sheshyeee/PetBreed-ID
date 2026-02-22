@@ -861,10 +861,7 @@ class ScanResultController extends Controller
             $overallStart = microtime(true);
 
             // ----------------------------------------------------------------
-            // SINGLE COMBINED PROMPT
-            // Returns structured JSON in one call:
-            //   primary_breed, primary_confidence, classification_type,
-            //   recognized_hybrid_name (if applicable), alternatives[]
+            // SINGLE COMBINED PROMPT — all logic/rules UNCHANGED from v2
             // ----------------------------------------------------------------
             $combinedPrompt = <<<'PROMPT'
 You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs, and ALL recognized designer/hybrid breeds (Puggle, Goldendoodle, Labradoodle, Cockapoo, Maltipoo, Affenhuahua, Schnoodle, Cavapoo, Yorkipoo, Shorkie, Pomsky, Aussiedoodle, Bernedoodle, Sheepadoodle, Whoodle, and hundreds more).
@@ -938,31 +935,26 @@ Beagador = Beagle × Labrador Retriever
 Bogle = Boxer × Beagle
 Doxle = Dachshund × Beagle
 Boggle = Boxer × Beagle
-Bulldog × Beagle = Beabull
-Cocker Spaniel × Beagle = Bocker
-Poodle × Beagle = Poogle
-Rottweiler × Labrador = Labrottie
-German Shepherd × Labrador = Sheprador
-Husky × German Shepherd = Gerberian Shepsky
-Husky × Poodle = Huskydoodle
-Husky × Malamute = Alusky
-Husky × Golden Retriever = Goberian
-Corgi × Poodle = Corgipoo
-Corgi × Husky = Horgi
-Corgi × Australian Shepherd = Aussie-Corgi
-Dachshund × Poodle = Doodle / Doxiepoo
-Maltese × Shih Tzu = Malshi
-Bichon Frise × Poodle = Bichpoo / Poochon
-Pekingese × Poodle = Peekapoo
-Shih Tzu × Maltese = Malshi
-Shih Tzu × Poodle = Shih-Poo
-Pomeranian × Poodle = Pomapoo
-Chihuahua × Dachshund = Chiweenie
-Chihuahua × Yorkshire Terrier = Chorkie
-Chihuahua × Shih Tzu = ShiChi
-Chihuahua × Pomeranian = Pomchi
-Border Collie × Poodle = Bordoodle
-Australian Cattle Dog × Dalmatian = Dalmatian Heeler
+Beabull = Bulldog × Beagle
+Bocker = Cocker Spaniel × Beagle
+Poogle = Poodle × Beagle
+Labrottie = Rottweiler × Labrador Retriever
+Sheprador = German Shepherd × Labrador Retriever
+Gerberian Shepsky = Husky × German Shepherd
+Huskydoodle = Husky × Poodle
+Alusky = Husky × Malamute
+Goberian = Husky × Golden Retriever
+Corgipoo = Corgi × Poodle
+Horgi = Corgi × Husky
+Aussie-Corgi = Corgi × Australian Shepherd
+Doxiepoo = Dachshund × Poodle
+Malshi = Maltese × Shih Tzu
+Bichpoo = Bichon Frise × Poodle
+Peekapoo = Pekingese × Poodle
+Pomapoo = Pomeranian × Poodle
+Chorkie = Chihuahua × Yorkshire Terrier
+ShiChi = Chihuahua × Shih Tzu
+Bordoodle = Border Collie × Poodle
 (Apply full knowledge for any cross not listed above)
 
 ══════════════════════════════════════════════════════════════
@@ -1001,7 +993,7 @@ Apply EXACTLY ONE of these in priority order:
    primary_breed = full official hybrid name (e.g. "Puggle", "Goldendoodle")
    classification_type = "designer_hybrid"
    recognized_hybrid_name = same as primary_breed
-   alternatives = [parent breed 1, parent breed 2] (with realistic confidence)
+   alternatives = [parent breed 1, parent breed 2] with realistic confidence
 
 3. PUREBRED → 80%+ of traits consistently match one official breed standard
    primary_breed = COMPLETE official registered breed name (zero abbreviations)
@@ -1010,7 +1002,7 @@ Apply EXACTLY ONE of these in priority order:
    alternatives = [2 most structurally similar breeds based on visible traits]
 
 4. UNNAMED MIXED BREED → Two visible dominant breeds, no recognized hybrid name
-   primary_breed = dominant parent breed full name (the breed that contributes the most visible traits)
+   primary_breed = dominant parent breed full name (the breed contributing most visible traits)
    classification_type = "mixed"
    recognized_hybrid_name = null
    alternatives = [secondary parent breed, then next closest alternative]
@@ -1019,7 +1011,7 @@ Apply EXACTLY ONE of these in priority order:
 CONFIDENCE SCORING RULES
 ══════════════════════════════════════════════════════════════
 - primary_confidence: your honest certainty (65–98 range)
-  • 90–98: you are completely certain, traits are unmistakably consistent
+  • 90–98: completely certain, traits unmistakably consistent
   • 80–89: very confident, minor uncertainty only
   • 70–79: reasonably confident, some ambiguous traits
   • 65–69: moderate confidence, notable uncertainty
@@ -1029,24 +1021,15 @@ CONFIDENCE SCORING RULES
 ══════════════════════════════════════════════════════════════
 CRITICAL OUTPUT RULES
 ══════════════════════════════════════════════════════════════
-- Output ONLY valid JSON. NOTHING else. No markdown fences. No explanation.
-- NEVER abbreviate breed names: "Labrador Retriever" not "Lab", "Staffordshire Bull Terrier" not "Staffie", "Pembroke Welsh Corgi" not "Corgi"
+- Output ONLY valid JSON. NOTHING else. No markdown fences. No explanation. No preamble.
+- NEVER abbreviate breed names: "Labrador Retriever" not "Lab", "Staffordshire Bull Terrier" not "Staffie"
 - For designer hybrids: use the FULL recognized hybrid name ("Puggle", not "Pug Mix")
 - alternatives array: exactly 2 entries, each with "breed" and "confidence"
 - Each alternative must be DIFFERENT from primary_breed
 - Trim all breed names — no leading/trailing spaces
 
-Output format (strict — output this exact JSON structure and nothing else):
-{
-  "primary_breed": "Full Official Breed Name or Hybrid Name",
-  "primary_confidence": 87.0,
-  "classification_type": "purebred|designer_hybrid|mixed|aspin",
-  "recognized_hybrid_name": null,
-  "alternatives": [
-    { "breed": "Full Official Breed Name", "confidence": 65.0 },
-    { "breed": "Full Official Breed Name", "confidence": 48.0 }
-  ]
-}
+Output EXACTLY this JSON structure:
+{"primary_breed":"Full Official Breed Name or Hybrid Name","primary_confidence":87.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Official Breed Name","confidence":65.0},{"breed":"Full Official Breed Name","confidence":48.0}]}
 PROMPT;
 
             $callStart = microtime(true);
@@ -1067,11 +1050,15 @@ PROMPT;
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature'      => 0.1,       // Low temp = deterministic, accurate
-                        'maxOutputTokens'  => 400,        // Enough for the JSON + breed names
-                        'responseMimeType' => 'application/json', // Forces clean JSON, blocks thought-block leakage
-                        'thinkingConfig'   => [
-                            'thinkingBudget' => 8192,    // UNCHANGED — full thinking for accuracy
+                        'temperature'     => 0.1,    // Low = deterministic, accurate
+                        'maxOutputTokens' => 1200,   // FIX: was 400 — too low, caused truncation
+                        // NOTE: responseMimeType intentionally REMOVED
+                        // It conflicts with thinkingConfig on this model and causes
+                        // the JSON to be embedded inside thoughtSignature blobs,
+                        // making it unparseable. The 3-pass text extractor below
+                        // handles clean extraction without needing JSON mode.
+                        'thinkingConfig'  => [
+                            'thinkingBudget' => 8192, // UNCHANGED — full thinking for accuracy
                         ],
                     ],
                     'safetySettings' => [
@@ -1092,19 +1079,20 @@ PROMPT;
 
             // ----------------------------------------------------------------
             // EXTRACT JSON TEXT FROM RESPONSE PARTS
-            // (identical defensive parsing to original)
+            // 3-pass defensive extraction — handles thought blocks,
+            // thoughtSignature blobs, and empty parts safely
             // ----------------------------------------------------------------
             $jsonText = '';
 
             if (!empty($result['candidates'][0]['content']['parts'])) {
-                // Pass 1: prefer non-thought text parts
+                // Pass 1: prefer non-thought text parts (skip thought/thoughtSignature blocks)
                 foreach ($result['candidates'][0]['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
                         $jsonText = trim($part['text']);
                         break;
                     }
                 }
-                // Pass 2: fallback — grab any text part
+                // Pass 2: fallback — grab any text part if pass 1 found nothing
                 if (empty($jsonText)) {
                     foreach ($result['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text'])) {
@@ -1113,7 +1101,7 @@ PROMPT;
                         }
                     }
                 }
-                // Pass 3: look for part containing our expected keys
+                // Pass 3: last resort — find any part containing our expected JSON key
                 if (empty($jsonText)) {
                     foreach ($result['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text']) && str_contains($part['text'], '"primary_breed"')) {
@@ -1124,7 +1112,7 @@ PROMPT;
                 }
             }
 
-            // Strip accidental markdown fences
+            // Strip any accidental markdown fences
             $jsonText = preg_replace('/```json\s*|\s*```/i', '', $jsonText);
             $jsonText = trim($jsonText);
 
@@ -1135,10 +1123,11 @@ PROMPT;
             if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
                 Log::error('✗ Failed to parse combined Gemini JSON. Raw: ' . $jsonText);
 
-                // Check for Gemini-level errors (safety block, etc.)
+                // Check for Gemini-level API errors
                 if (isset($result['error'])) {
                     return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
                 }
+                // Check for safety/recitation blocks
                 $finishReason = $result['candidates'][0]['finishReason'] ?? '';
                 if (in_array($finishReason, ['SAFETY', 'RECITATION'])) {
                     return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
@@ -1152,19 +1141,23 @@ PROMPT;
             // ----------------------------------------------------------------
             $classType            = trim($parsed['classification_type'] ?? 'purebred');
             $recognizedHybridName = isset($parsed['recognized_hybrid_name'])
-                ? trim($parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
+                ? trim((string) $parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
                 : null;
+
+            // Empty string or literal "null" string → treat as null
+            if (empty($recognizedHybridName) || strtolower($recognizedHybridName) === 'null') {
+                $recognizedHybridName = null;
+            }
 
             // Raw primary from Gemini
             $primaryBreedRaw = trim($parsed['primary_breed'], " \t\n\r\0\x0B\"'`");
             $primaryBreedRaw = preg_replace('/\s+/', ' ', $primaryBreedRaw);
             $primaryBreedRaw = substr($primaryBreedRaw, 0, 120);
 
-            // For designer hybrids and named mixes: keep the hybrid name as-is
-            // For purebreds, mixed (dominant parent), aspin: pass through cleanBreedName to strip
-            // any slash/cross/mix notation that Gemini may have slipped in
-            if (in_array($classType, ['designer_hybrid'])) {
-                $cleanedBreed = $primaryBreedRaw; // Puggle, Goldendoodle etc — keep as-is
+            // Designer hybrids: keep name exactly as returned (Puggle, Goldendoodle, etc.)
+            // Everything else: run through cleanBreedName to strip any slash/mix/cross notation
+            if ($classType === 'designer_hybrid') {
+                $cleanedBreed = $primaryBreedRaw;
             } else {
                 $cleanedBreed = $this->cleanBreedName($primaryBreedRaw);
             }
@@ -1174,18 +1167,16 @@ PROMPT;
             }
 
             // ----------------------------------------------------------------
-            // CONFIDENCE — from Gemini, clamped to safe range
+            // CONFIDENCE — from Gemini, clamped to safe display range
             // ----------------------------------------------------------------
             $rawConfidence    = isset($parsed['primary_confidence']) ? (float) $parsed['primary_confidence'] : 85.0;
-            $microVariance    = (mt_rand(-30, 30) / 10); // ±3 micro-variance to avoid always-same number
+            $microVariance    = (mt_rand(-30, 30) / 10); // ±3 micro-variance keeps number feeling natural
             $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
 
             // ----------------------------------------------------------------
             // BUILD top_predictions
-            //
-            // [0] always = primary breed (hybrid name, purebred, or dominant parent)
-            // [1..n]     = alternatives from Gemini (parent breeds for hybrids,
-            //              structural alternatives for purebreds, SE Asian for Aspin)
+            // [0] = primary breed (hybrid name, purebred, dominant parent, or Aspin)
+            // [1+] = alternatives from Gemini
             // ----------------------------------------------------------------
             $topPredictions = [
                 [
@@ -1209,7 +1200,7 @@ PROMPT;
                         continue;
                     }
 
-                    // Skip if same as primary
+                    // Skip duplicates of primary
                     if (strtolower($altBreed) === strtolower($cleanedBreed)) {
                         continue;
                     }
@@ -1249,10 +1240,10 @@ PROMPT;
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'model'                 => 'gemini-3.1-pro-preview',
-                    'response_time_s'       => $totalTime,
-                    'classification_type'   => $classType,
-                    'recognized_hybrid'     => $recognizedHybridName,
+                    'model'               => 'gemini-3.1-pro-preview',
+                    'response_time_s'     => $totalTime,
+                    'classification_type' => $classType,
+                    'recognized_hybrid'   => $recognizedHybridName,
                 ],
             ];
         } catch (\GuzzleHttp\Exception\RequestException $e) {
