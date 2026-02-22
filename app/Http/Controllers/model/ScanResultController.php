@@ -803,7 +803,7 @@ class ScanResultController extends Controller
      * Call 2 — alternatives with realistic confidence
      * ==========================================
      */
-    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false): array
+    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false, $mlBreed = null, $mlConfidence = null): array
     {
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION (v2 SINGLE-CALL) ===');
         Log::info('Image path: ' . $imagePath);
@@ -861,9 +861,24 @@ class ScanResultController extends Controller
             $overallStart = microtime(true);
 
             // ----------------------------------------------------------------
-            // SINGLE COMBINED PROMPT — all logic/rules UNCHANGED from v2
+            // ML CONTEXT INJECTION (NEW — only added lines)
+            // When ML model already ran, give Gemini that result as a signal.
+            // This helps Gemini focus its analysis, especially for hybrid detection.
             // ----------------------------------------------------------------
-            $combinedPrompt = <<<'PROMPT'
+            $mlContextPrefix = '';
+            if (!empty($mlBreed) && !empty($mlConfidence)) {
+                $mlConfPct       = round($mlConfidence, 1);
+                $mlContextPrefix = "IMPORTANT CONTEXT: A trained ML image classification model has already analyzed this dog image and identified the breed as \"{$mlBreed}\" with {$mlConfPct}% confidence. Treat this as a strong signal in your analysis. However, apply your own expert judgment — especially verify whether this could be a recognized hybrid breed (e.g. if ML says \"Cocker Spaniel\", check carefully if this is actually a Cockapoo; if ML says \"Poodle\", check if it could be a Goldendoodle, Labradoodle, etc.).\n\n";
+                Log::info('✓ ML context injected into Gemini prompt', [
+                    'ml_breed'      => $mlBreed,
+                    'ml_confidence' => $mlConfPct,
+                ]);
+            }
+
+            // ----------------------------------------------------------------
+            // SINGLE COMBINED PROMPT — all logic/rules IDENTICAL to your original
+            // ----------------------------------------------------------------
+            $combinedPrompt = $mlContextPrefix . <<<'PROMPT'
 You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs, and ALL recognized designer/hybrid breeds (Puggle, Goldendoodle, Labradoodle, Cockapoo, Maltipoo, Affenhuahua, Schnoodle, Cavapoo, Yorkipoo, Shorkie, Pomsky, Aussiedoodle, Bernedoodle, Sheepadoodle, Whoodle, and hundreds more).
 
 ══════════════════════════════════════════════════════════════
@@ -1050,15 +1065,10 @@ PROMPT;
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature'     => 0.1,    // Low = deterministic, accurate
-                        'maxOutputTokens' => 8200,   // FIX: was 400 — too low, caused truncation
-                        // NOTE: responseMimeType intentionally REMOVED
-                        // It conflicts with thinkingConfig on this model and causes
-                        // the JSON to be embedded inside thoughtSignature blobs,
-                        // making it unparseable. The 3-pass text extractor below
-                        // handles clean extraction without needing JSON mode.
+                        'temperature'     => 0.1,
+                        'maxOutputTokens' => 8200,
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 8200,    // 0 = suppress thoughtSignature output that was truncating JSON
+                            'thinkingBudget' => 8200,
                         ],
                     ],
                     'safetySettings' => [
@@ -1078,21 +1088,19 @@ PROMPT;
             Log::info('📥 Raw Gemini response: ' . substr($body, 0, 1000));
 
             // ----------------------------------------------------------------
-            // EXTRACT JSON TEXT FROM RESPONSE PARTS
-            // 3-pass defensive extraction — handles thought blocks,
-            // thoughtSignature blobs, and empty parts safely
+            // EXTRACT JSON TEXT FROM RESPONSE PARTS — identical to original
             // ----------------------------------------------------------------
             $jsonText = '';
 
             if (!empty($result['candidates'][0]['content']['parts'])) {
-                // Pass 1: prefer non-thought text parts (skip thought/thoughtSignature blocks)
+                // Pass 1: prefer non-thought text parts
                 foreach ($result['candidates'][0]['content']['parts'] as $part) {
                     if (isset($part['text']) && empty($part['thought'])) {
                         $jsonText = trim($part['text']);
                         break;
                     }
                 }
-                // Pass 2: fallback — grab any text part if pass 1 found nothing
+                // Pass 2: fallback — grab any text part
                 if (empty($jsonText)) {
                     foreach ($result['candidates'][0]['content']['parts'] as $part) {
                         if (isset($part['text'])) {
@@ -1123,11 +1131,9 @@ PROMPT;
             if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
                 Log::error('✗ Failed to parse combined Gemini JSON. Raw: ' . $jsonText);
 
-                // Check for Gemini-level API errors
                 if (isset($result['error'])) {
                     return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
                 }
-                // Check for safety/recitation blocks
                 $finishReason = $result['candidates'][0]['finishReason'] ?? '';
                 if (in_array($finishReason, ['SAFETY', 'RECITATION'])) {
                     return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
@@ -1137,25 +1143,21 @@ PROMPT;
             }
 
             // ----------------------------------------------------------------
-            // BUILD PRIMARY BREED NAME
+            // BUILD PRIMARY BREED NAME — identical to original
             // ----------------------------------------------------------------
             $classType            = trim($parsed['classification_type'] ?? 'purebred');
             $recognizedHybridName = isset($parsed['recognized_hybrid_name'])
                 ? trim((string) $parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
                 : null;
 
-            // Empty string or literal "null" string → treat as null
             if (empty($recognizedHybridName) || strtolower($recognizedHybridName) === 'null') {
                 $recognizedHybridName = null;
             }
 
-            // Raw primary from Gemini
             $primaryBreedRaw = trim($parsed['primary_breed'], " \t\n\r\0\x0B\"'`");
             $primaryBreedRaw = preg_replace('/\s+/', ' ', $primaryBreedRaw);
             $primaryBreedRaw = substr($primaryBreedRaw, 0, 120);
 
-            // Designer hybrids: keep name exactly as returned (Puggle, Goldendoodle, etc.)
-            // Everything else: run through cleanBreedName to strip any slash/mix/cross notation
             if ($classType === 'designer_hybrid') {
                 $cleanedBreed = $primaryBreedRaw;
             } else {
@@ -1167,16 +1169,14 @@ PROMPT;
             }
 
             // ----------------------------------------------------------------
-            // CONFIDENCE — from Gemini, clamped to safe display range
+            // CONFIDENCE — identical to original
             // ----------------------------------------------------------------
             $rawConfidence    = isset($parsed['primary_confidence']) ? (float) $parsed['primary_confidence'] : 85.0;
-            $microVariance    = (mt_rand(-30, 30) / 10); // ±3 micro-variance keeps number feeling natural
+            $microVariance    = (mt_rand(-30, 30) / 10);
             $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
 
             // ----------------------------------------------------------------
-            // BUILD top_predictions
-            // [0] = primary breed (hybrid name, purebred, dominant parent, or Aspin)
-            // [1+] = alternatives from Gemini
+            // BUILD top_predictions — identical to original
             // ----------------------------------------------------------------
             $topPredictions = [
                 [
@@ -1185,7 +1185,6 @@ PROMPT;
                 ],
             ];
 
-            // Parse and append alternatives
             if (!empty($parsed['alternatives']) && is_array($parsed['alternatives'])) {
                 foreach ($parsed['alternatives'] as $alt) {
                     if (empty($alt['breed']) || !isset($alt['confidence'])) {
@@ -1200,7 +1199,6 @@ PROMPT;
                         continue;
                     }
 
-                    // Skip duplicates of primary
                     if (strtolower($altBreed) === strtolower($cleanedBreed)) {
                         continue;
                     }
@@ -1224,6 +1222,7 @@ PROMPT;
                 'confidence'            => $actualConfidence,
                 'alternatives_count'    => count($topPredictions) - 1,
                 'total_time_s'          => $totalTime,
+                'ml_context_used'       => !empty($mlBreed),
             ]);
 
             Log::info('✓ Breed identification complete', [
@@ -1257,7 +1256,6 @@ PROMPT;
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
-
 
 
 
@@ -1344,20 +1342,19 @@ PROMPT;
     /**
      * ML Model Prediction (Fallback)
      */
-    private function identifyBreedWithModel($imagePath)
+    private function identifyBreedWithModel($imagePath): array
     {
         try {
-            Log::info('=== USING ML API SERVICE ===');
+            Log::info('=== USING ML API SERVICE (YOLO + hybrid verification) ===');
 
             $mlService = new \App\Services\MLApiService();
 
-            // Check if ML API is healthy
             if (!$mlService->isHealthy()) {
                 throw new \Exception('ML API is not available or unhealthy');
             }
 
-            $startTime = microtime(true);
-            $result = $mlService->predictBreed($imagePath);
+            $startTime     = microtime(true);
+            $result        = $mlService->predictBreed($imagePath);
             $executionTime = round(microtime(true) - $startTime, 2);
 
             Log::info('ML API Execution time: ' . $executionTime . 's');
@@ -1366,23 +1363,36 @@ PROMPT;
                 throw new \Exception($result['error'] ?? 'ML API prediction failed');
             }
 
-            // Format response to match existing structure
+            // Log hybrid verification outcome if it fired
+            $learningStats = $result['metadata']['learning_stats'] ?? [];
+            if (!empty($learningStats['gemini_triggered'])) {
+                if (!empty($learningStats['gemini_corrected'])) {
+                    Log::info('✓ YOLO hybrid verification: Gemini CORRECTED the prediction', [
+                        'final_breed' => $result['breed'],
+                    ]);
+                } else {
+                    Log::info('✓ YOLO hybrid verification: Gemini CONFIRMED the prediction', [
+                        'breed' => $result['breed'],
+                    ]);
+                }
+            }
+
             return [
-                'success' => true,
-                'method' => $result['method'], // 'model' or 'memory'
-                'breed' => $result['breed'],
-                'confidence' => $result['confidence'] * 100, // Convert to percentage
-                'top_predictions' => $result['top_predictions'],
-                'metadata' => array_merge(
+                'success'          => true,
+                'method'           => $result['method'],   // 'model', 'memory', or 'gemini_correction'
+                'breed'            => $result['breed'],
+                'confidence'       => $result['confidence'] * 100, // 0–1 scale → percentage
+                'top_predictions'  => $result['top_predictions'],
+                'metadata'         => array_merge(
                     $result['metadata'] ?? [],
                     ['execution_time' => $executionTime]
-                )
+                ),
             ];
         } catch (\Exception $e) {
             Log::error('ML API prediction failed: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ];
         }
     }
@@ -2034,72 +2044,145 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } else {
-                // NEW IMAGE - Run API-only breed identification
-                Log::info('→ New image - running breed identification...');
+                // NEW IMAGE — ML model runs first, Gemini confirms and enriches
+                Log::info('→ New image — running ML model first (YOLO + hybrid verification)...');
 
-                // SAFETY CHECK: Validate file exists before API call
                 if (!file_exists($fullPath)) {
                     throw new \Exception('Image file was lost before breed identification');
                 }
 
-                // FIXED: Pass local temp file path with isObjectStorage=false
-                $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
+                // ── STEP A: ML API (YOLO + Gemini hybrid check inside Python) ──────────
+                $mlResult = $this->identifyBreedWithModel($fullPath);
 
-                // NO ML FALLBACK - If API fails, return error to user
-                if (!$predictionResult['success']) {
-                    Log::error('✗ Breed identification failed: ' . $predictionResult['error']);
+                if ($mlResult['success']) {
+                    $mlBreed      = $mlResult['breed'];
+                    $mlConfidence = $mlResult['confidence']; // already percentage
+                    $mlMethod     = $mlResult['method'];
 
-                    // Map technical errors to user-friendly messages
-                    $errorMessage = $predictionResult['error'];
-                    $userMessage = 'Unable to identify the dog breed. Please try again.';
+                    Log::info('✓ ML model result', [
+                        'breed'      => $mlBreed,
+                        'confidence' => $mlConfidence,
+                        'method'     => $mlMethod,
+                    ]);
 
-                    if (str_contains($errorMessage, 'API key not configured')) {
-                        $userMessage = 'Service is temporarily unavailable. Please contact support.';
-                    } elseif (str_contains($errorMessage, 'quota') || str_contains($errorMessage, 'rate limit')) {
-                        $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
-                    } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'Connection')) {
-                        $userMessage = 'Network connection issue. Please check your internet and try again.';
-                    } elseif (str_contains($errorMessage, 'Image file not found')) {
-                        $userMessage = 'Failed to process the image. Please try uploading again.';
-                    } elseif (str_contains($errorMessage, 'Invalid image')) {
-                        $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+                    // ── STEP B: GEMINI (gemini-3.1-pro-preview) with ML context ──────────
+                    // Gemini runs its full forensic analysis but receives the ML breed
+                    // as a strong signal — helps it focus on hybrid detection.
+                    Log::info('→ Running Gemini (gemini-3.1-pro-preview) with ML context...');
+
+                    $geminiResult = $this->identifyBreedWithAPI($fullPath, false, $mlBreed, $mlConfidence);
+
+                    if ($geminiResult['success']) {
+                        $geminiBreed      = $geminiResult['breed'];
+                        $geminiConfidence = $geminiResult['confidence'];
+
+                        if ($mlMethod === 'gemini_correction') {
+                            // ML already consulted Gemini internally for hybrid detection
+                            // — trust that result directly, no need to compare again
+                            $detectedBreed    = $mlBreed;
+                            $confidence       = $mlConfidence;
+                            $predictionMethod = 'ml_gemini_verified';
+                            Log::info('✓ Using ML+Gemini hybrid-verified breed', [
+                                'breed'      => $detectedBreed,
+                                'confidence' => $confidence,
+                            ]);
+                        } elseif (
+                            strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed))
+                            && $geminiConfidence >= 80
+                        ) {
+                            // Gemini strongly disagrees with ML — trust Gemini
+                            // (Gemini-3.1-pro-preview has better visual reasoning for hybrids)
+                            $detectedBreed    = $geminiBreed;
+                            $confidence       = $geminiConfidence;
+                            $predictionMethod = 'gemini_override';
+                            Log::info('✓ Gemini overrides ML result', [
+                                'ml_breed'     => $mlBreed,
+                                'gemini_breed' => $geminiBreed,
+                                'gemini_conf'  => $geminiConfidence,
+                            ]);
+                        } else {
+                            // ML and Gemini agree (or Gemini not confident enough to override)
+                            // Use ML breed with the higher of the two confidence values
+                            $detectedBreed    = $mlBreed;
+                            $confidence       = max($mlConfidence, $geminiConfidence);
+                            $predictionMethod = 'ml_gemini_confirmed';
+                            Log::info('✓ ML and Gemini agree on breed', [
+                                'breed'      => $detectedBreed,
+                                'confidence' => $confidence,
+                            ]);
+                        }
+
+                        $topPredictions = $geminiResult['top_predictions'];
+                    } else {
+                        // Gemini failed — use ML result only
+                        Log::warning('⚠️ Gemini failed — using ML result only', [
+                            'error' => $geminiResult['error'] ?? 'unknown',
+                        ]);
+                        $detectedBreed    = $mlBreed;
+                        $confidence       = $mlConfidence;
+                        $predictionMethod = $mlMethod;
+                        $topPredictions   = $mlResult['top_predictions'];
+                    }
+                } else {
+                    // ML API unavailable — fall back to Gemini-only (original behaviour)
+                    Log::warning('⚠️ ML API unavailable — falling back to Gemini-only', [
+                        'error' => $mlResult['error'] ?? 'unknown',
+                    ]);
+
+                    $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
+
+                    if (!$predictionResult['success']) {
+                        Log::error('✗ Both ML and Gemini failed: ' . ($predictionResult['error'] ?? ''));
+
+                        $errorMessage = $predictionResult['error'] ?? '';
+                        $userMessage  = 'Unable to identify the dog breed. Please try again.';
+
+                        if (str_contains($errorMessage, 'API key not configured')) {
+                            $userMessage = 'Service is temporarily unavailable. Please contact support.';
+                        } elseif (str_contains($errorMessage, 'quota') || str_contains($errorMessage, 'rate limit')) {
+                            $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
+                        } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'Connection')) {
+                            $userMessage = 'Network connection issue. Please check your internet and try again.';
+                        } elseif (str_contains($errorMessage, 'Image file not found')) {
+                            $userMessage = 'Failed to process the image. Please try uploading again.';
+                        } elseif (str_contains($errorMessage, 'Invalid image')) {
+                            $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+                        }
+
+                        throw new \Exception($userMessage);
                     }
 
-                    throw new \Exception($userMessage);
+                    $detectedBreed    = $predictionResult['breed'];
+                    $confidence       = $predictionResult['confidence'];
+                    $predictionMethod = $predictionResult['method'];
+                    $topPredictions   = $predictionResult['top_predictions'];
                 }
 
-                $detectedBreed = $predictionResult['breed'];
-                $confidence = $predictionResult['confidence'];
-                $predictionMethod = $predictionResult['method'];
-
-                Log::info('✓ Breed identification successful', [
-                    'breed' => $detectedBreed,
+                Log::info('✓ Final breed identification', [
+                    'breed'      => $detectedBreed,
                     'confidence' => $confidence,
-                    'method' => $predictionMethod,
-                    'confidence_range' => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : ($confidence >= 45 ? 'Low' : 'Very Low'))
+                    'method'     => $predictionMethod,
+                    'range'      => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : 'Low'),
                 ]);
 
-                // Use top predictions from API
-                $topPredictions = $predictionResult['top_predictions'];
-
-                // Generate AI descriptions (breed info, health, origin)
+                // Generate AI descriptions — identical to original
                 $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
 
-                // Initialize simulation data for new scan
+                // Initialize simulation data — identical to original
                 $simulationData = [
-                    '1_years' => null,
-                    '3_years' => null,
-                    'status' => 'pending',
-                    'dog_features' => [], // Empty - job will populate this
-                    'prediction_method' => $predictionMethod,
-                    'is_exact_match' => false,
+                    '1_years'              => null,
+                    '3_years'              => null,
+                    'status'               => 'pending',
+                    'dog_features'         => [],
+                    'prediction_method'    => $predictionMethod,
+                    'is_exact_match'       => false,
                     'has_admin_correction' => false,
                 ];
 
-                Log::info("✓ NEW scan prediction completed", [
-                    'breed' => $detectedBreed,
+                Log::info('✓ NEW scan prediction completed', [
+                    'breed'      => $detectedBreed,
                     'confidence' => $confidence,
-                    'method' => $predictionMethod
+                    'method'     => $predictionMethod,
                 ]);
             }
 
