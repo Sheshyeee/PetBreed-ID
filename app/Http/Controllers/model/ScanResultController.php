@@ -1345,7 +1345,7 @@ PROMPT;
     private function identifyBreedWithModel($imagePath): array
     {
         try {
-            Log::info('=== USING ML API SERVICE (YOLO + hybrid verification) ===');
+            Log::info('=== USING ML API SERVICE (YOLO classification + hybrid flag) ===');
 
             $mlService = new \App\Services\MLApiService();
 
@@ -1363,23 +1363,18 @@ PROMPT;
                 throw new \Exception($result['error'] ?? 'ML API prediction failed');
             }
 
-            // Log hybrid verification outcome if it fired
+            // Log hybrid-prone flag — Gemini Pro will handle hybrid detection
             $learningStats = $result['metadata']['learning_stats'] ?? [];
-            if (!empty($learningStats['gemini_triggered'])) {
-                if (!empty($learningStats['gemini_corrected'])) {
-                    Log::info('✓ YOLO hybrid verification: Gemini CORRECTED the prediction', [
-                        'final_breed' => $result['breed'],
-                    ]);
-                } else {
-                    Log::info('✓ YOLO hybrid verification: Gemini CONFIRMED the prediction', [
-                        'breed' => $result['breed'],
-                    ]);
-                }
+            $isHybridProne = !empty($learningStats['is_hybrid_prone']);
+            if ($isHybridProne) {
+                Log::info('⚠️ YOLO flagged hybrid-prone breed — Gemini Pro will apply extra hybrid scrutiny', [
+                    'breed' => $result['breed'],
+                ]);
             }
 
             return [
                 'success'          => true,
-                'method'           => $result['method'],   // 'model', 'memory', or 'gemini_correction'
+                'method'           => $result['method'],   // 'model' or 'memory'
                 'breed'            => $result['breed'],
                 'confidence'       => $result['confidence'] * 100, // 0–1 scale → percentage
                 'top_predictions'  => $result['top_predictions'],
@@ -2044,69 +2039,71 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } else {
-                // NEW IMAGE — ML model runs first, Gemini confirms and enriches
-                Log::info('→ New image — running ML model first (YOLO + hybrid verification)...');
+                // NEW IMAGE — YOLO runs first, then Gemini Pro Preview makes the final call
+                Log::info('→ New image — running YOLO classification + Gemini Pro forensic analysis...');
 
                 if (!file_exists($fullPath)) {
                     throw new \Exception('Image file was lost before breed identification');
                 }
 
-                // ── STEP A: ML API (YOLO + Gemini hybrid check inside Python) ──────────
+                // ── STEP A: ML API (YOLO — fast classification + hybrid flag) ──────────
                 $mlResult = $this->identifyBreedWithModel($fullPath);
 
                 if ($mlResult['success']) {
-                    $mlBreed      = $mlResult['breed'];
-                    $mlConfidence = $mlResult['confidence']; // already percentage
-                    $mlMethod     = $mlResult['method'];
+                    $mlBreed        = $mlResult['breed'];
+                    $mlConfidence   = $mlResult['confidence']; // already percentage
+                    $mlMethod       = $mlResult['method'];
+                    $isHybridProne  = $mlResult['metadata']['learning_stats']['is_hybrid_prone'] ?? false;
 
                     Log::info('✓ ML model result', [
-                        'breed'      => $mlBreed,
-                        'confidence' => $mlConfidence,
-                        'method'     => $mlMethod,
+                        'breed'          => $mlBreed,
+                        'confidence'     => $mlConfidence,
+                        'method'         => $mlMethod,
+                        'is_hybrid_prone' => $isHybridProne,
                     ]);
 
-                    // ── STEP B: GEMINI (gemini-3.1-pro-preview) with ML context ──────────
-                    // Gemini runs its full forensic analysis but receives the ML breed
-                    // as a strong signal — helps it focus on hybrid detection.
-                    Log::info('→ Running Gemini (gemini-3.1-pro-preview) with ML context...');
+                    // ── STEP B: GEMINI Pro Preview — the sole intelligent brain ──────────
+                    // Always runs on every new image.
+                    // When YOLO flagged a hybrid-prone breed, we inject that signal
+                    // so Gemini knows to apply extra scrutiny for hybrid detection.
+                    // Gemini Pro Preview (not Flash) makes the final call on everything.
+                    $hybridContext = '';
+                    if ($isHybridProne) {
+                        $hybridContext = " NOTE: The ML model flagged \"{$mlBreed}\" as a hybrid-prone breed — pay extra attention to hybrid indicators (coat texture, mixed proportions, features from two breeds). Check carefully if this could be a recognized designer hybrid (Cockapoo, Goldendoodle, Labradoodle, Cavapoo, Maltipoo, etc.).";
+                        Log::info('⚠️ Hybrid-prone breed flagged — injecting hybrid context into Gemini Pro prompt');
+                    }
 
-                    $geminiResult = $this->identifyBreedWithAPI($fullPath, false, $mlBreed, $mlConfidence);
+                    Log::info('→ Running Gemini Pro Preview (full forensic analysis)...');
+
+                    $geminiResult = $this->identifyBreedWithAPI(
+                        $fullPath,
+                        false,
+                        $mlBreed . $hybridContext,
+                        $mlConfidence
+                    );
 
                     if ($geminiResult['success']) {
                         $geminiBreed      = $geminiResult['breed'];
                         $geminiConfidence = $geminiResult['confidence'];
 
-                        if ($mlMethod === 'gemini_correction') {
-                            // ML already consulted Gemini internally for hybrid detection
-                            // — trust that result directly, no need to compare again
-                            $detectedBreed    = $mlBreed;
-                            $confidence       = $mlConfidence;
-                            $predictionMethod = 'ml_gemini_verified';
-                            Log::info('✓ Using ML+Gemini hybrid-verified breed', [
-                                'breed'      => $detectedBreed,
-                                'confidence' => $confidence,
-                            ]);
-                        } elseif (
-                            strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed))
-                            && $geminiConfidence >= 80
-                        ) {
-                            // Gemini strongly disagrees with ML — trust Gemini
-                            // (Gemini-3.1-pro-preview has better visual reasoning for hybrids)
+                        if (strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed)) && $geminiConfidence >= 75) {
+                            // Gemini disagrees with YOLO — trust Gemini
+                            // This covers both hybrid corrections AND breed corrections
                             $detectedBreed    = $geminiBreed;
                             $confidence       = $geminiConfidence;
-                            $predictionMethod = 'gemini_override';
-                            Log::info('✓ Gemini overrides ML result', [
-                                'ml_breed'     => $mlBreed,
+                            $predictionMethod = $isHybridProne ? 'gemini_hybrid_override' : 'gemini_override';
+                            Log::info('✓ Gemini overrides YOLO', [
+                                'yolo_breed'   => $mlBreed,
                                 'gemini_breed' => $geminiBreed,
                                 'gemini_conf'  => $geminiConfidence,
+                                'hybrid_prone' => $isHybridProne,
                             ]);
                         } else {
-                            // ML and Gemini agree (or Gemini not confident enough to override)
-                            // Use ML breed with the higher of the two confidence values
+                            // Gemini agrees with YOLO — use YOLO breed, take higher confidence
                             $detectedBreed    = $mlBreed;
                             $confidence       = max($mlConfidence, $geminiConfidence);
                             $predictionMethod = 'ml_gemini_confirmed';
-                            Log::info('✓ ML and Gemini agree on breed', [
+                            Log::info('✓ Gemini confirms YOLO breed', [
                                 'breed'      => $detectedBreed,
                                 'confidence' => $confidence,
                             ]);
@@ -2295,6 +2292,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             ]);
         }
     }
+
 
 
 
