@@ -861,14 +861,26 @@ class ScanResultController extends Controller
             $overallStart = microtime(true);
 
             // ----------------------------------------------------------------
-            // ML CONTEXT INJECTION (NEW — only added lines)
-            // When ML model already ran, give Gemini that result as a signal.
-            // This helps Gemini focus its analysis, especially for hybrid detection.
+            // ML CONTEXT INJECTION
+            // Give Gemini the YOLO result as a weak directional hint only.
+            // Gemini's own visual analysis ALWAYS takes priority.
             // ----------------------------------------------------------------
             $mlContextPrefix = '';
             if (!empty($mlBreed) && !empty($mlConfidence)) {
-                $mlConfPct       = round($mlConfidence, 1);
-                $mlContextPrefix = "IMPORTANT CONTEXT: A trained ML image classification model has already analyzed this dog image and identified the breed as \"{$mlBreed}\" with {$mlConfPct}% confidence. Treat this as a strong signal in your analysis. However, apply your own expert judgment — especially verify whether this could be a recognized hybrid breed (e.g. if ML says \"Cocker Spaniel\", check carefully if this is actually a Cockapoo; if ML says \"Poodle\", check if it could be a Goldendoodle, Labradoodle, etc.).\n\n";
+                $mlConfPct = round($mlConfidence, 1);
+                $mlContextPrefix = <<<MLCONTEXT
+ML MODEL HINT (use cautiously — do NOT blindly trust this):
+A computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
+
+Rules for using this hint:
+• Treat this as a STARTING POINT for your analysis, not a conclusion.
+• Your own forensic visual analysis ALWAYS overrides this hint.
+• If the visual evidence clearly points to a DIFFERENT breed — trust your eyes, not this hint.
+• ML models frequently confuse visually similar breeds (e.g. Spanish Water Dog vs Airedoodle, Labrador vs Sheprador). Do NOT anchor to the ML prediction if the physical traits don't match.
+• For hybrids: the ML model only knows purebred classes — it will always output a purebred name even for hybrids. If you see mixed traits, identify the actual cross from the visual evidence.
+• NEVER let this hint suppress your correct identification of a hybrid, rare breed, or regional breed.
+
+MLCONTEXT;
                 Log::info('✓ ML context injected into Gemini prompt', [
                     'ml_breed'      => $mlBreed,
                     'ml_confidence' => $mlConfPct,
@@ -876,174 +888,214 @@ class ScanResultController extends Controller
             }
 
             // ----------------------------------------------------------------
-            // SINGLE COMBINED PROMPT — all logic/rules IDENTICAL to your original
+            // PROMPT
             // ----------------------------------------------------------------
             $combinedPrompt = $mlContextPrefix . <<<'PROMPT'
-You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs, and ALL recognized designer/hybrid breeds (Puggle, Goldendoodle, Labradoodle, Cockapoo, Maltipoo, Affenhuahua, Schnoodle, Cavapoo, Yorkipoo, Shorkie, Pomsky, Aussiedoodle, Bernedoodle, Sheepadoodle, Whoodle, and hundreds more).
+You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs (Aspin, Bangkaew, Phu Quoc Ridgeback, Taiwan Dog, Kintamani, etc.), and ALL recognized designer/hybrid breeds.
+
+YOUR TASK: Identify this dog's breed with maximum accuracy using pure visual forensic analysis.
 
 ══════════════════════════════════════════════════════════════
-STEP 1 — PUPPY vs ADULT ASSESSMENT (do this FIRST)
+STEP 1 — VISUAL INDEPENDENCE (do this FIRST)
 ══════════════════════════════════════════════════════════════
-Before any breed analysis, determine if this is a puppy (under ~12 months):
-- Puppies have: rounder/larger head relative to body, oversized paws, shorter muzzle, softer/fluffier coat, proportionally larger ears, less defined musculature, rounder eyes
-- If puppy traits are present, ADJUST your trait analysis accordingly:
-  • Do NOT penalize a breed match for seemingly "wrong" proportions that are normal for puppies
-  • Focus on structural bone shape, ear set, coat type/texture, and overall body type — these are reliable even in puppies
-  • A pup's face is always rounder and flatter than its adult form — do NOT confuse puppy face roundness with brachycephalic features
+Before anything else, look at the image with completely fresh eyes.
+- IGNORE any ML hint provided above until you have formed your own initial impression.
+- Ask yourself: "If I had no hint at all, what breed(s) would I identify from these physical traits?"
+- Only AFTER forming your own impression should you cross-reference the ML hint.
+- If your impression contradicts the ML hint — TRUST YOUR IMPRESSION.
 
 ══════════════════════════════════════════════════════════════
-STEP 2 — FORENSIC TRAIT ANALYSIS (silent, complete, before any decision)
+STEP 2 — PUPPY vs ADULT ASSESSMENT
 ══════════════════════════════════════════════════════════════
-Examine every visible physical trait with maximum precision:
-- COAT: exact texture (smooth/short/wire/wavy/curly/double/silky/harsh/fluffy), length, density, color, and pattern (solid/spotted/ticked/merle/parti/saddle/blanket/sable/brindle/tricolor/phantom)
-- HEAD & SKULL: shape (domed/flat/wedge/chiseled/broad/narrow/blocky/refined/brachycephalic), occiput prominence, stop angle (pronounced/moderate/slight/absent), muzzle-to-skull length ratio, flews, lip tightness, cheek muscles, wrinkle presence
-- EARS: attachment point (high/mid/low-set), shape (erect/semi-erect/rose/button/pendant/folded/lobular/cropped/tipped), leather thickness, ear length relative to muzzle
-- EYES: shape (almond/oval/round/triangular/deep-set/prominent/bug-eyed), spacing (close/normal/wide), color, expression, third eyelid visibility
-- NECK: length, arch, presence of dewlap, throatiness
-- BODY: length-to-height ratio, chest width and depth, forechest development, rib spring, degree of tuck-up, back length, loin strength, coupling, topline (level/roached/sloping)
-- LIMBS: bone substance (fine/moderate/heavy/substantial), front leg straightness, hindquarter angulation, stifle bend, hock length and angle, feet type (cat/hare/oval/round), pad thickness, dewclaws
-- TAIL: set (high/low), length, natural carriage at rest and alert (sabre/sickle/curled tightly/otter/whip/bobtail/gay/plume/corkscrew), feathering or brush
-- SIZE: estimate shoulder height and weight category (toy <5kg / small 5–10kg / medium 10–25kg / large 25–45kg / giant >45kg)
-- OVERALL TYPE: match silhouette to FCI group (sighthound/scenthound/gundog/terrier/spitz/molosser/herding/primitive/companion/toy)
+Determine if this is a puppy (under ~12 months):
+- Puppies: rounder head, oversized paws, shorter muzzle, softer coat, larger ears proportionally, less muscle definition
+- If puppy: adjust trait analysis — focus on bone structure, ear set, coat texture (reliable in puppies), not facial proportions
+- Do NOT confuse puppy face roundness with brachycephalic breed features
 
 ══════════════════════════════════════════════════════════════
-STEP 3 — HYBRID / MIX DETECTION (critical step — do this before breed selection)
+STEP 3 — FORENSIC TRAIT ANALYSIS (complete before any decision)
 ══════════════════════════════════════════════════════════════
-BEFORE committing to a single purebred, actively check:
-- Does this dog show traits from TWO different breed types simultaneously?
-  (e.g., one breed's head + another breed's body / coat / ear type)
-- Are proportions, coat, and structure internally inconsistent for any single purebred?
-- Would a knowledgeable breeder immediately see two parent breeds?
+Examine every visible trait with maximum precision:
 
-If YES to any of the above:
-→ Identify BOTH parent breeds by their dominant traits
-→ Check the RECOGNIZED DESIGNER HYBRID LIST below
-→ If the cross matches a named hybrid: use that name as primary_breed
-→ If no recognized name: use the dominant parent breed as primary_breed
+COAT: texture (smooth/short/wire/wavy/curly/loose-curl/tight-curl/double/silky/harsh/fluffy/corded), length, density, color, pattern (solid/spotted/ticked/merle/parti/saddle/blanket/sable/brindle/tricolor/phantom/roan)
 
-RECOGNIZED DESIGNER HYBRID REFERENCE (non-exhaustive — use your full knowledge):
-Puggle = Pug × Beagle
+HEAD & SKULL: shape (domed/flat/wedge/chiseled/broad/narrow/blocky/refined/brachycephalic/dolichocephalic), stop angle (pronounced/moderate/slight/absent), muzzle length vs skull length ratio, occiput prominence, cheek muscles, wrinkles, flews
+
+EARS: set (high/mid/low), shape (erect/semi-erect/rose/button/pendant/folded/lobular/tipped), leather thickness, length relative to muzzle
+
+EYES: shape (almond/oval/round/triangular), set (deep/prominent), spacing, color
+
+NECK & BODY: neck length and arch, body length-to-height ratio, chest depth and width, forechest, tuck-up, topline (level/roached/sloping), loin
+
+LIMBS: bone substance (fine/moderate/heavy), angulation, hock angle, feet shape (cat/hare/oval), dewclaws
+
+TAIL: set, length, carriage (sabre/sickle/curl/otter/whip/bobtail/gay/plume/corkscrew)
+
+SIZE: estimate weight (toy <5kg / small 5–10kg / medium 10–25kg / large 25–45kg / giant >45kg)
+
+FCI TYPE: sighthound / scenthound / gundog / terrier / spitz / molosser / herding / primitive / companion / toy
+
+══════════════════════════════════════════════════════════════
+STEP 4 — HYBRID / CROSS DETECTION (CRITICAL — always do this)
+══════════════════════════════════════════════════════════════
+BEFORE committing to any purebred, check:
+• Does this dog show traits from TWO breed types simultaneously?
+• Are the coat, head, and body internally inconsistent for any single purebred standard?
+• Would a breeder immediately see two parent breeds?
+
+If YES to any → identify BOTH parent breeds visually, then check the hybrid list.
+
+IDENTIFYING DOODLES & POODLE CROSSES CORRECTLY:
+When you see curly/wavy coat, do NOT default to common doodles. Instead:
+1. Ignore the curly coat temporarily
+2. Examine the HEAD SHAPE, BODY SIZE, BONE STRUCTURE, and EAR SET
+3. These features reveal the NON-POODLE parent precisely:
+   - Long rectangular head + large body + wiry texture under curl = Airedale Terrier parent → AIREDOODLE
+   - Broad blocky head + heavy bone + tan/black markings = Rottweiler parent → ROTTLE
+   - Wedge-shaped herding head + merle pattern = Australian Shepherd parent → AUSSIEDOODLE
+   - Long low body + short legs = Dachshund parent → DOXIEPOO
+   - Floppy ears + hound expression + scent hound body = Beagle parent → POOGLE
+   - Broad retriever head + otter tail + yellow/gold coat = Golden Retriever parent → GOLDENDOODLE
+   - Broad retriever head + black/chocolate coat + otter tail = Labrador parent → LABRADOODLE
+   - Refined spaniel head + long pendulous ears = Cocker Spaniel parent → COCKAPOO
+   - Narrow Collie head + merle or tricolor = Border Collie parent → BORDOODLE
+   - Shepherd head + saddle markings + large body = German Shepherd parent → SHEPADOODLE
+   - Husky mask/blue eyes/thick double coat under curl = Husky parent → HUSKYDOODLE
+   - Heavy Bernese tricolor markings + large body = Bernese Mountain Dog parent → BERNEDOODLE
+   - OES shaggy coloring + large body = Old English Sheepdog parent → SHEEPADOODLE
+
+RECOGNIZED DESIGNER HYBRID REFERENCE (apply full knowledge beyond this list):
+── POODLE CROSSES ──
 Goldendoodle = Golden Retriever × Poodle
 Labradoodle = Labrador Retriever × Poodle
 Cockapoo = Cocker Spaniel × Poodle
 Maltipoo = Maltese × Poodle
-Affenhuahua = Affenpinscher × Chihuahua
 Schnoodle = Schnauzer × Poodle
 Cavapoo = Cavalier King Charles Spaniel × Poodle
 Yorkipoo = Yorkshire Terrier × Poodle
-Shorkie = Shih Tzu × Yorkshire Terrier
-Shih-Poo = Shih Tzu × Poodle
-Pomsky = Pomeranian × Husky
 Aussiedoodle = Australian Shepherd × Poodle
 Bernedoodle = Bernese Mountain Dog × Poodle
 Sheepadoodle = Old English Sheepdog × Poodle
-Whoodle = Wheaten Terrier × Poodle
+Whoodle = Soft Coated Wheaten Terrier × Poodle
+Airedoodle = Airedale Terrier × Poodle
+Bordoodle = Border Collie × Poodle
+Boxerdoodle = Boxer × Poodle
+Rottle = Rottweiler × Poodle
+Shepadoodle = German Shepherd × Poodle
+Huskydoodle = Siberian Husky × Poodle
+Irishdoodle = Irish Setter × Poodle
+Springerdoodle = English Springer Spaniel × Poodle
+Weimardoodle = Weimaraner × Poodle
+Doberdoodle = Doberman Pinscher × Poodle
+Saint Berdoodle = Saint Bernard × Poodle
+Newfypoo = Newfoundland × Poodle
+Pyredoodle = Great Pyrenees × Poodle
+Doxiepoo = Dachshund × Poodle
+Corgipoo = Corgi × Poodle
+Shih-Poo = Shih Tzu × Poodle
+Pomapoo = Pomeranian × Poodle
+Peekapoo = Pekingese × Poodle
+Bichpoo = Bichon Frise × Poodle
+Lhasapoo = Lhasa Apso × Poodle
+Westiepoo = West Highland White Terrier × Poodle
+Cairnoodle = Cairn Terrier × Poodle
+Scoodle = Scottish Terrier × Poodle
+Jackapoo = Jack Russell Terrier × Poodle
+Havapoo = Havanese × Poodle
+Chipoo = Chihuahua × Poodle
+Pugapoo = Pug × Poodle
+Poogle = Poodle × Beagle
+── SMALL CROSSES ──
+Puggle = Pug × Beagle
+Affenhuahua = Affenpinscher × Chihuahua
+Shorkie = Shih Tzu × Yorkshire Terrier
+Morkie = Maltese × Yorkshire Terrier
+Pomchi = Pomeranian × Chihuahua
+Chiweenie = Chihuahua × Dachshund
+Chorkie = Chihuahua × Yorkshire Terrier
+ShiChi = Chihuahua × Shih Tzu
+Malshi = Maltese × Shih Tzu
 Chug = Chihuahua × Pug
 Bugg = Boston Terrier × Pug
 Jug = Jack Russell Terrier × Pug
 Frug = French Bulldog × Pug
-Morkie = Maltese × Yorkshire Terrier
-Pomchi = Pomeranian × Chihuahua
-Chiweenie = Chihuahua × Dachshund
-Jackabee = Jack Russell Terrier × Beagle
-Beagador = Beagle × Labrador Retriever
-Bogle = Boxer × Beagle
-Doxle = Dachshund × Beagle
-Boggle = Boxer × Beagle
-Beabull = Bulldog × Beagle
-Bocker = Cocker Spaniel × Beagle
-Poogle = Poodle × Beagle
-Labrottie = Rottweiler × Labrador Retriever
-Sheprador = German Shepherd × Labrador Retriever
-Gerberian Shepsky = Husky × German Shepherd
-Huskydoodle = Husky × Poodle
-Alusky = Husky × Malamute
+Pomsky = Pomeranian × Husky
+── LARGE/MEDIUM CROSSES ──
 Goberian = Husky × Golden Retriever
-Corgipoo = Corgi × Poodle
+Gerberian Shepsky = Husky × German Shepherd
+Alusky = Husky × Malamute
+Sheprador = German Shepherd × Labrador Retriever
+Labrottie = Rottweiler × Labrador Retriever
+Beagador = Beagle × Labrador Retriever
+Jackabee = Jack Russell Terrier × Beagle
+Bocker = Cocker Spaniel × Beagle
 Horgi = Corgi × Husky
 Aussie-Corgi = Corgi × Australian Shepherd
-Doxiepoo = Dachshund × Poodle
-Malshi = Maltese × Shih Tzu
-Bichpoo = Bichon Frise × Poodle
-Peekapoo = Pekingese × Poodle
-Pomapoo = Pomeranian × Poodle
-Chorkie = Chihuahua × Yorkshire Terrier
-ShiChi = Chihuahua × Shih Tzu
-Bordoodle = Border Collie × Poodle
-(Apply full knowledge for any cross not listed above)
+(Apply your FULL expert knowledge for any cross not listed — the list is illustrative, not exhaustive)
 
 ══════════════════════════════════════════════════════════════
-STEP 4 — ASPIN RULE (MANDATORY — highest priority for Philippine dogs)
+STEP 5 — ASPIN RULE (MANDATORY — highest priority for Philippine/SE Asian dogs)
 ══════════════════════════════════════════════════════════════
-The Aspin (Asong Pinoy) is the Philippine native dog — extremely common in Southeast Asia.
-It MUST be identified correctly and MUST NEVER be mislabeled as a foreign purebred or mix.
-
-Aspin traits — classify as Aspin if the MAJORITY of these are present:
+The Aspin (Asong Pinoy) is the Philippine native dog — extremely common in SE Asia.
+Classify as Aspin if the MAJORITY of these are present:
 ✓ Lean, lightly muscled body with visible tuck-up
-✓ Short, smooth, close-lying coat (any color: tan, black, spotted, brindle, white — all valid)
-✓ Wedge-shaped or slightly rounded head with moderate stop
-✓ Almond-shaped eyes, often dark brown
-✓ Semi-erect, erect, or slightly tipped ears (NOT fully pendant, NOT lobular)
+✓ Short, smooth, close-lying coat (any color — tan, black, spotted, brindle, white all valid)
+✓ Wedge-shaped or slightly rounded head, moderate stop
+✓ Almond-shaped dark brown eyes
+✓ Semi-erect, erect, or slightly tipped ears (NOT fully pendant or lobular)
 ✓ Sickle-shaped, curled, or low-carried tail
 ✓ Medium size, fine to moderate bone
-✓ Overall primitive/pariah dog appearance — unexaggerated in every feature
-✓ No exaggerated coat, no dewlap, no heavy wrinkles, no extreme angulation
+✓ Overall primitive/pariah dog appearance — nothing exaggerated
+✓ No heavy coat, no dewlap, no extreme wrinkles, no heavy angulation
 
-→ If Aspin traits confirmed: primary_breed = "Aspin", classification_type = "aspin"
-→ NEVER label an Aspin as: Village Dog, Mixed Breed, Mutt, Philippine Dog, Street Dog, or any foreign breed name
-→ For Aspin alternatives: list the 2 closest Southeast Asian primitive-type breeds (e.g. Thai Ridgeback, Basenji, Canaan Dog, Indian Pariah Dog, Jindo, Shiba Inu)
+→ primary_breed = "Aspin", classification_type = "aspin"
+→ NEVER label an Aspin as: Village Dog, Mixed Breed, Mutt, Street Dog, or any foreign breed name
 
 ══════════════════════════════════════════════════════════════
-STEP 5 — FINAL CLASSIFICATION DECISION
+STEP 6 — FINAL CLASSIFICATION DECISION
 ══════════════════════════════════════════════════════════════
-Apply EXACTLY ONE of these in priority order:
+Apply EXACTLY ONE in priority order:
 
-1. ASPIN → Step 4 criteria met
-   primary_breed = "Aspin"
-   classification_type = "aspin"
-   recognized_hybrid_name = null
-   alternatives = [2 closest SE Asian / pariah-type breeds]
+1. ASPIN → Step 5 criteria met
+   classification_type = "aspin", recognized_hybrid_name = null
 
-2. RECOGNIZED DESIGNER HYBRID → Step 3 identified a known cross
-   primary_breed = full official hybrid name (e.g. "Puggle", "Goldendoodle")
+2. RECOGNIZED DESIGNER HYBRID → Step 4 identified a known cross
+   primary_breed = full hybrid name (e.g. "Airedoodle", "Goldendoodle")
    classification_type = "designer_hybrid"
    recognized_hybrid_name = same as primary_breed
-   alternatives = [parent breed 1, parent breed 2] with realistic confidence
+   alternatives = [parent breed 1, parent breed 2]
 
-3. PUREBRED → 80%+ of traits consistently match one official breed standard
-   primary_breed = COMPLETE official registered breed name (zero abbreviations)
-   classification_type = "purebred"
-   recognized_hybrid_name = null
-   alternatives = [2 most structurally similar breeds based on visible traits]
+3. PUREBRED → 80%+ of traits match one breed standard consistently
+   classification_type = "purebred", recognized_hybrid_name = null
+   alternatives = [2 most structurally similar breeds]
 
-4. UNNAMED MIXED BREED → Two visible dominant breeds, no recognized hybrid name
-   primary_breed = dominant parent breed full name (the breed contributing most visible traits)
-   classification_type = "mixed"
-   recognized_hybrid_name = null
-   alternatives = [secondary parent breed, then next closest alternative]
+4. UNNAMED MIXED BREED → Two visible breeds, no recognized hybrid name
+   primary_breed = dominant parent breed full name
+   classification_type = "mixed", recognized_hybrid_name = null
+   alternatives = [secondary parent, next closest]
 
 ══════════════════════════════════════════════════════════════
-CONFIDENCE SCORING RULES
+CONFIDENCE SCORING
 ══════════════════════════════════════════════════════════════
-- primary_confidence: your honest certainty (65–98 range)
-  • 90–98: completely certain, traits unmistakably consistent
-  • 80–89: very confident, minor uncertainty only
-  • 70–79: reasonably confident, some ambiguous traits
-  • 65–69: moderate confidence, notable uncertainty
-- alternative confidence: must be lower than primary, range 15–84
-- Be HONEST — do not always output 88. Score must reflect actual certainty.
+primary_confidence (65–98):
+• 90–98: completely certain, traits unmistakably consistent
+• 80–89: very confident, minor uncertainty only
+• 70–79: reasonably confident, some ambiguous traits
+• 65–69: moderate confidence, notable uncertainty
+alternative confidence: lower than primary, range 15–84
+Be HONEST — reflect actual certainty, do not always output the same number.
 
 ══════════════════════════════════════════════════════════════
-CRITICAL OUTPUT RULES
+OUTPUT RULES
 ══════════════════════════════════════════════════════════════
-- Output ONLY valid JSON. NOTHING else. No markdown fences. No explanation. No preamble.
-- NEVER abbreviate breed names: "Labrador Retriever" not "Lab", "Staffordshire Bull Terrier" not "Staffie"
-- For designer hybrids: use the FULL recognized hybrid name ("Puggle", not "Pug Mix")
-- alternatives array: exactly 2 entries, each with "breed" and "confidence"
-- Each alternative must be DIFFERENT from primary_breed
-- Trim all breed names — no leading/trailing spaces
+- Output ONLY valid JSON. No markdown. No explanation. No preamble.
+- NEVER abbreviate: "Labrador Retriever" not "Lab", "Airedale Terrier" not "Airedale"
+- For hybrids: use the FULL recognized hybrid name ("Airedoodle" not "Airedale Mix")
+- alternatives: exactly 2 entries with "breed" and "confidence"
+- Each alternative must differ from primary_breed
+- Trim all breed names
 
-Output EXACTLY this JSON structure:
+Output EXACTLY this structure:
 {"primary_breed":"Full Official Breed Name or Hybrid Name","primary_confidence":87.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Official Breed Name","confidence":65.0},{"breed":"Full Official Breed Name","confidence":48.0}]}
 PROMPT;
 
@@ -1256,7 +1308,6 @@ PROMPT;
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
-
 
 
 
