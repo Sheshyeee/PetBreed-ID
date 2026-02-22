@@ -1058,7 +1058,7 @@ PROMPT;
                         // making it unparseable. The 3-pass text extractor below
                         // handles clean extraction without needing JSON mode.
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 0,    // 0 = suppress thoughtSignature output that was truncating JSON
+                            'thinkingBudget' => 8200,    // 0 = suppress thoughtSignature output that was truncating JSON
                         ],
                     ],
                     'safetySettings' => [
