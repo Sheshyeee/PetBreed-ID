@@ -1051,7 +1051,7 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,    // Low = deterministic, accurate
-                        'maxOutputTokens' => 2200,   // FIX: was 400 — too low, caused truncation
+                        'maxOutputTokens' => 8200,   // FIX: was 400 — too low, caused truncation
                         // NOTE: responseMimeType intentionally REMOVED
                         // It conflicts with thinkingConfig on this model and causes
                         // the JSON to be embedded inside thoughtSignature blobs,
