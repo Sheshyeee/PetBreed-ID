@@ -44,7 +44,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
             id: 'identify',
             label: 'Identifying breed',
             icon: <Brain className="h-4 w-4" />,
-            duration: 5500,
+            duration: 7500,
         },
         {
             id: 'features',
