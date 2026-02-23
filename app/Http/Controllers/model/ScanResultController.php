@@ -867,7 +867,7 @@ class ScanResultController extends Controller
 
             Log::info('✓ Image encoded — size: ' . strlen($imageContents) . ' bytes');
 
-            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy4xLXByby1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
+            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy1mbGFzaC1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
             $fullUrl    = base64_decode($encodedUrl) . $apiKey;
 
             $client = new \GuzzleHttp\Client([
@@ -1150,9 +1150,9 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 2100,  // JSON output ~150 tokens, 1500 = safe buffer
+                        'maxOutputTokens' => 1500,  // JSON output ~150 tokens, 1500 = safe buffer
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 2100, // Sufficient for accurate breed ID, ~8-12s
+                            'thinkingBudget' => 2000, // Sufficient for accurate breed ID, ~8-12s
                         ],
                     ],
                     'safetySettings' => [
@@ -1230,7 +1230,9 @@ PROMPT;
                 $recovered['alternatives'] = [];
                 preg_match_all(
                     '/"breed"\s*:\s*"([^"]+)"\s*,\s*"confidence"\s*:\s*([\d.]+)/',
-                    $jsonText, $altMatches, PREG_SET_ORDER
+                    $jsonText,
+                    $altMatches,
+                    PREG_SET_ORDER
                 );
                 foreach ($altMatches as $alt)
                     $recovered['alternatives'][] = ['breed' => $alt[1], 'confidence' => (float) $alt[2]];
@@ -1346,7 +1348,7 @@ PROMPT;
                 'confidence'      => round($actualConfidence, 1),
                 'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'model'               => 'gemini-3.1-pro-preview',
+                    'model'               => 'gemini-3-flash-preview',
                     'response_time_s'     => $totalTime,
                     'classification_type' => $classType,
                     'recognized_hybrid'   => $recognizedHybridName,
