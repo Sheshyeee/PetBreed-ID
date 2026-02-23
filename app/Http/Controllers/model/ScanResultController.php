@@ -673,11 +673,28 @@ class ScanResultController extends Controller
             ->first();
 
         if ($previousResult) {
-            Log::info('✓ EXACT IMAGE MATCH FOUND', [
-                'previous_scan_id' => $previousResult->scan_id,
-                'previous_breed' => $previousResult->breed,
+            // Only serve cache if the previous result was high quality.
+            // Low-confidence or model-only results get re-run so Gemini
+            // gets another chance to identify correctly.
+            $prevMethod     = $previousResult->prediction_method ?? 'unknown';
+            $prevConfidence = (float) ($previousResult->confidence ?? 0);
+            $lowQualityMethods = ['yolo_only', 'model', 'unknown'];
+            $isLowQuality = in_array($prevMethod, $lowQualityMethods) && $prevConfidence < 85;
+
+            if ($isLowQuality) {
+                Log::info('⚠️ Exact match found but low quality — forcing re-run', [
+                    'previous_method'     => $prevMethod,
+                    'previous_confidence' => $prevConfidence,
+                    'previous_breed'      => $previousResult->breed,
+                ]);
+                return [false, null];
+            }
+
+            Log::info('✓ EXACT IMAGE MATCH — serving high-quality cache', [
+                'previous_scan_id'    => $previousResult->scan_id,
+                'previous_breed'      => $previousResult->breed,
                 'previous_confidence' => $previousResult->confidence,
-                'scan_date' => $previousResult->created_at
+                'previous_method'     => $prevMethod,
             ]);
             return [true, $previousResult];
         }
@@ -868,23 +885,38 @@ class ScanResultController extends Controller
             $mlContextPrefix = '';
             if (!empty($mlBreed) && !empty($mlConfidence)) {
                 $mlConfPct = round($mlConfidence, 1);
-                $mlContextPrefix = <<<MLCONTEXT
-ML MODEL HINT (use cautiously — do NOT blindly trust this):
-A computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
 
-Rules for using this hint:
-• Treat this as a STARTING POINT for your analysis, not a conclusion.
-• Your own forensic visual analysis ALWAYS overrides this hint.
-• If the visual evidence clearly points to a DIFFERENT breed — trust your eyes, not this hint.
-• ML models frequently confuse visually similar breeds (e.g. Spanish Water Dog vs Airedoodle, Labrador vs Sheprador). Do NOT anchor to the ML prediction if the physical traits don't match.
-• For hybrids: the ML model only knows purebred classes — it will always output a purebred name even for hybrids. If you see mixed traits, identify the actual cross from the visual evidence.
-• NEVER let this hint suppress your correct identification of a hybrid, rare breed, or regional breed.
+                if ($mlConfPct >= 98) {
+                    // Near-certain — strong signal, still visually verified
+                    $mlContextPrefix = <<<MLCONTEXT
+ML MODEL SIGNAL (very high confidence — treat as strong starting point):
+A trained computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
+• Confirm physical traits match this breed standard visually.
+• Check if this could be a hybrid that resembles this breed.
+• If clear visual contradiction exists — trust your eyes over this signal.
 
 MLCONTEXT;
-                Log::info('✓ ML context injected into Gemini prompt', [
-                    'ml_breed'      => $mlBreed,
-                    'ml_confidence' => $mlConfPct,
-                ]);
+                    Log::info('✓ ML hint — HIGH CONFIDENCE (' . $mlConfPct . '%)', [
+                        'ml_breed' => $mlBreed,
+                    ]);
+                } elseif ($mlConfPct >= 75) {
+                    // Moderate — very weak hint, Gemini leads
+                    $mlContextPrefix = <<<MLCONTEXT
+ML MODEL HINT (weak — low priority, do NOT anchor to this):
+A computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
+• WEAK hint only. Your visual forensic analysis takes complete priority.
+• Only consider this if your analysis is genuinely uncertain between two very similar breeds.
+• If your visual reading disagrees — ignore this hint entirely.
+
+MLCONTEXT;
+                    Log::info('✓ ML hint — WEAK mode (' . $mlConfPct . '%)', [
+                        'ml_breed' => $mlBreed,
+                    ]);
+                } else {
+                    // Low confidence (<75%) — suppress entirely, Gemini works blind
+                    $mlContextPrefix = '';
+                    Log::info('⚠️ ML confidence too low (' . $mlConfPct . '%) — hint suppressed, Gemini working independently');
+                }
             }
 
             // ----------------------------------------------------------------
@@ -1118,9 +1150,9 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 8200,
+                        'maxOutputTokens' => 1024,
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 8200,
+                            'thinkingBudget' => 1024,
                         ],
                     ],
                     'safetySettings' => [
