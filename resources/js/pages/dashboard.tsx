@@ -1,7 +1,4 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import {
     Table,
     TableBody,
@@ -17,60 +14,54 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowDown,
-    ArrowRight,
     ArrowUp,
     BarChart3,
-    Brain,
     CheckCircle2,
     ChevronRight,
     ClipboardList,
     Database,
+    Flame,
     GraduationCap,
     LineChart,
     Minus,
+    Sparkles,
     Target,
-    TrendingUp,
+    Trophy,
+    Zap,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
+/* ─────────────────── breadcrumbs ────────────────────────────────────────── */
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
 ];
 
-type Result = {
-    scan_id: string;
-    breed: string;
-    confidence: number;
+/* ─────────────────── types ──────────────────────────────────────────────── */
+type Result = { scan_id: string; breed: string; confidence: number };
+
+type HeatmapDay = {
+    date: string;
+    count: number;
+    week: number;
+    day_of_week: number;
+    label: string;
+    is_today: boolean;
 };
 
-type BreedLearning = {
+type HeatmapSummary = {
+    active_days: number;
+    total_in_range: number;
+    current_streak: number;
+    best_day_count: number;
+    best_day_label: string;
+};
+
+type MemoryChip = {
     breed: string;
-    ai_guess_breed: string;
-    ai_guess_confidence: number;
-    event_type: 'corrected' | 'boosted' | 'confirmed';
-    status_label: string;
-    status_color: 'blue' | 'amber' | 'green';
     times_taught: number;
-    examples_in_memory: number;
-    first_taught_date: string;
-    days_since_taught: number;
-    latest_taught_date: string;
-    // legacy
-    examples_learned: number;
-    corrections_made: number;
-    avg_confidence: number;
-    success_rate: number;
-    first_learned: string;
-    days_learning: number;
-    recent_scans: number;
-};
-
-type LearningBreakdown = {
-    knowledge_base: number;
-    memory_usage: number;
-    breed_coverage: number;
-    avg_corrections_per_day: number;
-    recent_activity: number;
+    first_taught: string;
+    days_ago: number;
+    level: 'new' | 'learning' | 'trained' | 'expert';
 };
 
 type TimelineDay = {
@@ -94,976 +85,1054 @@ type PageProps = {
     totalScansWeeklyTrend?: number;
     correctedWeeklyTrend?: number;
     highConfidenceWeeklyTrend?: number;
-    lowConfidenceWeeklyTrend?: number;
     memoryCount?: number;
-    uniqueBreedsLearned?: number;
-    recentCorrectionsCount?: number;
     avgConfidence?: number;
     confidenceTrend?: number;
     memoryHitRate?: number;
     accuracyImprovement?: number;
-    breedCoverage?: number;
-    accuracyBeforeCorrections?: number;
-    accuracyAfterCorrections?: number;
-    lastCorrectionCount?: number;
-    breedLearningProgress?: BreedLearning[];
-    learningBreakdown?: LearningBreakdown;
     learningTimeline?: TimelineDay[];
+    learningHeatmap?: HeatmapDay[];
+    heatmapSummary?: HeatmapSummary;
+    breedMemoryWall?: MemoryChip[];
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Confidence pill — simple coloured badge showing a % score
-// ─────────────────────────────────────────────────────────────────────────────
-function ConfidencePill({ value }: { value: number }) {
-    const cls =
-        value >= 80
-            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-            : value >= 60
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-              : value >= 40
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300';
-    return (
-        <span
-            className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-black ${cls}`}
-        >
-            {value}%
-        </span>
-    );
+/* ─────────────────── level config ───────────────────────────────────────── */
+const LEVEL_CFG = {
+    expert: {
+        bg: 'bg-emerald-500/15',
+        border: 'border-emerald-500/35',
+        text: 'text-emerald-300',
+        dot: '#10b981',
+        label: 'Expert',
+    },
+    trained: {
+        bg: 'bg-green-500/12',
+        border: 'border-green-500/30',
+        text: 'text-green-300',
+        dot: '#22c55e',
+        label: 'Trained',
+    },
+    learning: {
+        bg: 'bg-blue-500/12',
+        border: 'border-blue-500/30',
+        text: 'text-blue-300',
+        dot: '#3b82f6',
+        label: 'Learning',
+    },
+    new: {
+        bg: 'bg-amber-500/12',
+        border: 'border-amber-500/30',
+        text: 'text-amber-300',
+        dot: '#f59e0b',
+        label: 'New',
+    },
+};
+
+/* ─────────────────── heatmap cell colours ───────────────────────────────── */
+function heatColor(count: number, max: number): string {
+    if (count === 0) return 'rgba(255,255,255,0.04)';
+    const ratio = Math.min(count / Math.max(max, 1), 1);
+    // emerald ramp: light → vibrant
+    if (ratio < 0.25) return 'rgba(16,185,129,0.20)';
+    if (ratio < 0.5) return 'rgba(16,185,129,0.40)';
+    if (ratio < 0.75) return 'rgba(16,185,129,0.65)';
+    return 'rgba(16,185,129,0.90)';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TeachingLogCard — one per corrected breed
-// ─────────────────────────────────────────────────────────────────────────────
-function TeachingLogCard({
-    entry,
-    rank,
+/* ─────────────────── HeatmapGrid ───────────────────────────────────────── */
+function HeatmapGrid({
+    days,
+    summary,
 }: {
-    entry: BreedLearning;
-    rank: number;
+    days: HeatmapDay[];
+    summary: HeatmapSummary;
 }) {
-    const isCorrected = entry.event_type === 'corrected';
-    const isBoosted = entry.event_type === 'boosted';
-    const isConfirmed = entry.event_type === 'confirmed';
+    const [hovered, setHovered] = useState<HeatmapDay | null>(null);
+    const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
 
-    // Accent colours per event type
-    const accentBorder = isCorrected
-        ? 'border-blue-300  dark:border-blue-700'
-        : isBoosted
-          ? 'border-amber-300 dark:border-amber-700'
-          : 'border-green-300 dark:border-green-700';
-
-    const accentBg = isCorrected
-        ? 'bg-blue-50  dark:bg-blue-950/30'
-        : isBoosted
-          ? 'bg-amber-50 dark:bg-amber-950/30'
-          : 'bg-green-50 dark:bg-green-950/30';
-
-    const badgeCls = isCorrected
-        ? 'bg-blue-100  text-blue-700  dark:bg-blue-950  dark:text-blue-300'
-        : isBoosted
-          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-          : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300';
-
-    const icon = isCorrected ? '🔄' : isBoosted ? '📈' : '✅';
-
-    const rankRings: Record<number, string> = {
-        1: 'bg-gradient-to-br from-yellow-400 to-orange-500',
-        2: 'bg-gradient-to-br from-gray-300  to-gray-400',
-        3: 'bg-gradient-to-br from-orange-400 to-orange-600',
-    };
-
-    // The "story" headline — written so ANY non-technical person understands
-    const headline = isCorrected ? (
-        <>
-            AI guessed{' '}
-            <span className="font-black text-red-500 dark:text-red-400">
-                "{entry.ai_guess_breed}"
-            </span>{' '}
-            — vet corrected to{' '}
-            <span className="font-black text-green-600 dark:text-green-400">
-                "{entry.breed}"
-            </span>
-        </>
-    ) : isBoosted ? (
-        <>
-            AI identified{' '}
-            <span className="font-black text-blue-600 dark:text-blue-400">
-                "{entry.breed}"
-            </span>{' '}
-            but wasn't sure — vet confirmed it
-        </>
-    ) : (
-        <>
-            AI correctly identified{' '}
-            <span className="font-black text-green-600 dark:text-green-400">
-                "{entry.breed}"
-            </span>{' '}
-            — vet verified
-        </>
+    // Build a 7×12 grid (rows = day-of-week Sun–Sat, cols = weeks 0–11)
+    const maxCount = Math.max(...days.map((d) => d.count), 1);
+    const grid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
+        Array(12).fill(null),
     );
+    days.forEach((d) => {
+        grid[d.day_of_week][d.week] = d;
+    });
+
+    const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // Month labels above columns — derive from first day of each week
+    const weekMonths: string[] = Array(12).fill('');
+    let lastMonth = '';
+    days.forEach((d) => {
+        const m = new Date(d.date).toLocaleString('en-US', { month: 'short' });
+        if (m !== lastMonth) {
+            weekMonths[d.week] = m;
+            lastMonth = m;
+        }
+    });
+
     return (
-        <div
-            className={`relative overflow-hidden rounded-2xl border-2 ${accentBorder} bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:bg-neutral-900`}
-        >
-            {/* Coloured top strip */}
-            <div className={`px-4 pt-4 pb-3 ${accentBg}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                        {rank <= 3 ? (
-                            <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white shadow ${rankRings[rank]}`}
-                            >
-                                {rank}
-                            </div>
-                        ) : (
-                            <span className="text-sm font-bold text-gray-400">
-                                #{rank}
-                            </span>
-                        )}
-                        <h3 className="text-base font-black text-gray-900 dark:text-white">
-                            {entry.breed}
-                        </h3>
-                    </div>
-                    <span
-                        className={`rounded-full px-3 py-0.5 text-xs font-bold ${badgeCls}`}
+        <div className="relative">
+            {/* Tooltip */}
+            {hovered && (
+                <div
+                    className="pointer-events-none fixed z-50 rounded-xl border border-white/15 bg-gray-900/97 px-3 py-2.5 text-xs shadow-2xl backdrop-blur-md"
+                    style={{
+                        left: tipPos.x + 14,
+                        top: tipPos.y - 10,
+                        minWidth: 148,
+                    }}
+                >
+                    <p className="mb-1 font-black text-white">
+                        {hovered.is_today ? '📅 Today' : hovered.label}
+                    </p>
+                    <p
+                        className={
+                            hovered.count > 0
+                                ? 'text-emerald-400'
+                                : 'text-white/25'
+                        }
                     >
-                        {icon} {entry.status_label}
-                    </span>
+                        {hovered.count > 0
+                            ? `${hovered.count} correction${hovered.count !== 1 ? 's' : ''}`
+                            : 'No activity'}
+                    </p>
                 </div>
+            )}
+
+            {/* Month labels */}
+            <div className="mb-1 flex pl-8">
+                {weekMonths.map((m, i) => (
+                    <div key={i} className="flex-1 text-[10px] text-white/25">
+                        {m}
+                    </div>
+                ))}
             </div>
 
-            {/* The story row */}
-            <div className="px-4 py-3">
-                <p className="text-sm leading-snug text-gray-700 dark:text-gray-300">
-                    {headline}
-                </p>
-
-                {/* Visual: AI confidence → vet action */}
-                {isCorrected && (
-                    <div className="mt-3 flex items-center gap-2">
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                AI was
-                            </span>
-                            <ConfidencePill value={entry.ai_guess_confidence} />
-                            <span className="mt-1 max-w-[70px] text-center text-[10px] leading-tight text-gray-400">
-                                confident it was "{entry.ai_guess_breed}"
-                            </span>
-                        </div>
-                        <div className="flex flex-1 flex-col items-center">
-                            <ArrowRight className="h-5 w-5 text-gray-400" />
-                            <span className="mt-0.5 text-[9px] text-gray-400">
-                                vet corrected
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                Now stored as
-                            </span>
-                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
-                                ✓ 100%
-                            </span>
-                            <span className="mt-1 max-w-[70px] text-center text-[10px] leading-tight text-gray-400">
-                                "{entry.breed}" in memory
-                            </span>
-                        </div>
+            {/* Grid */}
+            <div className="flex gap-0.5 pl-8">
+                {/* Week columns */}
+                {Array.from({ length: 12 }, (_, week) => (
+                    <div key={week} className="flex flex-1 flex-col gap-0.5">
+                        {Array.from({ length: 7 }, (_, dow) => {
+                            const cell = grid[dow][week];
+                            return (
+                                <div
+                                    key={dow}
+                                    className="aspect-square w-full cursor-default rounded-sm transition-all duration-150 hover:ring-1 hover:ring-white/30"
+                                    style={{
+                                        background: cell
+                                            ? heatColor(cell.count, maxCount)
+                                            : 'rgba(255,255,255,0.03)',
+                                        boxShadow: cell?.is_today
+                                            ? '0 0 0 1.5px #6366f1'
+                                            : undefined,
+                                    }}
+                                    onMouseEnter={
+                                        cell
+                                            ? (e) => {
+                                                  setHovered(cell);
+                                                  setTipPos({
+                                                      x: e.clientX,
+                                                      y: e.clientY,
+                                                  });
+                                              }
+                                            : undefined
+                                    }
+                                    onMouseMove={
+                                        cell
+                                            ? (e) =>
+                                                  setTipPos({
+                                                      x: e.clientX,
+                                                      y: e.clientY,
+                                                  })
+                                            : undefined
+                                    }
+                                    onMouseLeave={() => setHovered(null)}
+                                />
+                            );
+                        })}
                     </div>
-                )}
-
-                {isBoosted && (
-                    <div className="mt-3 flex items-center gap-2">
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                AI confidence
-                            </span>
-                            <ConfidencePill value={entry.ai_guess_confidence} />
-                        </div>
-                        <div className="flex flex-1 flex-col items-center">
-                            <ArrowRight className="h-5 w-5 text-amber-500" />
-                            <span className="mt-0.5 text-[9px] text-gray-400">
-                                vet confirmed
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                Now stored as
-                            </span>
-                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
-                                ✓ 100%
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {isConfirmed && (
-                    <div className="mt-3 flex items-center gap-2">
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                AI confidence
-                            </span>
-                            <ConfidencePill value={entry.ai_guess_confidence} />
-                        </div>
-                        <div className="flex flex-1 flex-col items-center">
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                            <span className="mt-0.5 text-[9px] text-gray-400">
-                                vet verified
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                                Reinforced
-                            </span>
-                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
-                                ✓ 100%
-                            </span>
-                        </div>
-                    </div>
-                )}
+                ))}
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 dark:border-gray-800">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                    🎓 Taught{' '}
-                    <strong className="text-gray-800 dark:text-gray-200">
-                        {entry.times_taught}×
-                    </strong>
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                    🧠{' '}
-                    <strong className="text-gray-800 dark:text-gray-200">
-                        {entry.examples_in_memory}
-                    </strong>{' '}
-                    example{entry.examples_in_memory !== 1 ? 's' : ''} in memory
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                    📅 {entry.latest_taught_date}
-                </span>
+            {/* Day-of-week labels (absolute left) */}
+            <div className="absolute top-6 left-0 flex flex-col gap-0.5">
+                {DAY_LABELS.map((l, i) => (
+                    <div
+                        key={i}
+                        className="flex h-full items-center text-[9px] leading-none text-white/20"
+                        style={{ height: 'calc((100% - 1.25rem) / 7)' }}
+                    >
+                        {i % 2 === 0 ? l : ''}
+                    </div>
+                ))}
+            </div>
+
+            {/* Legend */}
+            <div className="mt-3 flex items-center justify-between">
+                <span className="text-[10px] text-white/20">Less</span>
+                <div className="flex items-center gap-1">
+                    {[0, 0.2, 0.45, 0.7, 1].map((r, i) => (
+                        <div
+                            key={i}
+                            className="h-2.5 w-2.5 rounded-sm"
+                            style={{
+                                background:
+                                    r === 0
+                                        ? 'rgba(255,255,255,0.04)'
+                                        : `rgba(16,185,129,${r * 0.9 + 0.1})`,
+                            }}
+                        />
+                    ))}
+                </div>
+                <span className="text-[10px] text-white/20">More</span>
             </div>
         </div>
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Dashboard
-// ─────────────────────────────────────────────────────────────────────────────
+/* ─────────────────── MemoryChipCard ─────────────────────────────────────── */
+function MemoryChipCard({ chip }: { chip: MemoryChip }) {
+    const cfg = LEVEL_CFG[chip.level];
+    const [show, setShow] = useState(false);
+
+    return (
+        <div className="relative">
+            <div
+                className={`group flex cursor-default items-center gap-2 rounded-xl border px-3 py-2 transition-all duration-200 hover:brightness-110 ${cfg.bg} ${cfg.border}`}
+                onMouseEnter={() => setShow(true)}
+                onMouseLeave={() => setShow(false)}
+            >
+                {/* Pulsing dot for well-trained */}
+                <span className="relative flex h-2 w-2 shrink-0">
+                    {(chip.level === 'trained' || chip.level === 'expert') && (
+                        <span
+                            className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-40"
+                            style={{
+                                backgroundColor: cfg.dot,
+                                animationDuration: '2.5s',
+                            }}
+                        />
+                    )}
+                    <span
+                        className="relative inline-flex h-2 w-2 rounded-full"
+                        style={{ backgroundColor: cfg.dot }}
+                    />
+                </span>
+                <span
+                    className={`truncate text-xs leading-none font-semibold ${cfg.text}`}
+                >
+                    {chip.breed}
+                </span>
+                {chip.times_taught > 1 && (
+                    <span
+                        className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[9px] leading-none font-black ${cfg.bg} ${cfg.text}`}
+                    >
+                        ×{chip.times_taught}
+                    </span>
+                )}
+            </div>
+            {show && (
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-40 -translate-x-1/2 rounded-xl border border-white/12 bg-gray-900/97 p-2.5 text-xs shadow-2xl backdrop-blur-md">
+                    <p className="mb-1 font-black text-white">{chip.breed}</p>
+                    <p className={cfg.text}>{cfg.label}</p>
+                    <p className="text-white/40">
+                        Taught {chip.times_taught}× by vet
+                    </p>
+                    <p className="text-white/25">First: {chip.first_taught}</p>
+                    {chip.days_ago === 0 && (
+                        <p className="mt-0.5 text-indigo-400">
+                            ✨ Added today!
+                        </p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─────────────────── Main Dashboard ─────────────────────────────────────── */
 export default function Dashboard() {
     const {
         results,
         correctedBreedCount,
         resultCount,
         pendingReviewCount = 0,
-        lowConfidenceCount,
-        highConfidenceCount,
+        highConfidenceCount = 0,
         totalScansWeeklyTrend = 0,
         correctedWeeklyTrend = 0,
         highConfidenceWeeklyTrend = 0,
-        lowConfidenceWeeklyTrend = 0,
         memoryCount = 0,
-        uniqueBreedsLearned = 0,
-        recentCorrectionsCount = 0,
         avgConfidence = 0,
         confidenceTrend = 0,
         memoryHitRate = 0,
         accuracyImprovement = 0,
-        breedCoverage = 0,
-        accuracyBeforeCorrections = 0,
-        accuracyAfterCorrections = 0,
-        lastCorrectionCount = 0,
-        breedLearningProgress = [],
-        learningBreakdown = {
-            knowledge_base: 0,
-            memory_usage: 0,
-            breed_coverage: 0,
-            avg_corrections_per_day: 0,
-            recent_activity: 0,
-        },
         learningTimeline = [],
+        learningHeatmap = [],
+        heatmapSummary,
+        breedMemoryWall = [],
     } = usePage<PageProps>().props;
 
     const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
-    const pendingReviewWeeklyTrend = -correctedWeeklyTrend;
-    const formatTrend = (t: number) => `${t > 0 ? '+' : ''}${t.toFixed(1)}%`;
-    const getTrendIcon = (t: number) =>
+    const fmt = (t: number) => `${t >= 0 ? '+' : ''}${t.toFixed(1)}%`;
+    const tIcon = (t: number) =>
         t > 0 ? (
-            <ArrowUp className="h-3 w-3 text-green-600" />
+            <ArrowUp className="h-3 w-3" />
         ) : t < 0 ? (
-            <ArrowDown className="h-3 w-3 text-red-600" />
+            <ArrowDown className="h-3 w-3" />
         ) : (
-            <Minus className="h-3 w-3 text-gray-400" />
+            <Minus className="h-3 w-3" />
         );
-    const getTrendColor = (t: number, inv = false) => {
+    const tClr = (t: number, inv = false) => {
         if (inv)
             return t < 0
-                ? 'text-green-600 dark:text-green-400'
+                ? 'text-emerald-400'
                 : t > 0
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-400';
+                  ? 'text-red-400'
+                  : 'text-gray-400';
         return t > 0
-            ? 'text-green-600 dark:text-green-400'
+            ? 'text-emerald-400'
             : t < 0
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-gray-600 dark:text-gray-400';
+              ? 'text-red-400'
+              : 'text-gray-400';
     };
 
-    useEffect(() => {
-        const iv = setInterval(() => {
-            if (correctedBreedCount % 5 === 0) {
-                router.reload({
-                    only: [
-                        'breedLearningProgress',
-                        'memoryCount',
-                        'uniqueBreedsLearned',
-                        'learningTimeline',
-                    ],
-                });
-            }
-        }, 30000);
-        return () => clearInterval(iv);
-    }, [correctedBreedCount]);
-
-    // Teaching log summary counts
-    const correctedCount = breedLearningProgress.filter(
-        (b) => b.event_type === 'corrected',
-    ).length;
-    const boostedCount = breedLearningProgress.filter(
-        (b) => b.event_type === 'boosted',
-    ).length;
-    const confirmedCount = breedLearningProgress.filter(
-        (b) => b.event_type === 'confirmed',
-    ).length;
-
-    // Timeline
-    const maxCorrections = Math.max(
-        ...learningTimeline.map((d) => d.corrections),
-        1,
-    );
-    const timelineTotal = learningTimeline.reduce(
-        (s, d) => s + d.corrections,
-        0,
-    );
+    const maxCor = Math.max(...learningTimeline.map((d) => d.corrections), 1);
+    const tlTotal = learningTimeline.reduce((s, d) => s + d.corrections, 0);
     const todayEntry = learningTimeline.find((d) => d.is_today);
 
     const tlStatus = (() => {
         if (!todayEntry) return null;
         if (todayEntry.corrections > 0)
             return {
-                text: `✅ ${todayEntry.corrections} correction${todayEntry.corrections > 1 ? 's' : ''} submitted today — the AI is actively learning!`,
-                cls: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+                text: `✅ ${todayEntry.corrections} correction${todayEntry.corrections !== 1 ? 's' : ''} today — AI is actively learning!`,
+                cls: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300',
             };
         const r3 = learningTimeline
             .slice(-3)
             .reduce((s, d) => s + d.corrections, 0);
         if (r3 > 0)
             return {
-                text: `🟡 No corrections today yet — ${r3} submitted in the last 3 days. Keep going!`,
-                cls: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+                text: `🟡 No corrections today — ${r3} in the last 3 days. Keep going!`,
+                cls: 'bg-amber-500/10 border-amber-500/25 text-amber-300',
             };
         return {
-            text: '🔴 No corrections in the last 3 days — review pending scans to keep training the AI.',
-            cls: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+            text: '🔴 No recent corrections — review pending scans to keep training the AI.',
+            cls: 'bg-red-500/10 border-red-500/25 text-red-300',
         };
     })();
 
+    // Group memory wall by level
+    const expertChips = breedMemoryWall.filter((c) => c.level === 'expert');
+    const trainedChips = breedMemoryWall.filter((c) => c.level === 'trained');
+    const learningChips = breedMemoryWall.filter((c) => c.level === 'learning');
+    const newChips = breedMemoryWall.filter((c) => c.level === 'new');
+
+    useEffect(() => {
+        const iv = setInterval(
+            () =>
+                router.reload({
+                    only: [
+                        'breedMemoryWall',
+                        'learningHeatmap',
+                        'heatmapSummary',
+                        'correctedBreedCount',
+                        'learningTimeline',
+                    ],
+                }),
+            30000,
+        );
+        return () => clearInterval(iv);
+    }, []);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Learning Analytics Dashboard" />
+            <Head title="AI Learning Dashboard" />
 
             <div className="flex h-full flex-col gap-6 p-4 md:p-6">
-                {/* ── 4-column key metrics ─────────────────────────────── */}
+                {/* ── 4 metric cards ───────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {[
-                        {
-                            label: 'Total Scans',
-                            value: resultCount,
-                            trend: totalScansWeeklyTrend,
-                            sub: 'vs last week',
-                            Icon: BarChart3,
-                            bg: 'bg-blue-100 dark:bg-blue-950',
-                            ic: 'text-blue-600 dark:text-blue-400',
-                        },
-                        {
-                            label: 'Corrections Made',
-                            value: correctedBreedCount,
-                            trend: correctedWeeklyTrend,
-                            sub: 'Teaching the system',
-                            Icon: GraduationCap,
-                            bg: 'bg-purple-100 dark:bg-purple-950',
-                            ic: 'text-purple-600 dark:text-purple-400',
-                        },
-                        {
-                            label: 'High Confidence',
-                            value: highConfidenceCount,
-                            trend: highConfidenceWeeklyTrend,
-                            sub: '≥80% confidence',
-                            Icon: CheckCircle2,
-                            bg: 'bg-green-100 dark:bg-green-950',
-                            ic: 'text-green-600 dark:text-green-400',
-                        },
-                        {
-                            label: 'Pending Review',
-                            value: pendingReviewCount,
-                            trend: pendingReviewWeeklyTrend,
-                            sub: 'Awaiting correction',
-                            Icon: ClipboardList,
-                            bg: 'bg-amber-100 dark:bg-amber-950',
-                            ic: 'text-amber-600 dark:text-amber-400',
-                            inv: true,
-                        },
-                    ].map(({ label, value, trend, sub, Icon, bg, ic, inv }) => (
-                        <Card key={label} className="p-5 dark:bg-neutral-900">
+                    {(
+                        [
+                            {
+                                label: 'Total Scans',
+                                value: resultCount,
+                                trend: totalScansWeeklyTrend,
+                                Icon: BarChart3,
+                                accent: '#3b82f6',
+                                inv: false,
+                            },
+                            {
+                                label: 'Corrections Made',
+                                value: correctedBreedCount,
+                                trend: correctedWeeklyTrend,
+                                Icon: GraduationCap,
+                                accent: '#8b5cf6',
+                                inv: false,
+                            },
+                            {
+                                label: 'High Confidence',
+                                value: highConfidenceCount,
+                                trend: highConfidenceWeeklyTrend,
+                                Icon: CheckCircle2,
+                                accent: '#10b981',
+                                inv: false,
+                            },
+                            {
+                                label: 'Pending Review',
+                                value: pendingReviewCount,
+                                trend: -correctedWeeklyTrend,
+                                Icon: ClipboardList,
+                                accent: '#f59e0b',
+                                inv: true,
+                            },
+                        ] as {
+                            label: string;
+                            value: number;
+                            trend: number;
+                            Icon: React.ElementType;
+                            accent: string;
+                            inv: boolean;
+                        }[]
+                    ).map(({ label, value, trend, Icon, accent, inv }) => (
+                        <div
+                            key={label}
+                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-gray-900 p-5"
+                        >
+                            <div
+                                className="pointer-events-none absolute -top-3 -right-3 h-16 w-16 rounded-full opacity-15 blur-xl"
+                                style={{ background: accent }}
+                            />
                             <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                <div>
+                                    <p className="text-sm text-white/40">
                                         {label}
                                     </p>
                                     <div className="mt-2 flex items-baseline gap-2">
-                                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                        <p className="text-3xl font-black text-white">
                                             {value}
                                         </p>
                                         <div
-                                            className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(trend, inv)}`}
+                                            className={`flex items-center gap-0.5 text-sm font-bold ${tClr(trend, inv)}`}
                                         >
-                                            {getTrendIcon(trend)}
-                                            <span>{formatTrend(trend)}</span>
+                                            {tIcon(trend)}
+                                            <span>{fmt(trend)}</span>
                                         </div>
                                     </div>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="mt-0.5 text-xs text-white/20">
+                                        vs last week
+                                    </p>
+                                </div>
+                                <div
+                                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                                    style={{
+                                        background: `${accent}20`,
+                                        border: `1px solid ${accent}35`,
+                                    }}
+                                >
+                                    <Icon
+                                        className="h-5 w-5"
+                                        style={{ color: accent }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* ── 3 mini stats ─────────────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {(
+                        [
+                            {
+                                label: 'Learning Progress',
+                                val: `${accuracyImprovement.toFixed(0)}/100`,
+                                sub: 'Composite score',
+                                Icon: Target,
+                                a: '#10b981',
+                            },
+                            {
+                                label: 'Avg Confidence',
+                                val: `${avgConfidence.toFixed(1)}%`,
+                                sub: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}% this week`,
+                                Icon: LineChart,
+                                a: '#3b82f6',
+                            },
+                            {
+                                label: 'Memory Usage Rate',
+                                val: `${memoryHitRate.toFixed(1)}%`,
+                                sub: `${memoryCount} patterns stored`,
+                                Icon: Database,
+                                a: '#8b5cf6',
+                            },
+                        ] as const
+                    ).map(({ label, val, sub, Icon, a }) => (
+                        <div
+                            key={label}
+                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-gray-900 p-5"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-white/40">
+                                        {label}
+                                    </p>
+                                    <p className="mt-1 text-2xl font-black text-white">
+                                        {val}
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-white/25">
                                         {sub}
                                     </p>
                                 </div>
                                 <div
-                                    className={`flex h-12 w-12 items-center justify-center rounded-lg ${bg}`}
+                                    className="flex h-12 w-12 items-center justify-center rounded-full"
+                                    style={{
+                                        background: `${a}20`,
+                                        border: `1px solid ${a}30`,
+                                    }}
                                 >
-                                    <Icon className={`h-6 w-6 ${ic}`} />
+                                    <Icon
+                                        className="h-6 w-6"
+                                        style={{ color: a }}
+                                    />
                                 </div>
                             </div>
-                        </Card>
+                        </div>
                     ))}
                 </div>
 
-                {/* ── 3-column learning impact ──────────────────────────── */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 dark:from-green-950/30 dark:to-emerald-950/30">
-                        <div className="flex items-center justify-between">
+                {/* ── Learning Pulse ───────────────────────────────────── */}
+                <div className="rounded-2xl border border-white/8 bg-gray-900 p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/25 bg-indigo-500/15">
+                                <Activity className="h-5 w-5 text-indigo-400" />
+                            </div>
                             <div>
-                                <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                                    Learning Progress Score
-                                </p>
-                                <div className="mt-2 flex items-baseline gap-2">
-                                    <p className="text-4xl font-bold text-green-900 dark:text-green-300">
-                                        {accuracyImprovement.toFixed(0)}
-                                    </p>
-                                    <span className="text-lg text-green-700 dark:text-green-400">
-                                        /100
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                                    {learningBreakdown.knowledge_base}{' '}
-                                    corrections ·{' '}
-                                    {learningBreakdown.breed_coverage} breeds
+                                <h2 className="font-bold text-white">
+                                    Learning Pulse
+                                </h2>
+                                <p className="text-xs text-white/35">
+                                    Daily corrections — last 10 days
                                 </p>
                             </div>
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-200 dark:bg-green-900">
-                                <Target className="h-7 w-7 text-green-700 dark:text-green-300" />
-                            </div>
                         </div>
-                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
-                            <p className="text-xs font-medium text-green-800 dark:text-green-200">
-                                💡 <strong>Learning Health:</strong> Score of{' '}
-                                {accuracyImprovement.toFixed(0)} shows{' '}
-                                {accuracyImprovement >= 80
-                                    ? 'excellent'
-                                    : accuracyImprovement >= 60
-                                      ? 'good'
-                                      : accuracyImprovement >= 40
-                                        ? 'fair'
-                                        : 'developing'}{' '}
-                                progress!
-                            </p>
-                        </div>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 dark:from-blue-950/30 dark:to-indigo-950/30">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                                    Avg Confidence Score
-                                </p>
-                                <div className="mt-2 flex items-baseline gap-2">
-                                    <p className="text-4xl font-bold text-blue-900 dark:text-blue-300">
-                                        {avgConfidence.toFixed(1)}%
-                                    </p>
-                                    <div
-                                        className={`flex items-center gap-0.5 text-lg font-bold ${getTrendColor(confidenceTrend)}`}
-                                    >
-                                        {getTrendIcon(confidenceTrend)}
-                                        <span className="text-base">
-                                            {confidenceTrend.toFixed(1)}%
-                                        </span>
-                                    </div>
-                                </div>
-                                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                                    This week vs last week
-                                </p>
-                            </div>
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-200 dark:bg-blue-900">
-                                <LineChart className="h-7 w-7 text-blue-700 dark:text-blue-300" />
-                            </div>
-                        </div>
-                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
-                            <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                                📈 <strong>Trend:</strong>{' '}
-                                {confidenceTrend > 0
-                                    ? 'Confidence is rising! Learning is working.'
-                                    : confidenceTrend < 0
-                                      ? 'Confidence dipped — keep correcting!'
-                                      : 'Confidence is stable.'}
-                            </p>
-                        </div>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 dark:from-purple-950/30 dark:to-pink-950/30">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-purple-700 dark:text-purple-400">
-                                    Memory Usage Rate
-                                </p>
-                                <div className="mt-2 flex items-baseline gap-2">
-                                    <p className="text-4xl font-bold text-purple-900 dark:text-purple-300">
-                                        {memoryHitRate.toFixed(1)}%
-                                    </p>
-                                </div>
-                                <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
-                                    {memoryCount > 0
-                                        ? `${memoryCount} patterns stored`
-                                        : 'No patterns yet'}
-                                </p>
-                            </div>
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-200 dark:bg-purple-900">
-                                <Database className="h-7 w-7 text-purple-700 dark:text-purple-300" />
-                            </div>
-                        </div>
-                        <div className="mt-4 rounded-lg bg-white/50 p-3 dark:bg-black/20">
-                            <p className="text-xs font-medium text-purple-800 dark:text-purple-200">
-                                🧠 <strong>Memory:</strong>{' '}
-                                {memoryHitRate > 50
-                                    ? 'Memory is actively helping predictions!'
-                                    : 'Add more corrections to boost memory usage.'}
-                            </p>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* ── Learning Pulse — 10-day bar chart ────────────────── */}
-                <Card className="overflow-hidden dark:bg-neutral-900">
-                    <div className="border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-5 dark:border-gray-800 dark:from-indigo-950/50 dark:to-blue-950/50">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 shadow-md">
-                                    <Activity className="h-5 w-5 text-white" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                                        Learning Pulse
-                                    </h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Daily correction activity — last 10 days
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Badge className="bg-indigo-100 px-3 py-1 text-xs text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                                    {timelineTotal} total in 10 days
-                                </Badge>
-                                {todayEntry && todayEntry.corrections > 0 && (
-                                    <Badge className="bg-green-100 px-3 py-1 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
-                                        🟢 Active today
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
+                        <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-300">
+                            {tlTotal} total
+                        </span>
                     </div>
-                    <div className="p-5">
-                        {learningTimeline.length === 0 ? (
-                            <div className="flex h-40 items-center justify-center text-sm text-gray-400">
-                                No data yet. Start reviewing scans to see
-                                activity here.
-                            </div>
-                        ) : (
-                            <>
-                                <div className="relative">
-                                    <div className="pointer-events-none absolute inset-x-0 top-0 flex h-40 flex-col justify-between">
-                                        {[0, 1, 2].map((i) => (
-                                            <div
-                                                key={i}
-                                                className="w-full border-t border-dashed border-gray-100 dark:border-gray-800"
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="flex h-40 items-end gap-1.5 sm:gap-2">
-                                        {learningTimeline.map((d, idx) => {
-                                            const h =
-                                                d.corrections > 0
-                                                    ? Math.max(
-                                                          8,
-                                                          (d.corrections /
-                                                              maxCorrections) *
-                                                              100,
-                                                      )
-                                                    : 4;
-                                            const hov = hoveredDay === idx;
-                                            return (
-                                                <div
-                                                    key={d.date}
-                                                    className="relative flex flex-1 flex-col items-center"
-                                                    onMouseEnter={() =>
-                                                        setHoveredDay(idx)
-                                                    }
-                                                    onMouseLeave={() =>
-                                                        setHoveredDay(null)
-                                                    }
-                                                >
-                                                    {hov && (
-                                                        <div
-                                                            className="absolute bottom-full z-20 mb-2 w-44 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-                                                            style={{
-                                                                left: '50%',
-                                                                transform:
-                                                                    'translateX(-50%)',
-                                                            }}
-                                                        >
-                                                            <p className="mb-1.5 text-xs font-bold text-gray-900 dark:text-white">
-                                                                {d.is_today
-                                                                    ? '📅 Today'
-                                                                    : d.day}{' '}
-                                                                <span className="font-normal text-gray-400">
-                                                                    ({d.date})
-                                                                </span>
-                                                            </p>
-                                                            <div className="space-y-1 text-xs">
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-indigo-600">
-                                                                        📝
-                                                                        Corrections
-                                                                    </span>
-                                                                    <span className="font-bold">
-                                                                        {
-                                                                            d.corrections
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-blue-600">
-                                                                        🔍 Scans
-                                                                    </span>
-                                                                    <span className="font-bold">
-                                                                        {
-                                                                            d.total_scans
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-green-600">
-                                                                        ✅ High
-                                                                        conf.
-                                                                    </span>
-                                                                    <span className="font-bold">
-                                                                        {
-                                                                            d.high_conf_rate
-                                                                        }
-                                                                        %
-                                                                    </span>
-                                                                </div>
-                                                                <div className="mt-1 flex justify-between border-t pt-1 dark:border-gray-700">
-                                                                    <span className="text-gray-500">
-                                                                        Total
-                                                                        memory
-                                                                    </span>
-                                                                    <span className="font-bold text-purple-600">
-                                                                        {
-                                                                            d.total_corrections_to_date
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white dark:border-t-gray-900" />
-                                                        </div>
-                                                    )}
-                                                    {d.corrections > 0 && (
-                                                        <span
-                                                            className={`mb-1 text-xs font-bold ${hov ? 'opacity-0' : 'opacity-100'} ${d.is_today ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}
-                                                        >
-                                                            {d.corrections}
-                                                        </span>
-                                                    )}
-                                                    <div
-                                                        className={`w-full rounded-t-md transition-all duration-300 ${
-                                                            d.is_today
-                                                                ? 'bg-gradient-to-t from-indigo-600 to-indigo-400 shadow-md'
-                                                                : d.corrections >
-                                                                    0
-                                                                  ? hov
-                                                                      ? 'bg-gradient-to-t from-blue-500 to-blue-300'
-                                                                      : 'bg-gradient-to-t from-blue-400 to-blue-200 dark:from-blue-700 dark:to-blue-500'
-                                                                  : 'bg-gray-100 dark:bg-gray-800'
-                                                        }`}
-                                                        style={{
-                                                            height: `${h}%`,
-                                                            minHeight: '4px',
-                                                        }}
-                                                    />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="mt-2 flex gap-1.5 sm:gap-2">
-                                    {learningTimeline.map((d) => (
+                    {learningTimeline.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-white/20">
+                            No activity yet — submit corrections to see activity
+                        </p>
+                    ) : (
+                        <>
+                            <div className="flex h-36 items-end gap-2">
+                                {learningTimeline.map((d, idx) => {
+                                    const h =
+                                        d.corrections > 0
+                                            ? Math.max(
+                                                  8,
+                                                  (d.corrections / maxCor) *
+                                                      100,
+                                              )
+                                            : 3;
+                                    const hov = hoveredDay === idx;
+                                    return (
                                         <div
                                             key={d.date}
-                                            className="flex flex-1 justify-center"
+                                            className="relative flex flex-1 flex-col items-center"
+                                            onMouseEnter={() =>
+                                                setHoveredDay(idx)
+                                            }
+                                            onMouseLeave={() =>
+                                                setHoveredDay(null)
+                                            }
                                         >
-                                            <span
-                                                className={`text-center leading-tight ${d.is_today ? 'font-bold text-indigo-700 dark:text-indigo-300' : 'text-gray-400 dark:text-gray-500'}`}
-                                                style={{ fontSize: '0.62rem' }}
-                                            >
-                                                {d.is_today ? 'Today' : d.day}
-                                            </span>
+                                            {hov && (
+                                                <div
+                                                    className="absolute bottom-full z-20 mb-2 w-40 rounded-xl border border-white/12 bg-gray-900/95 p-3 text-xs shadow-2xl backdrop-blur-sm"
+                                                    style={{
+                                                        left: '50%',
+                                                        transform:
+                                                            'translateX(-50%)',
+                                                    }}
+                                                >
+                                                    <p className="mb-1.5 font-bold text-white">
+                                                        {d.is_today
+                                                            ? '📅 Today'
+                                                            : d.day}
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/40">
+                                                                Corrections
+                                                            </span>
+                                                            <span className="font-bold text-indigo-300">
+                                                                {d.corrections}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/40">
+                                                                Scans
+                                                            </span>
+                                                            <span className="font-bold text-blue-300">
+                                                                {d.total_scans}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/40">
+                                                                High conf.
+                                                            </span>
+                                                            <span className="font-bold text-emerald-300">
+                                                                {
+                                                                    d.high_conf_rate
+                                                                }
+                                                                %
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div
+                                                className="w-full rounded-t-md transition-all duration-300"
+                                                style={{
+                                                    height: `${h}%`,
+                                                    minHeight: 3,
+                                                    background: d.is_today
+                                                        ? 'linear-gradient(to top,#6366f1,#818cf8)'
+                                                        : d.corrections > 0
+                                                          ? hov
+                                                              ? 'linear-gradient(to top,#3b82f6,#60a5fa)'
+                                                              : 'rgba(99,102,241,0.4)'
+                                                          : 'rgba(255,255,255,0.04)',
+                                                    boxShadow:
+                                                        d.corrections > 0
+                                                            ? '0 0 8px #6366f133'
+                                                            : 'none',
+                                                }}
+                                            />
                                         </div>
-                                    ))}
-                                </div>
-                                {tlStatus && (
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                                {learningTimeline.map((d) => (
                                     <div
-                                        className={`mt-4 rounded-lg px-4 py-2.5 text-xs font-medium ${tlStatus.cls}`}
+                                        key={d.date}
+                                        className="flex flex-1 justify-center"
                                     >
-                                        {tlStatus.text}
+                                        <span
+                                            className={
+                                                d.is_today
+                                                    ? 'font-bold text-indigo-400'
+                                                    : 'text-white/20'
+                                            }
+                                            style={{
+                                                fontSize: '0.6rem',
+                                                textAlign: 'center',
+                                                lineHeight: 1,
+                                            }}
+                                        >
+                                            {d.is_today ? 'Today' : d.day}
+                                        </span>
                                     </div>
-                                )}
-                                <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="inline-block h-3 w-3 rounded bg-indigo-500" />
-                                        Today
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="inline-block h-3 w-3 rounded bg-blue-400" />
-                                        Corrections
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="inline-block h-3 w-3 rounded bg-gray-200 dark:bg-gray-700" />
-                                        No activity
-                                    </span>
-                                    <span className="ml-auto">
-                                        Hover bars for details
+                                ))}
+                            </div>
+                            {tlStatus && (
+                                <div
+                                    className={`mt-4 rounded-lg border px-4 py-2.5 text-xs font-medium ${tlStatus.cls}`}
+                                >
+                                    {tlStatus.text}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* ════════════════════════════════════════════════════════
+                        AI TRAINING ACTIVITY — Heatmap + Memory Wall
+                ═══════════════════════════════════════════════════════════ */}
+                <div className="overflow-hidden rounded-2xl border border-white/8 bg-gray-950">
+                    {/* ── Section header ────────────────────────────────── */}
+                    <div
+                        className="relative overflow-hidden border-b border-white/8 p-6"
+                        style={{
+                            background:
+                                'linear-gradient(135deg,#0f172a 0%,#064e3b 60%,#0f172a 100%)',
+                        }}
+                    >
+                        <div className="pointer-events-none absolute top-0 left-1/4 h-48 w-48 rounded-full bg-emerald-600/8 blur-3xl" />
+                        <div className="pointer-events-none absolute right-1/3 bottom-0 h-32 w-32 rounded-full bg-teal-500/8 blur-2xl" />
+
+                        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            {/* Title */}
+                            <div className="flex items-center gap-4">
+                                <div
+                                    className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/35"
+                                    style={{
+                                        background:
+                                            'linear-gradient(135deg,#10b98118,#06b6d410)',
+                                        boxShadow: '0 0 20px #10b98133',
+                                    }}
+                                >
+                                    <Activity className="h-7 w-7 text-emerald-400" />
+                                    <div
+                                        className="absolute inset-0 animate-ping rounded-2xl opacity-10"
+                                        style={{
+                                            border: '2px solid #10b981',
+                                            animationDuration: '4s',
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black tracking-tight text-white">
+                                        AI Training Activity
+                                    </h2>
+                                    <p className="mt-0.5 text-sm text-white/35">
+                                        Every correction{' '}
+                                        <span className="text-emerald-400">
+                                            colours a square
+                                        </span>{' '}
+                                        — watch the AI's memory grow over 12
+                                        weeks
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Summary stat pills */}
+                            {heatmapSummary && (
+                                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-center">
+                                        <p className="text-xl font-black text-emerald-400">
+                                            {heatmapSummary.total_in_range}
+                                        </p>
+                                        <p className="text-[10px] font-semibold tracking-wider text-emerald-400/50 uppercase">
+                                            12-Week Total
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-2 text-center">
+                                        <p className="text-xl font-black text-white">
+                                            {heatmapSummary.active_days}
+                                        </p>
+                                        <p className="text-[10px] font-semibold tracking-wider text-white/25 uppercase">
+                                            Active Days
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-orange-500/25 bg-orange-500/10 px-4 py-2 text-center">
+                                        <div className="flex items-center gap-1">
+                                            <Flame className="h-4 w-4 text-orange-400" />
+                                            <p className="text-xl font-black text-orange-300">
+                                                {heatmapSummary.current_streak}
+                                            </p>
+                                        </div>
+                                        <p className="text-[10px] font-semibold tracking-wider text-orange-400/50 uppercase">
+                                            Day Streak
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Best day badge */}
+                        {heatmapSummary &&
+                            heatmapSummary.best_day_count > 0 && (
+                                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-3 py-1.5">
+                                    <Trophy className="h-3 w-3 text-emerald-400" />
+                                    <span className="text-xs font-medium text-emerald-300">
+                                        Best day:{' '}
+                                        <strong>
+                                            {heatmapSummary.best_day_count}{' '}
+                                            corrections
+                                        </strong>
+                                        <span className="ml-1 text-emerald-400/50">
+                                            on {heatmapSummary.best_day_label}
+                                        </span>
                                     </span>
                                 </div>
-                            </>
+                            )}
+                    </div>
+
+                    {/* ── Training Heatmap ──────────────────────────────── */}
+                    <div className="border-b border-white/6 p-6">
+                        <div className="mb-4 flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-emerald-400" />
+                            <h3 className="text-sm font-bold text-white">
+                                12-Week Correction Heatmap
+                            </h3>
+                            <span className="ml-auto text-[10px] text-white/20">
+                                Like GitHub contributions — darker = more
+                                corrections that day
+                            </span>
+                        </div>
+                        {learningHeatmap.length > 0 ? (
+                            <HeatmapGrid
+                                days={learningHeatmap}
+                                summary={
+                                    heatmapSummary ?? {
+                                        active_days: 0,
+                                        total_in_range: 0,
+                                        current_streak: 0,
+                                        best_day_count: 0,
+                                        best_day_label: '',
+                                    }
+                                }
+                            />
+                        ) : (
+                            <p className="py-8 text-center text-sm text-white/20">
+                                No heatmap data — submit corrections to start
+                                building history
+                            </p>
                         )}
                     </div>
-                </Card>
 
-                {/* ── Vet Teaching Log ─────────────────────────────────── */}
-                {breedLearningProgress && breedLearningProgress.length > 0 && (
-                    <div>
-                        {/* Header */}
-                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-600 shadow-md">
-                                    <Brain className="h-5 w-5 text-white" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                        How the Vet Is Training the AI
-                                    </h2>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Every correction the vet makes is
-                                        permanently stored in the AI's memory
-                                    </p>
-                                </div>
+                    {/* ── Breed Memory Wall ─────────────────────────────── */}
+                    <div className="p-6">
+                        <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-violet-400" />
+                                <h3 className="text-sm font-bold text-white">
+                                    Breed Memory Wall
+                                </h3>
                             </div>
-                            <Badge className="w-fit bg-teal-100 px-4 py-1.5 text-sm font-bold text-teal-700 dark:bg-teal-950 dark:text-teal-300">
-                                {breedLearningProgress.length} Breed
-                                {breedLearningProgress.length !== 1 ? 's' : ''}{' '}
-                                in Memory
-                            </Badge>
+                            <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-0.5 text-xs font-bold text-violet-300">
+                                {breedMemoryWall.length} breed
+                                {breedMemoryWall.length !== 1 ? 's' : ''} stored
+                            </span>
+                            <span className="ml-auto text-[10px] text-white/20">
+                                Hover a chip for details
+                            </span>
                         </div>
 
-                        {/* Legend — what each colour means */}
-                        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/40">
-                                <span className="mt-0.5 text-lg leading-none">
-                                    🔄
-                                </span>
-                                <div>
-                                    <p className="text-xs font-bold text-blue-800 dark:text-blue-200">
-                                        AI Corrected
-                                    </p>
-                                    <p className="text-xs text-blue-700 dark:text-blue-300">
-                                        AI guessed the wrong breed — vet fixed
-                                        it
-                                    </p>
+                        {breedMemoryWall.length === 0 ? (
+                            <p className="py-8 text-center text-sm text-white/20">
+                                No breeds in memory yet — submit your first
+                                correction to add a breed
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                {/* Level legend */}
+                                <div className="flex flex-wrap gap-3 rounded-xl border border-white/6 bg-white/[0.02] p-3">
+                                    {Object.entries(LEVEL_CFG)
+                                        .reverse()
+                                        .map(([key, cfg]) => (
+                                            <div
+                                                key={key}
+                                                className="flex items-center gap-1.5"
+                                            >
+                                                <span
+                                                    className="h-2 w-2 rounded-full"
+                                                    style={{
+                                                        backgroundColor:
+                                                            cfg.dot,
+                                                    }}
+                                                />
+                                                <span className="text-[11px] text-white/35">
+                                                    {cfg.label}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    <span className="ml-auto text-[10px] text-white/15">
+                                        expert ≥5× · trained ≥3× · learning ≥2×
+                                        · new = 1×
+                                    </span>
                                 </div>
-                            </div>
-                            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
-                                <span className="mt-0.5 text-lg leading-none">
-                                    📈
-                                </span>
-                                <div>
-                                    <p className="text-xs font-bold text-amber-800 dark:text-amber-200">
-                                        Confidence Boosted
-                                    </p>
-                                    <p className="text-xs text-amber-700 dark:text-amber-300">
-                                        AI was unsure — vet confirmed the breed
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900 dark:bg-green-950/40">
-                                <span className="mt-0.5 text-lg leading-none">
-                                    ✅
-                                </span>
-                                <div>
-                                    <p className="text-xs font-bold text-green-800 dark:text-green-200">
-                                        Verified by Vet
-                                    </p>
-                                    <p className="text-xs text-green-700 dark:text-green-300">
-                                        AI was correct — vet verified and
-                                        reinforced it
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Cards */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                            {breedLearningProgress.map((b, idx) => (
-                                <TeachingLogCard
-                                    key={b.breed}
-                                    entry={b}
-                                    rank={idx + 1}
-                                />
-                            ))}
-                        </div>
+                                {/* Expert row */}
+                                {expertChips.length > 0 && (
+                                    <div>
+                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-emerald-500/50 uppercase">
+                                            Expert ({expertChips.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {expertChips.map((c) => (
+                                                <MemoryChipCard
+                                                    key={c.breed}
+                                                    chip={c}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
-                        {/* Summary strip */}
-                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="flex items-center gap-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
-                                <span className="text-2xl">🔄</span>
-                                <div>
-                                    <p className="text-2xl font-black text-blue-700 dark:text-blue-300">
-                                        {correctedCount}
-                                    </p>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                                        Wrong guesses corrected
-                                    </p>
-                                </div>
+                                {/* Trained row */}
+                                {trainedChips.length > 0 && (
+                                    <div>
+                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-green-500/50 uppercase">
+                                            Trained ({trainedChips.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {trainedChips.map((c) => (
+                                                <MemoryChipCard
+                                                    key={c.breed}
+                                                    chip={c}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Learning row */}
+                                {learningChips.length > 0 && (
+                                    <div>
+                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-blue-500/50 uppercase">
+                                            Learning ({learningChips.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {learningChips.map((c) => (
+                                                <MemoryChipCard
+                                                    key={c.breed}
+                                                    chip={c}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* New row */}
+                                {newChips.length > 0 && (
+                                    <div>
+                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-amber-500/50 uppercase">
+                                            New ({newChips.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {newChips.map((c) => (
+                                                <MemoryChipCard
+                                                    key={c.breed}
+                                                    chip={c}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-3 rounded-xl bg-amber-50 p-4 dark:bg-amber-950/30">
-                                <span className="text-2xl">📈</span>
-                                <div>
-                                    <p className="text-2xl font-black text-amber-700 dark:text-amber-300">
-                                        {boostedCount}
-                                    </p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                                        Uncertain predictions confirmed
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-xl bg-green-50 p-4 dark:bg-green-950/30">
-                                <TrendingUp className="h-8 w-8 shrink-0 text-green-600 dark:text-green-400" />
-                                <div>
-                                    <p className="text-2xl font-black text-green-700 dark:text-green-300">
-                                        {confirmedCount}
-                                    </p>
-                                    <p className="text-xs text-green-600 dark:text-green-400">
-                                        Correct predictions verified
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
-                )}
+                </div>
 
-                {/* ── Recent Scans ─────────────────────────────────────── */}
-                <Card className="dark:bg-neutral-900">
-                    <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                                    Recent Scans
-                                </h2>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Latest predictions from the system
-                                </p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    router.visit('/model/scan-results')
-                                }
-                            >
-                                View All{' '}
-                                <ChevronRight className="ml-1 h-4 w-4" />
-                            </Button>
+                {/* ── Recent Scans table ────────────────────────────────── */}
+                <div className="overflow-hidden rounded-2xl border border-white/8 bg-gray-900">
+                    <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
+                        <div>
+                            <h2 className="font-bold text-white">
+                                Recent Scans
+                            </h2>
+                            <p className="text-xs text-white/35">
+                                Latest AI predictions
+                            </p>
                         </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.visit('/model/scan-results')}
+                            className="border-white/10 bg-white/4 text-white/50 hover:bg-white/8 hover:text-white"
+                        >
+                            View All <ChevronRight className="ml-1 h-4 w-4" />
+                        </Button>
                     </div>
                     <div className="overflow-x-auto px-5">
                         <Table>
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Scan ID</TableHead>
-                                    <TableHead>Breed</TableHead>
-                                    <TableHead>Confidence</TableHead>
-                                    <TableHead>Status</TableHead>
+                                <TableRow className="border-white/5">
+                                    {[
+                                        'Scan ID',
+                                        'Breed',
+                                        'Confidence',
+                                        'Status',
+                                    ].map((h) => (
+                                        <TableHead
+                                            key={h}
+                                            className="text-white/30"
+                                        >
+                                            {h}
+                                        </TableHead>
+                                    ))}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {results?.map((result) => (
-                                    <TableRow key={result.scan_id}>
-                                        <TableCell className="font-mono text-xs">
-                                            {result.scan_id}
+                                {results?.map((r) => (
+                                    <TableRow
+                                        key={r.scan_id}
+                                        className="border-white/5"
+                                    >
+                                        <TableCell className="font-mono text-xs text-white/30">
+                                            {r.scan_id}
                                         </TableCell>
-                                        <TableCell className="font-medium">
-                                            {result.breed}
+                                        <TableCell className="font-medium text-white">
+                                            {r.breed}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                <Progress
-                                                    value={result.confidence}
-                                                    className="h-2 w-20"
-                                                />
-                                                <span className="text-sm font-semibold">
-                                                    {result.confidence}%
+                                                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/8">
+                                                    <div
+                                                        className="h-full rounded-full"
+                                                        style={{
+                                                            width: `${r.confidence}%`,
+                                                            background:
+                                                                r.confidence >=
+                                                                80
+                                                                    ? '#10b981'
+                                                                    : r.confidence >=
+                                                                        60
+                                                                      ? '#3b82f6'
+                                                                      : r.confidence >=
+                                                                          40
+                                                                        ? '#f59e0b'
+                                                                        : '#ef4444',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-sm font-bold text-white/60">
+                                                    {r.confidence}%
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {result.confidence >= 80 ? (
-                                                <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                                                    High
-                                                </Badge>
-                                            ) : result.confidence >= 60 ? (
-                                                <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400">
-                                                    Medium
-                                                </Badge>
-                                            ) : result.confidence >= 40 ? (
-                                                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400">
-                                                    Low
-                                                </Badge>
-                                            ) : (
-                                                <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400">
-                                                    Very Low
-                                                </Badge>
-                                            )}
+                                            {[
+                                                [
+                                                    80,
+                                                    'High',
+                                                    'bg-emerald-500/12 text-emerald-400 border-emerald-500/20',
+                                                ],
+                                                [
+                                                    60,
+                                                    'Medium',
+                                                    'bg-blue-500/12 text-blue-400 border-blue-500/20',
+                                                ],
+                                                [
+                                                    40,
+                                                    'Low',
+                                                    'bg-amber-500/12 text-amber-400 border-amber-500/20',
+                                                ],
+                                                [
+                                                    0,
+                                                    'Very Low',
+                                                    'bg-red-500/12 text-red-400 border-red-500/20',
+                                                ],
+                                            ]
+                                                .map(([thresh, label, cls]) =>
+                                                    r.confidence >=
+                                                    (thresh as number) ? (
+                                                        <span
+                                                            key={
+                                                                label as string
+                                                            }
+                                                            className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${cls}`}
+                                                        >
+                                                            {label}
+                                                        </span>
+                                                    ) : null,
+                                                )
+                                                .find(Boolean)}
                                         </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </div>
-                </Card>
+                </div>
             </div>
         </AppLayout>
     );

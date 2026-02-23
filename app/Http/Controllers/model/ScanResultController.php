@@ -214,6 +214,92 @@ class ScanResultController extends Controller
         return $timeline;
     }
 
+    private function getLearningHeatmap(): array
+    {
+        $days   = 84; // 12 weeks
+        $result = [];
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date  = \Carbon\Carbon::now()->subDays($i)->startOfDay();
+            $count = \App\Models\BreedCorrection::whereDate('created_at', $date->toDateString())->count();
+
+            $result[] = [
+                'date'        => $date->toDateString(),       // "2026-02-15"
+                'count'       => $count,
+                'week'        => (int) floor(($days - 1 - $i) / 7),  // 0–11
+                'day_of_week' => (int) $date->dayOfWeek,              // 0=Sun … 6=Sat
+                'label'       => $date->format('M j, Y'),             // "Feb 15, 2026"
+                'is_today'    => $i === 0,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns one chip per unique corrected breed for the memory wall.
+     * Each entry: { breed, times_taught, first_taught, level }
+     */
+    private function getBreedMemoryWall(): array
+    {
+        $rows = \App\Models\BreedCorrection::selectRaw(
+            'LOWER(TRIM(corrected_breed)) as breed_key,
+         MAX(corrected_breed)         as breed_name,
+         COUNT(*)                     as times_taught,
+         MIN(created_at)              as first_taught'
+        )
+            ->groupBy('breed_key')
+            ->orderByDesc('times_taught')
+            ->get();
+
+        $wall = [];
+        foreach ($rows as $row) {
+            $times = (int) $row->times_taught;
+
+            // Level drives the chip colour — no percentages, just effort count
+            if ($times >= 5)      $level = 'expert';   // dark green
+            elseif ($times >= 3)  $level = 'trained';  // green
+            elseif ($times >= 2)  $level = 'learning'; // blue
+            else                  $level = 'new';       // amber
+
+            $wall[] = [
+                'breed'       => $row->breed_name,
+                'times_taught' => $times,
+                'first_taught' => \Carbon\Carbon::parse($row->first_taught)->format('M d, Y'),
+                'days_ago'    => (int) \Carbon\Carbon::parse($row->first_taught)->diffInDays(now()),
+                'level'       => $level,
+            ];
+        }
+
+        return $wall;
+    }
+
+    /**
+     * Returns a small summary for the heatmap header stats.
+     */
+    private function getHeatmapSummary(array $heatmap): array
+    {
+        $activeDays   = count(array_filter($heatmap, fn($d) => $d['count'] > 0));
+        $totalInRange = array_sum(array_column($heatmap, 'count'));
+        $streak       = 0;
+
+        // Count current streak (consecutive days ending today with ≥1 correction)
+        foreach (array_reverse($heatmap) as $day) {
+            if ($day['count'] > 0) $streak++;
+            else break;
+        }
+
+        $maxDay = collect($heatmap)->sortByDesc('count')->first();
+
+        return [
+            'active_days'    => $activeDays,
+            'total_in_range' => $totalInRange,
+            'current_streak' => $streak,
+            'best_day_count' => $maxDay ? $maxDay['count'] : 0,
+            'best_day_label' => $maxDay ? $maxDay['label'] : '',
+        ];
+    }
+
 
 
 
@@ -250,9 +336,15 @@ class ScanResultController extends Controller
         $oneMonthAgo = Carbon::now()->subDays(30);
 
         // -------------------------------------------------------------------------
-        // Breed-specific learning progress (table data)
+        // AI Training Activity — heatmap + breed memory wall (replaces old
+        // breedLearningProgress table).  Zero dependency on ML API.
         // -------------------------------------------------------------------------
-        $breedLearningProgress = $this->calculateBreedLearningProgress();
+        $learningHeatmap   = $this->getLearningHeatmap();
+        $heatmapSummary    = $this->getHeatmapSummary($learningHeatmap);
+        $breedMemoryWall   = $this->getBreedMemoryWall();
+
+        // Keep the old variable as an empty array so nothing else breaks
+        $breedLearningProgress = [];
 
         // -------------------------------------------------------------------------
         // Day-by-day learning timeline — 10 days (NEW FEATURE)
@@ -441,7 +533,10 @@ class ScanResultController extends Controller
             'lastCorrectionCount'       => $lastMilestone,
             'breedLearningProgress'     => $breedLearningProgress,
             'learningBreakdown'         => $learningBreakdown ?? [],
-            'learningTimeline'          => $learningTimeline,  // ← NEW
+            'learningTimeline'          => $learningTimeline,
+            'learningHeatmap'           => $learningHeatmap,    // ← NEW
+            'heatmapSummary'            => $heatmapSummary,     // ← NEW
+            'breedMemoryWall'           => $breedMemoryWall,    // ← NEW
         ]);
     }
 
