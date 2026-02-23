@@ -1150,9 +1150,9 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 1500,  // JSON output ~150 tokens, 1500 = safe buffer
+                        'maxOutputTokens' => 2500,  // JSON output ~150 tokens, 1500 = safe buffer
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 2000, // Sufficient for accurate breed ID, ~8-12s
+                            'thinkingBudget' => 2500, // Sufficient for accurate breed ID, ~8-12s
                         ],
                     ],
                     'safetySettings' => [
