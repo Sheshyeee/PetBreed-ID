@@ -140,27 +140,39 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
     const maxCount = Math.max(...days.map((d) => d.count), 1);
 
-    const grid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
-        Array(12).fill(null),
-    );
-    days.forEach((d) => {
-        grid[d.day_of_week][d.week] = d;
-    });
-
     const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-    const weekMonths: string[] = Array(12).fill('');
-    let lastM = '';
-    days.forEach((d) => {
+    // Sort days chronologically so week/day_of_week indices are correct
+    const sorted = [...days].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+    const sortedGrid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
+        Array(12).fill(null),
+    );
+    sorted.forEach((d) => {
+        if (
+            d.week >= 0 &&
+            d.week < 12 &&
+            d.day_of_week >= 0 &&
+            d.day_of_week < 7
+        ) {
+            sortedGrid[d.day_of_week][d.week] = d;
+        }
+    });
+
+    // Derive month labels from sorted days so they align with week columns
+    const sortedMonths: string[] = Array(12).fill('');
+    let seenM = '';
+    sorted.forEach((d) => {
         const m = new Date(d.date).toLocaleString('en-US', { month: 'short' });
-        if (m !== lastM) {
-            weekMonths[d.week] = m;
-            lastM = m;
+        if (m !== seenM) {
+            sortedMonths[d.week] = m;
+            seenM = m;
         }
     });
 
     return (
-        <div className="relative inline-block select-none">
+        <div className="relative w-full select-none">
             {hovered && (
                 <div
                     className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-gray-900/97 px-2.5 py-2 text-xs shadow-xl backdrop-blur-sm"
@@ -187,91 +199,95 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                 </div>
             )}
 
-            {/* Month labels */}
-            <div className="mb-1 flex" style={{ paddingLeft: 18 }}>
-                {weekMonths.map((m, i) => (
-                    <div
-                        key={i}
-                        className="overflow-hidden text-[9px] leading-none text-white/25"
-                        style={{ width: 13, marginRight: 2 }}
-                    >
-                        {m}
-                    </div>
-                ))}
-            </div>
-
-            <div className="flex items-start gap-0">
-                {/* Day labels */}
-                <div className="mr-1.5 flex flex-col" style={{ gap: 2 }}>
+            {/* Outer wrapper: day-label column + grid column */}
+            <div className="flex w-full items-start gap-1">
+                {/* Day-of-week labels — fixed width, sits beside the grid */}
+                <div
+                    className="flex shrink-0 flex-col pt-4"
+                    style={{ gap: 2, width: 14 }}
+                >
                     {DOW.map((l, i) => (
                         <div
                             key={i}
-                            className="text-right text-[8px] text-white/20"
-                            style={{
-                                width: 12,
-                                height: 11,
-                                lineHeight: '11px',
-                            }}
+                            className="text-right text-[8px] leading-none text-white/20"
+                            style={{ height: 11, lineHeight: '11px' }}
                         >
                             {i % 2 === 1 ? l : ''}
                         </div>
                     ))}
                 </div>
 
-                {/* Cells */}
-                <div className="flex" style={{ gap: 2 }}>
-                    {Array.from({ length: 12 }, (_, week) => (
-                        <div
-                            key={week}
-                            className="flex flex-col"
-                            style={{ gap: 2 }}
-                        >
-                            {Array.from({ length: 7 }, (_, dow) => {
-                                const cell = grid[dow][week];
-                                return (
-                                    <div
-                                        key={dow}
-                                        style={{
-                                            width: 11,
-                                            height: 11,
-                                            borderRadius: 2,
-                                            background: cell
-                                                ? heatColor(
-                                                      cell.count,
-                                                      maxCount,
-                                                  )
-                                                : '#161b22',
-                                            outline: cell?.is_today
-                                                ? '1.5px solid #6366f1'
-                                                : undefined,
-                                            cursor: 'default',
-                                        }}
-                                        onMouseEnter={
-                                            cell
-                                                ? (e) => {
-                                                      setHovered(cell);
-                                                      setTipPos({
-                                                          x: e.clientX,
-                                                          y: e.clientY,
-                                                      });
-                                                  }
-                                                : undefined
-                                        }
-                                        onMouseMove={
-                                            cell
-                                                ? (e) =>
-                                                      setTipPos({
-                                                          x: e.clientX,
-                                                          y: e.clientY,
-                                                      })
-                                                : undefined
-                                        }
-                                        onMouseLeave={() => setHovered(null)}
-                                    />
-                                );
-                            })}
-                        </div>
-                    ))}
+                {/* Grid + month labels stacked */}
+                <div className="flex min-w-0 flex-1 flex-col">
+                    {/* Month labels — one per column, flex-1 so they align exactly */}
+                    <div className="mb-1 flex w-full" style={{ gap: 2 }}>
+                        {sortedMonths.map((m, i) => (
+                            <div
+                                key={i}
+                                className="flex-1 overflow-hidden text-[9px] leading-none text-white/25"
+                            >
+                                {m}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Week columns */}
+                    <div className="flex w-full" style={{ gap: 2 }}>
+                        {Array.from({ length: 12 }, (_, week) => (
+                            <div
+                                key={week}
+                                className="flex flex-1 flex-col"
+                                style={{ gap: 2 }}
+                            >
+                                {Array.from({ length: 7 }, (_, dow) => {
+                                    const cell = sortedGrid[dow][week];
+                                    return (
+                                        <div
+                                            key={dow}
+                                            className="w-full"
+                                            style={{
+                                                height: 11,
+                                                borderRadius: 2,
+                                                background: cell
+                                                    ? heatColor(
+                                                          cell.count,
+                                                          maxCount,
+                                                      )
+                                                    : '#161b22',
+                                                outline: cell?.is_today
+                                                    ? '1.5px solid #6366f1'
+                                                    : undefined,
+                                                cursor: 'default',
+                                            }}
+                                            onMouseEnter={
+                                                cell
+                                                    ? (e) => {
+                                                          setHovered(cell);
+                                                          setTipPos({
+                                                              x: e.clientX,
+                                                              y: e.clientY,
+                                                          });
+                                                      }
+                                                    : undefined
+                                            }
+                                            onMouseMove={
+                                                cell
+                                                    ? (e) =>
+                                                          setTipPos({
+                                                              x: e.clientX,
+                                                              y: e.clientY,
+                                                          })
+                                                    : undefined
+                                            }
+                                            onMouseLeave={() =>
+                                                setHovered(null)
+                                            }
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -800,9 +816,10 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    <div className="flex flex-col gap-6 p-5 lg:flex-row lg:items-start">
-                        {/* ── Compact GitHub heatmap ── */}
-                        <div className="shrink-0">
+                    {/* ── 50 / 50 split body ─────────────────────────────── */}
+                    <div className="flex flex-col lg:flex-row">
+                        {/* LEFT — heatmap, exactly half */}
+                        <div className="w-full p-5 lg:w-1/2">
                             <p className="mb-3 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
                                 Correction Heatmap
                             </p>
@@ -815,12 +832,12 @@ export default function Dashboard() {
                             )}
                         </div>
 
-                        {/* ── Divider ── */}
-                        <div className="hidden w-px self-stretch bg-white/6 lg:block" />
-                        <div className="h-px w-full bg-white/6 lg:hidden" />
+                        {/* Divider */}
+                        <div className="hidden w-px bg-white/6 lg:block" />
+                        <div className="mx-5 h-px bg-white/6 lg:hidden" />
 
-                        {/* ── Breed Memory Wall ── */}
-                        <div className="min-w-0 flex-1">
+                        {/* RIGHT — memory wall, exactly half */}
+                        <div className="w-full p-5 lg:w-1/2">
                             <div className="mb-3 flex flex-wrap items-center gap-2">
                                 <p className="text-[10px] font-semibold tracking-wider text-white/30 uppercase">
                                     Breed Memory Wall
