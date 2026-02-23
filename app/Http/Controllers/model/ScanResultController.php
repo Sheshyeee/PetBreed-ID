@@ -34,159 +34,142 @@ class ScanResultController extends Controller
     private function calculateBreedLearningProgress(): array
     {
         try {
-            Log::info('🔍 Starting breed learning progress calculation (before/after)');
+            Log::info('🔍 Building vet teaching log from BreedCorrection records');
 
             // ---------------------------------------------------------------
-            // STEP 1: All corrected breeds from DB — this is source of truth.
-            // Use LOWER/TRIM so "Labrador" and "labrador" are the same breed.
+            // Get all corrections, most recent first
             // ---------------------------------------------------------------
-            $dbBreedRows = BreedCorrection::selectRaw(
-                'LOWER(TRIM(corrected_breed)) as breed_key, corrected_breed'
-            )
-                ->groupBy('breed_key', 'corrected_breed')
-                ->get();
+            $allCorrections = BreedCorrection::orderBy('created_at', 'desc')->get();
 
-            if ($dbBreedRows->isEmpty()) {
-                Log::info('ℹ️ No corrections in DB yet');
+            if ($allCorrections->isEmpty()) {
+                Log::info('ℹ️ No corrections yet');
                 return [];
             }
 
-            $dbBreeds = [];
-            foreach ($dbBreedRows as $row) {
-                $dbBreeds[$row->breed_key] = $row->corrected_breed;
+            // ---------------------------------------------------------------
+            // Group by corrected_breed (case-insensitive)
+            // For each breed, track every correction event
+            // ---------------------------------------------------------------
+            $breedGroups = [];
+
+            foreach ($allCorrections as $correction) {
+                $key = strtolower(trim($correction->corrected_breed));
+                if (!isset($breedGroups[$key])) {
+                    $breedGroups[$key] = [
+                        'corrected_breed'   => $correction->corrected_breed,
+                        'corrections'       => [],
+                    ];
+                }
+                $breedGroups[$key]['corrections'][] = $correction;
             }
 
-            // ---------------------------------------------------------------
-            // STEP 2: Try ML API for memory counts (optional, never blocks)
-            // ---------------------------------------------------------------
-            $mlBreedCounts = [];
-            try {
-                $mlApiService  = app(\App\Services\MLApiService::class);
-                $statsResponse = $mlApiService->getMemoryStats();
-                if ($statsResponse['success'] && !empty($statsResponse['data']['breeds'])) {
-                    foreach ($statsResponse['data']['breeds'] as $mlBreed => $count) {
-                        $mlBreedCounts[strtolower(trim($mlBreed))] = (int) $count;
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('⚠️ ML API unavailable — using DB-only fallback', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $results = [];
 
-            // ---------------------------------------------------------------
-            // STEP 3: Build "before vs after" stats for each corrected breed
-            // ---------------------------------------------------------------
-            $breedLearning = [];
+            foreach ($breedGroups as $key => $group) {
+                $corrections    = $group['corrections']; // array, most recent first
+                $correctedBreed = $group['corrected_breed'];
+                $count          = count($corrections);
 
-            foreach ($dbBreeds as $breedKey => $originalBreedName) {
-                $corrections = BreedCorrection::whereRaw(
-                    'LOWER(TRIM(corrected_breed)) = ?',
-                    [$breedKey]
-                )
-                    ->orderBy('created_at', 'asc')
-                    ->get();
+                // Most recent correction event (for the "latest" display)
+                $latest = $corrections[0];
+                // The very first time this breed was taught (oldest)
+                $first  = $corrections[count($corrections) - 1];
 
-                if ($corrections->isEmpty()) {
-                    continue;
-                }
+                // What the AI originally predicted for the latest correction
+                $aiGuessBreed      = $latest->original_breed   ?? 'Unknown';
+                $aiGuessConfidence = (float) ($latest->confidence ?? 0);
 
-                $firstCorrectionDate = $corrections->first()->created_at;
-                $correctionCount     = $corrections->count();
-                $mlExamples          = $mlBreedCounts[$breedKey] ?? $correctionCount;
+                // Was the AI wrong about the breed, or just uncertain?
+                $breedWasWrong = strtolower(trim($aiGuessBreed)) !== $key;
 
-                // -------------------------------------------------------------------
-                // BEFORE: The confidence score AT THE TIME of the first correction.
-                // This is what the AI "thought" before the vet taught it.
-                // We get it from the correction record itself (stored original confidence).
-                // -------------------------------------------------------------------
-                $firstCorrection        = $corrections->first();
-                $firstScanConfidence    = (float) ($firstCorrection->confidence ?? 0);
-
-                // -------------------------------------------------------------------
-                // AFTER: The most recent scan for this breed — what the AI thinks NOW.
-                // -------------------------------------------------------------------
-                $latestScan             = Results::whereRaw('LOWER(TRIM(breed)) = ?', [$breedKey])
-                    ->latest()
-                    ->first();
-                $latestScanConfidence   = $latestScan ? (float) $latestScan->confidence : 0;
-
-                // -------------------------------------------------------------------
-                // Improvement delta
-                // -------------------------------------------------------------------
-                $improvement = $latestScanConfidence - $firstScanConfidence;
-
-                // -------------------------------------------------------------------
-                // Status label — plain English, no jargon
-                // -------------------------------------------------------------------
-                if ($latestScanConfidence >= 85) {
-                    $statusLabel = 'Now Reliable';
-                    $statusColor = 'green';
-                } elseif ($latestScanConfidence >= 70) {
-                    $statusLabel = 'Improving';
+                // Determine event type — drives the card colour and icon
+                if ($breedWasWrong) {
+                    // AI predicted a completely different breed
+                    $eventType  = 'corrected';   // "AI thought it was X, vet said Y"
+                    $statusLabel = 'AI Corrected';
                     $statusColor = 'blue';
-                } elseif ($correctionCount >= 1) {
-                    $statusLabel = 'Just Taught';
+                } elseif ($aiGuessConfidence < 70) {
+                    // AI knew the breed but wasn't confident
+                    $eventType   = 'boosted';    // "AI was unsure, vet confirmed"
+                    $statusLabel = 'Confidence Boosted';
                     $statusColor = 'amber';
                 } else {
-                    $statusLabel = 'Just Started';
-                    $statusColor = 'gray';
+                    // AI was right and confident — vet confirmed
+                    $eventType   = 'confirmed';  // "AI was right, vet verified"
+                    $statusLabel = 'Verified by Vet';
+                    $statusColor = 'green';
                 }
 
-                // -------------------------------------------------------------------
-                // Recent scans for success rate (last 10)
-                // -------------------------------------------------------------------
-                $recentScans          = Results::whereRaw('LOWER(TRIM(breed)) = ?', [$breedKey])
-                    ->latest()
-                    ->take(10)
-                    ->get();
-                $recentHighConf       = $recentScans->where('confidence', '>=', 80)->count();
-                $successRate          = $recentScans->count() > 0
-                    ? round(($recentHighConf / $recentScans->count()) * 100, 1)
-                    : min(90, $correctionCount * 10);
+                // Days since first taught
+                $firstDate   = \Carbon\Carbon::parse($first->created_at);
+                $daysTaught  = (int) $firstDate->diffInDays(now());
 
-                $breedLearning[] = [
-                    // Existing fields (keep these so nothing else breaks)
-                    'breed'              => $originalBreedName,
+                // ML API memory count (optional enrichment — never blocks rendering)
+                $mlExamples = $count; // fallback = number of corrections
+                try {
+                    static $mlBreedCounts = null;
+                    if ($mlBreedCounts === null) {
+                        $mlApiService  = app(\App\Services\MLApiService::class);
+                        $statsResponse = $mlApiService->getMemoryStats();
+                        $mlBreedCounts = [];
+                        if ($statsResponse['success'] && !empty($statsResponse['data']['breeds'])) {
+                            foreach ($statsResponse['data']['breeds'] as $b => $c) {
+                                $mlBreedCounts[strtolower(trim($b))] = (int) $c;
+                            }
+                        }
+                    }
+                    if (isset($mlBreedCounts[$key])) {
+                        $mlExamples = $mlBreedCounts[$key];
+                    }
+                } catch (\Exception $e) {
+                    // silently fall back to $count
+                }
+
+                $results[] = [
+                    // Fields the frontend needs for the Teaching Log cards
+                    'breed'              => $correctedBreed,
+                    'ai_guess_breed'     => $aiGuessBreed,
+                    'ai_guess_confidence' => round($aiGuessConfidence, 1),
+                    'event_type'         => $eventType,     // 'corrected' | 'boosted' | 'confirmed'
+                    'status_label'       => $statusLabel,
+                    'status_color'       => $statusColor,   // 'blue' | 'amber' | 'green'
+                    'times_taught'       => $count,
+                    'examples_in_memory' => $mlExamples,
+                    'first_taught_date'  => $firstDate->format('M d, Y'),
+                    'days_since_taught'  => $daysTaught,
+                    'latest_taught_date' => \Carbon\Carbon::parse($latest->created_at)->format('M d, Y'),
+
+                    // Keep legacy fields so nothing else in the codebase breaks
                     'examples_learned'   => $mlExamples,
-                    'corrections_made'   => $correctionCount,
-                    'avg_confidence'     => round($latestScanConfidence, 1),
-                    'success_rate'       => $successRate,
-                    'first_learned'      => $firstCorrectionDate->format('M d, Y'),
-                    'days_learning'      => (int) $firstCorrectionDate->diffInDays(now()),
-                    'recent_scans'       => $recentScans->count(),
-
-                    // NEW: Before/after fields for the visual cards
-                    'first_scan_confidence'  => round($firstScanConfidence, 1),
-                    'latest_scan_confidence' => round($latestScanConfidence, 1),
-                    'improvement'            => round($improvement, 1),
-                    'status_label'           => $statusLabel,
-                    'status_color'           => $statusColor,
+                    'corrections_made'   => $count,
+                    'avg_confidence'     => 100.0,   // after correction result is 100%
+                    'success_rate'       => 100.0,
+                    'first_learned'      => $firstDate->format('M d, Y'),
+                    'days_learning'      => $daysTaught,
+                    'recent_scans'       => $count,
                 ];
             }
 
-            if (empty($breedLearning)) {
-                return [];
-            }
-
-            // Sort: biggest improvement first, then by latest_scan_confidence
-            usort($breedLearning, function ($a, $b) {
-                if ($b['improvement'] !== $a['improvement']) {
-                    return $b['improvement'] <=> $a['improvement'];
-                }
-                return $b['latest_scan_confidence'] <=> $a['latest_scan_confidence'];
+            // Sort: corrected events first (most impressive), then boosted, then confirmed
+            // Within each group, sort by times_taught descending (most trained = most proof)
+            $order = ['corrected' => 0, 'boosted' => 1, 'confirmed' => 2];
+            usort($results, function ($a, $b) use ($order) {
+                $oa = $order[$a['event_type']] ?? 9;
+                $ob = $order[$b['event_type']] ?? 9;
+                if ($oa !== $ob) return $oa <=> $ob;
+                return $b['times_taught'] <=> $a['times_taught'];
             });
 
-            $topBreeds = array_slice($breedLearning, 0, 10);
+            $top = array_slice($results, 0, 10);
 
-            Log::info('✓ Breed before/after progress calculated', [
-                'total'    => count($breedLearning),
-                'returned' => count($topBreeds),
+            Log::info('✓ Teaching log built', [
+                'total_breeds' => count($results),
+                'returned'     => count($top),
             ]);
 
-            return $topBreeds;
+            return $top;
         } catch (\Exception $e) {
-            Log::error('❌ Error calculating breed learning progress', [
+            Log::error('❌ Error building teaching log', [
                 'error' => $e->getMessage(),
             ]);
             return [];
@@ -196,30 +179,26 @@ class ScanResultController extends Controller
 
     /**
      * =============================================================================
-     * getLearningTimeline — day-by-day (unchanged from previous fix, kept here
-     * so you have both functions in one file)
+     * getLearningTimeline — unchanged, kept here for completeness
      * =============================================================================
      */
     private function getLearningTimeline(int $days = 10): array
     {
         $timeline = [];
-
         for ($i = $days - 1; $i >= 0; $i--) {
-            $dayStart = Carbon::now()->subDays($i)->startOfDay();
-            $dayEnd   = Carbon::now()->subDays($i)->endOfDay();
+            $dayStart = \Carbon\Carbon::now()->subDays($i)->startOfDay();
+            $dayEnd   = \Carbon\Carbon::now()->subDays($i)->endOfDay();
 
-            if ($i === 0)      $label = 'Today';
-            elseif ($i === 1)  $label = 'Yesterday';
-            else               $label = $dayStart->format('M j');
+            if ($i === 0)     $label = 'Today';
+            elseif ($i === 1) $label = 'Yesterday';
+            else              $label = $dayStart->format('M j');
 
-            $corrections    = BreedCorrection::whereBetween('created_at', [$dayStart, $dayEnd])->count();
-            $totalScans     = Results::whereBetween('created_at', [$dayStart, $dayEnd])->count();
-            $highConfScans  = Results::whereBetween('created_at', [$dayStart, $dayEnd])
+            $corrections   = \App\Models\BreedCorrection::whereBetween('created_at', [$dayStart, $dayEnd])->count();
+            $totalScans    = \App\Models\Results::whereBetween('created_at', [$dayStart, $dayEnd])->count();
+            $highConfScans = \App\Models\Results::whereBetween('created_at', [$dayStart, $dayEnd])
                 ->where('confidence', '>=', 80)->count();
-            $highConfRate   = $totalScans > 0
-                ? round(($highConfScans / $totalScans) * 100, 1)
-                : 0;
-            $totalToDate    = BreedCorrection::where('created_at', '<=', $dayEnd)->count();
+            $highConfRate  = $totalScans > 0 ? round(($highConfScans / $totalScans) * 100, 1) : 0;
+            $totalToDate   = \App\Models\BreedCorrection::where('created_at', '<=', $dayEnd)->count();
 
             $timeline[] = [
                 'day'                       => $label,
@@ -232,11 +211,16 @@ class ScanResultController extends Controller
                 'total_corrections_to_date' => $totalToDate,
             ];
         }
-
         return $timeline;
     }
 
-    
+
+
+
+
+
+
+
 
 
     public function dashboard()

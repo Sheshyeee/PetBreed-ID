@@ -28,7 +28,6 @@ import {
     GraduationCap,
     LineChart,
     Minus,
-    Sparkles,
     Target,
     TrendingUp,
 } from 'lucide-react';
@@ -46,6 +45,17 @@ type Result = {
 
 type BreedLearning = {
     breed: string;
+    ai_guess_breed: string;
+    ai_guess_confidence: number;
+    event_type: 'corrected' | 'boosted' | 'confirmed';
+    status_label: string;
+    status_color: 'blue' | 'amber' | 'green';
+    times_taught: number;
+    examples_in_memory: number;
+    first_taught_date: string;
+    days_since_taught: number;
+    latest_taught_date: string;
+    // legacy
     examples_learned: number;
     corrections_made: number;
     avg_confidence: number;
@@ -53,12 +63,6 @@ type BreedLearning = {
     first_learned: string;
     days_learning: number;
     recent_scans: number;
-    // NEW before/after fields
-    first_scan_confidence: number;
-    latest_scan_confidence: number;
-    improvement: number;
-    status_label: string;
-    status_color: 'green' | 'blue' | 'amber' | 'gray';
 };
 
 type LearningBreakdown = {
@@ -108,200 +112,233 @@ type PageProps = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ConfidenceRing — SVG circle showing a % value with colour coding
+// Confidence pill — simple coloured badge showing a % score
 // ─────────────────────────────────────────────────────────────────────────────
-function ConfidenceRing({
-    value,
-    size = 80,
-    color,
-    label,
-}: {
-    value: number;
-    size?: number;
-    color: string;
-    label: string;
-}) {
-    const r = (size - 10) / 2;
-    const circ = 2 * Math.PI * r;
-    const filled = (value / 100) * circ;
-
-    const strokeColor: Record<string, string> = {
-        red: '#ef4444',
-        amber: '#f59e0b',
-        blue: '#3b82f6',
-        green: '#22c55e',
-        gray: '#9ca3af',
-    };
-    const textColor: Record<string, string> = {
-        red: 'text-red-500',
-        amber: 'text-amber-500',
-        blue: 'text-blue-500',
-        green: 'text-green-500',
-        gray: 'text-gray-400',
-    };
-
+function ConfidencePill({ value }: { value: number }) {
+    const cls =
+        value >= 80
+            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+            : value >= 60
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+              : value >= 40
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300';
     return (
-        <div className="flex flex-col items-center gap-1.5">
-            <div className="relative" style={{ width: size, height: size }}>
-                <svg
-                    width={size}
-                    height={size}
-                    style={{ transform: 'rotate(-90deg)' }}
-                >
-                    <circle
-                        cx={size / 2}
-                        cy={size / 2}
-                        r={r}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={7}
-                        className="text-gray-200 dark:text-gray-700"
-                    />
-                    <circle
-                        cx={size / 2}
-                        cy={size / 2}
-                        r={r}
-                        fill="none"
-                        stroke={strokeColor[color] ?? strokeColor.gray}
-                        strokeWidth={7}
-                        strokeDasharray={`${filled} ${circ - filled}`}
-                        strokeLinecap="round"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span
-                        className={`leading-none font-extrabold ${textColor[color] ?? 'text-gray-400'}`}
-                        style={{ fontSize: size * 0.21 }}
-                    >
-                        {value}%
-                    </span>
-                </div>
-            </div>
-            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                {label}
-            </span>
-        </div>
+        <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-black ${cls}`}
+        >
+            {value}%
+        </span>
     );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BreedLearningCard — the "Before → After" card per breed
+// TeachingLogCard — one per corrected breed
 // ─────────────────────────────────────────────────────────────────────────────
-function BreedLearningCard({
-    breed,
+function TeachingLogCard({
+    entry,
     rank,
 }: {
-    breed: BreedLearning;
+    entry: BreedLearning;
     rank: number;
 }) {
-    const toColor = (v: number) =>
-        v >= 80 ? 'green' : v >= 60 ? 'blue' : v >= 40 ? 'amber' : 'red';
+    const isCorrected = entry.event_type === 'corrected';
+    const isBoosted = entry.event_type === 'boosted';
+    const isConfirmed = entry.event_type === 'confirmed';
 
-    const beforeColor = toColor(breed.first_scan_confidence);
-    const afterColor = toColor(breed.latest_scan_confidence);
-    const improved = breed.improvement >= 0;
+    // Accent colours per event type
+    const accentBorder = isCorrected
+        ? 'border-blue-300  dark:border-blue-700'
+        : isBoosted
+          ? 'border-amber-300 dark:border-amber-700'
+          : 'border-green-300 dark:border-green-700';
 
-    const statusStyles: Record<string, string> = {
-        green: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
-        blue: 'bg-blue-100  text-blue-700  dark:bg-blue-950  dark:text-blue-300',
-        amber: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-        gray: 'bg-gray-100  text-gray-600  dark:bg-gray-800  dark:text-gray-400',
+    const accentBg = isCorrected
+        ? 'bg-blue-50  dark:bg-blue-950/30'
+        : isBoosted
+          ? 'bg-amber-50 dark:bg-amber-950/30'
+          : 'bg-green-50 dark:bg-green-950/30';
+
+    const badgeCls = isCorrected
+        ? 'bg-blue-100  text-blue-700  dark:bg-blue-950  dark:text-blue-300'
+        : isBoosted
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+          : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300';
+
+    const icon = isCorrected ? '🔄' : isBoosted ? '📈' : '✅';
+
+    const rankRings: Record<number, string> = {
+        1: 'bg-gradient-to-br from-yellow-400 to-orange-500',
+        2: 'bg-gradient-to-br from-gray-300  to-gray-400',
+        3: 'bg-gradient-to-br from-orange-400 to-orange-600',
     };
 
-    const rankRings = [
-        '',
-        'bg-gradient-to-br from-yellow-400 to-orange-500',
-        'bg-gradient-to-br from-gray-300 to-gray-400',
-        'bg-gradient-to-br from-orange-400 to-orange-600',
-    ];
-
+    // The "story" headline — written so ANY non-technical person understands
+    const headline = isCorrected ? (
+        <>
+            AI guessed{' '}
+            <span className="font-black text-red-500 dark:text-red-400">
+                "{entry.ai_guess_breed}"
+            </span>{' '}
+            — vet corrected to{' '}
+            <span className="font-black text-green-600 dark:text-green-400">
+                "{entry.breed}"
+            </span>
+        </>
+    ) : isBoosted ? (
+        <>
+            AI identified{' '}
+            <span className="font-black text-blue-600 dark:text-blue-400">
+                "{entry.breed}"
+            </span>{' '}
+            but wasn't sure — vet confirmed it
+        </>
+    ) : (
+        <>
+            AI correctly identified{' '}
+            <span className="font-black text-green-600 dark:text-green-400">
+                "{entry.breed}"
+            </span>{' '}
+            — vet verified
+        </>
+    );
     return (
-        <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-gray-800 dark:bg-neutral-900">
-            {/* Top row */}
-            <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                    {rank <= 3 ? (
-                        <div
-                            className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white shadow ${rankRings[rank]}`}
-                        >
-                            {rank}
-                        </div>
-                    ) : (
-                        <span className="text-sm font-bold text-gray-400">
-                            #{rank}
-                        </span>
-                    )}
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                        {breed.breed}
-                    </h3>
-                </div>
-                <span
-                    className={`rounded-full px-3 py-0.5 text-xs font-bold ${statusStyles[breed.status_color]}`}
-                >
-                    {breed.status_label}
-                </span>
-            </div>
-
-            {/* Before → After visual */}
-            <div className="flex items-center justify-center gap-2">
-                {/* BEFORE */}
-                <div className="flex flex-col items-center">
-                    <p className="mb-2 text-[9px] font-black tracking-widest text-gray-400 uppercase">
-                        Before
-                    </p>
-                    <ConfidenceRing
-                        value={breed.first_scan_confidence}
-                        size={78}
-                        color={beforeColor}
-                        label="1st scan"
-                    />
-                </div>
-
-                {/* Arrow + delta */}
-                <div className="flex flex-col items-center gap-1 px-1">
-                    <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full ${improved ? 'bg-green-100 dark:bg-green-950' : 'bg-red-100 dark:bg-red-950'}`}
-                    >
-                        <ArrowRight
-                            className={`h-4 w-4 ${improved ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}
-                        />
+        <div
+            className={`relative overflow-hidden rounded-2xl border-2 ${accentBorder} bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:bg-neutral-900`}
+        >
+            {/* Coloured top strip */}
+            <div className={`px-4 pt-4 pb-3 ${accentBg}`}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        {rank <= 3 ? (
+                            <div
+                                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white shadow ${rankRings[rank]}`}
+                            >
+                                {rank}
+                            </div>
+                        ) : (
+                            <span className="text-sm font-bold text-gray-400">
+                                #{rank}
+                            </span>
+                        )}
+                        <h3 className="text-base font-black text-gray-900 dark:text-white">
+                            {entry.breed}
+                        </h3>
                     </div>
                     <span
-                        className={`text-xs font-black ${improved ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}
+                        className={`rounded-full px-3 py-0.5 text-xs font-bold ${badgeCls}`}
                     >
-                        {improved ? '+' : ''}
-                        {breed.improvement.toFixed(0)}%
+                        {icon} {entry.status_label}
                     </span>
                 </div>
+            </div>
 
-                {/* AFTER */}
-                <div className="flex flex-col items-center">
-                    <p className="mb-2 text-[9px] font-black tracking-widest text-gray-400 uppercase">
-                        After
-                    </p>
-                    <ConfidenceRing
-                        value={breed.latest_scan_confidence}
-                        size={78}
-                        color={afterColor}
-                        label="Latest scan"
-                    />
-                </div>
+            {/* The story row */}
+            <div className="px-4 py-3">
+                <p className="text-sm leading-snug text-gray-700 dark:text-gray-300">
+                    {headline}
+                </p>
+
+                {/* Visual: AI confidence → vet action */}
+                {isCorrected && (
+                    <div className="mt-3 flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                AI was
+                            </span>
+                            <ConfidencePill value={entry.ai_guess_confidence} />
+                            <span className="mt-1 max-w-[70px] text-center text-[10px] leading-tight text-gray-400">
+                                confident it was "{entry.ai_guess_breed}"
+                            </span>
+                        </div>
+                        <div className="flex flex-1 flex-col items-center">
+                            <ArrowRight className="h-5 w-5 text-gray-400" />
+                            <span className="mt-0.5 text-[9px] text-gray-400">
+                                vet corrected
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                Now stored as
+                            </span>
+                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
+                                ✓ 100%
+                            </span>
+                            <span className="mt-1 max-w-[70px] text-center text-[10px] leading-tight text-gray-400">
+                                "{entry.breed}" in memory
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {isBoosted && (
+                    <div className="mt-3 flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                AI confidence
+                            </span>
+                            <ConfidencePill value={entry.ai_guess_confidence} />
+                        </div>
+                        <div className="flex flex-1 flex-col items-center">
+                            <ArrowRight className="h-5 w-5 text-amber-500" />
+                            <span className="mt-0.5 text-[9px] text-gray-400">
+                                vet confirmed
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                Now stored as
+                            </span>
+                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
+                                ✓ 100%
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {isConfirmed && (
+                    <div className="mt-3 flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                AI confidence
+                            </span>
+                            <ConfidencePill value={entry.ai_guess_confidence} />
+                        </div>
+                        <div className="flex flex-1 flex-col items-center">
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <span className="mt-0.5 text-[9px] text-gray-400">
+                                vet verified
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <span className="mb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                                Reinforced
+                            </span>
+                            <span className="inline-flex h-9 items-center rounded-full bg-green-100 px-3 text-sm font-black text-green-700 dark:bg-green-950 dark:text-green-300">
+                                ✓ 100%
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Footer */}
-            <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 dark:border-gray-800">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                     🎓 Taught{' '}
-                    <strong className="text-gray-700 dark:text-gray-200">
-                        {breed.corrections_made}×
+                    <strong className="text-gray-800 dark:text-gray-200">
+                        {entry.times_taught}×
                     </strong>
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                    📅{' '}
-                    <strong className="text-gray-700 dark:text-gray-200">
-                        {breed.days_learning}
+                    🧠{' '}
+                    <strong className="text-gray-800 dark:text-gray-200">
+                        {entry.examples_in_memory}
                     </strong>{' '}
-                    {breed.days_learning === 1 ? 'day' : 'days'}
+                    example{entry.examples_in_memory !== 1 ? 's' : ''} in memory
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    📅 {entry.latest_taught_date}
                 </span>
             </div>
         </div>
@@ -387,6 +424,17 @@ export default function Dashboard() {
         return () => clearInterval(iv);
     }, [correctedBreedCount]);
 
+    // Teaching log summary counts
+    const correctedCount = breedLearningProgress.filter(
+        (b) => b.event_type === 'corrected',
+    ).length;
+    const boostedCount = breedLearningProgress.filter(
+        (b) => b.event_type === 'boosted',
+    ).length;
+    const confirmedCount = breedLearningProgress.filter(
+        (b) => b.event_type === 'confirmed',
+    ).length;
+
     // Timeline
     const maxCorrections = Math.max(
         ...learningTimeline.map((d) => d.corrections),
@@ -397,6 +445,7 @@ export default function Dashboard() {
         0,
     );
     const todayEntry = learningTimeline.find((d) => d.is_today);
+
     const tlStatus = (() => {
         if (!todayEntry) return null;
         if (todayEntry.corrections > 0)
@@ -418,23 +467,6 @@ export default function Dashboard() {
         };
     })();
 
-    // Breed summary stats
-    const reliableBreeds = breedLearningProgress.filter(
-        (b) => b.status_color === 'green',
-    ).length;
-    const improvingBreeds = breedLearningProgress.filter(
-        (b) => b.improvement > 0,
-    ).length;
-    const avgGain =
-        breedLearningProgress.length > 0
-            ? Math.round(
-                  breedLearningProgress.reduce(
-                      (s, b) => s + Math.max(0, b.improvement),
-                      0,
-                  ) / breedLearningProgress.length,
-              )
-            : 0;
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Learning Analytics Dashboard" />
@@ -448,7 +480,7 @@ export default function Dashboard() {
                             value: resultCount,
                             trend: totalScansWeeklyTrend,
                             sub: 'vs last week',
-                            icon: BarChart3,
+                            Icon: BarChart3,
                             bg: 'bg-blue-100 dark:bg-blue-950',
                             ic: 'text-blue-600 dark:text-blue-400',
                         },
@@ -457,7 +489,7 @@ export default function Dashboard() {
                             value: correctedBreedCount,
                             trend: correctedWeeklyTrend,
                             sub: 'Teaching the system',
-                            icon: GraduationCap,
+                            Icon: GraduationCap,
                             bg: 'bg-purple-100 dark:bg-purple-950',
                             ic: 'text-purple-600 dark:text-purple-400',
                         },
@@ -466,7 +498,7 @@ export default function Dashboard() {
                             value: highConfidenceCount,
                             trend: highConfidenceWeeklyTrend,
                             sub: '≥80% confidence',
-                            icon: CheckCircle2,
+                            Icon: CheckCircle2,
                             bg: 'bg-green-100 dark:bg-green-950',
                             ic: 'text-green-600 dark:text-green-400',
                         },
@@ -475,57 +507,41 @@ export default function Dashboard() {
                             value: pendingReviewCount,
                             trend: pendingReviewWeeklyTrend,
                             sub: 'Awaiting correction',
-                            icon: ClipboardList,
+                            Icon: ClipboardList,
                             bg: 'bg-amber-100 dark:bg-amber-950',
                             ic: 'text-amber-600 dark:text-amber-400',
                             inv: true,
                         },
-                    ].map(
-                        ({
-                            label,
-                            value,
-                            trend,
-                            sub,
-                            icon: Icon,
-                            bg,
-                            ic,
-                            inv,
-                        }) => (
-                            <Card
-                                key={label}
-                                className="p-5 dark:bg-neutral-900"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            {label}
+                    ].map(({ label, value, trend, sub, Icon, bg, ic, inv }) => (
+                        <Card key={label} className="p-5 dark:bg-neutral-900">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        {label}
+                                    </p>
+                                    <div className="mt-2 flex items-baseline gap-2">
+                                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                            {value}
                                         </p>
-                                        <div className="mt-2 flex items-baseline gap-2">
-                                            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                                                {value}
-                                            </p>
-                                            <div
-                                                className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(trend, inv)}`}
-                                            >
-                                                {getTrendIcon(trend)}
-                                                <span>
-                                                    {formatTrend(trend)}
-                                                </span>
-                                            </div>
+                                        <div
+                                            className={`flex items-center gap-0.5 text-sm font-semibold ${getTrendColor(trend, inv)}`}
+                                        >
+                                            {getTrendIcon(trend)}
+                                            <span>{formatTrend(trend)}</span>
                                         </div>
-                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            {sub}
-                                        </p>
                                     </div>
-                                    <div
-                                        className={`flex h-12 w-12 items-center justify-center rounded-lg ${bg}`}
-                                    >
-                                        <Icon className={`h-6 w-6 ${ic}`} />
-                                    </div>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {sub}
+                                    </p>
                                 </div>
-                            </Card>
-                        ),
-                    )}
+                                <div
+                                    className={`flex h-12 w-12 items-center justify-center rounded-lg ${bg}`}
+                                >
+                                    <Icon className={`h-6 w-6 ${ic}`} />
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
                 </div>
 
                 {/* ── 3-column learning impact ──────────────────────────── */}
@@ -848,93 +864,120 @@ export default function Dashboard() {
                     </div>
                 </Card>
 
-                {/* ── AI Is Learning — Before → After Breed Cards ──────── */}
+                {/* ── Vet Teaching Log ─────────────────────────────────── */}
                 {breedLearningProgress && breedLearningProgress.length > 0 && (
                     <div>
-                        {/* Section header */}
-                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        {/* Header */}
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 shadow-md">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-600 shadow-md">
                                     <Brain className="h-5 w-5 text-white" />
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                        The AI Is Learning — See the Proof
+                                        How the Vet Is Training the AI
                                     </h2>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Each card shows confidence{' '}
-                                        <strong>before</strong> the vet
-                                        corrected it vs <strong>after</strong>
+                                        Every correction the vet makes is
+                                        permanently stored in the AI's memory
                                     </p>
                                 </div>
                             </div>
-                            <Badge className="w-fit bg-emerald-100 px-4 py-1.5 text-sm font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            <Badge className="w-fit bg-teal-100 px-4 py-1.5 text-sm font-bold text-teal-700 dark:bg-teal-950 dark:text-teal-300">
                                 {breedLearningProgress.length} Breed
-                                {breedLearningProgress.length !== 1
-                                    ? 's'
-                                    : ''}{' '}
-                                Trained
+                                {breedLearningProgress.length !== 1 ? 's' : ''}{' '}
+                                in Memory
                             </Badge>
                         </div>
 
-                        {/* Plain-English explainer */}
-                        <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/40">
-                            <span className="mt-0.5 text-xl leading-none">
-                                💡
-                            </span>
-                            <p className="text-sm text-blue-900 dark:text-blue-100">
-                                <strong>How to read this:</strong> The{' '}
-                                <strong>left circle</strong> is what the AI
-                                scored on its very first scan of that breed. The{' '}
-                                <strong>right circle</strong> is its most recent
-                                scan. A bigger number on the right means the AI
-                                has learned and improved!
-                            </p>
+                        {/* Legend — what each colour means */}
+                        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/40">
+                                <span className="mt-0.5 text-lg leading-none">
+                                    🔄
+                                </span>
+                                <div>
+                                    <p className="text-xs font-bold text-blue-800 dark:text-blue-200">
+                                        AI Corrected
+                                    </p>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        AI guessed the wrong breed — vet fixed
+                                        it
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
+                                <span className="mt-0.5 text-lg leading-none">
+                                    📈
+                                </span>
+                                <div>
+                                    <p className="text-xs font-bold text-amber-800 dark:text-amber-200">
+                                        Confidence Boosted
+                                    </p>
+                                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                                        AI was unsure — vet confirmed the breed
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900 dark:bg-green-950/40">
+                                <span className="mt-0.5 text-lg leading-none">
+                                    ✅
+                                </span>
+                                <div>
+                                    <p className="text-xs font-bold text-green-800 dark:text-green-200">
+                                        Verified by Vet
+                                    </p>
+                                    <p className="text-xs text-green-700 dark:text-green-300">
+                                        AI was correct — vet verified and
+                                        reinforced it
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Cards grid */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {/* Cards */}
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {breedLearningProgress.map((b, idx) => (
-                                <BreedLearningCard
+                                <TeachingLogCard
                                     key={b.breed}
-                                    breed={b}
+                                    entry={b}
                                     rank={idx + 1}
                                 />
                             ))}
                         </div>
 
-                        {/* Summary 3-box strip */}
+                        {/* Summary strip */}
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="flex items-center gap-3 rounded-xl bg-green-50 p-4 dark:bg-green-950/30">
-                                <CheckCircle2 className="h-8 w-8 shrink-0 text-green-600 dark:text-green-400" />
-                                <div>
-                                    <p className="text-2xl font-black text-green-700 dark:text-green-300">
-                                        {reliableBreeds}
-                                    </p>
-                                    <p className="text-xs text-green-600 dark:text-green-400">
-                                        Breeds now reliable (≥85%)
-                                    </p>
-                                </div>
-                            </div>
                             <div className="flex items-center gap-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
-                                <TrendingUp className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" />
+                                <span className="text-2xl">🔄</span>
                                 <div>
                                     <p className="text-2xl font-black text-blue-700 dark:text-blue-300">
-                                        {improvingBreeds}
+                                        {correctedCount}
                                     </p>
                                     <p className="text-xs text-blue-600 dark:text-blue-400">
-                                        Breeds showing improvement
+                                        Wrong guesses corrected
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 rounded-xl bg-purple-50 p-4 dark:bg-purple-950/30">
-                                <Sparkles className="h-8 w-8 shrink-0 text-purple-600 dark:text-purple-400" />
+                            <div className="flex items-center gap-3 rounded-xl bg-amber-50 p-4 dark:bg-amber-950/30">
+                                <span className="text-2xl">📈</span>
                                 <div>
-                                    <p className="text-2xl font-black text-purple-700 dark:text-purple-300">
-                                        {avgGain > 0 ? `+${avgGain}%` : '—'}
+                                    <p className="text-2xl font-black text-amber-700 dark:text-amber-300">
+                                        {boostedCount}
                                     </p>
-                                    <p className="text-xs text-purple-600 dark:text-purple-400">
-                                        Avg confidence gain per breed
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        Uncertain predictions confirmed
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-xl bg-green-50 p-4 dark:bg-green-950/30">
+                                <TrendingUp className="h-8 w-8 shrink-0 text-green-600 dark:text-green-400" />
+                                <div>
+                                    <p className="text-2xl font-black text-green-700 dark:text-green-300">
+                                        {confirmedCount}
+                                    </p>
+                                    <p className="text-xs text-green-600 dark:text-green-400">
+                                        Correct predictions verified
                                     </p>
                                 </div>
                             </div>
