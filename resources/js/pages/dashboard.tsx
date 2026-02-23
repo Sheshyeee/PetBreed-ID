@@ -12,7 +12,6 @@ import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
-    Activity,
     ArrowDown,
     ArrowUp,
     BarChart3,
@@ -138,50 +137,70 @@ function heatColor(count: number, max: number): string {
 function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const [hovered, setHovered] = useState<HeatmapDay | null>(null);
     const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
-    const maxCount = Math.max(...days.map((d) => d.count), 1);
 
-    const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    // ── GitHub algorithm ───────────────────────────────────────────────────
+    // 1. Build a lookup: dateString → HeatmapDay
+    const byDate: Record<string, HeatmapDay> = {};
+    days.forEach((d) => {
+        byDate[d.date] = d;
+    });
 
-    // Sort oldest→newest. Recalculate week col from scratch so column 0 is
-    // always the oldest Sunday-aligned week and column 11 is the latest.
-    const sorted = [...days].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    // 2. Anchor: the Sunday on or before 83 days ago (= start of week 0)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const anchor = new Date(today);
+    anchor.setDate(today.getDate() - 83); // go back 83 days (84-day window)
+    const dow0 = anchor.getDay(); // 0=Sun … 6=Sat
+    anchor.setDate(anchor.getDate() - dow0); // rewind to the Sunday of that week
+
+    // 3. Build 12 columns × 7 rows. col 0 = oldest week (left), col 11 = this week (right)
+    //    row 0 = Sunday, row 6 = Saturday
+    const COLS = 12;
+    const ROWS = 7;
+    const grid: (HeatmapDay | null)[][] = Array.from({ length: COLS }, () =>
+        Array(ROWS).fill(null),
     );
+    const monthLabels: string[] = Array(COLS).fill('');
 
-    const sortedGrid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
-        Array(12).fill(null),
-    );
-    const sortedMonths: string[] = Array(12).fill('');
-    let seenM = '';
-
-    if (sorted.length > 0) {
-        const oldest = new Date(sorted[0].date).getTime();
-        sorted.forEach((d) => {
-            const dt = new Date(d.date);
-            const dow = dt.getDay(); // 0=Sun … 6=Sat
-            const diffMs = dt.getTime() - oldest;
-            const weekCol = Math.floor(diffMs / (7 * 86400000)); // 0-based week column
-
-            if (weekCol >= 0 && weekCol < 12) {
-                sortedGrid[dow][weekCol] = d;
-                const m = dt.toLocaleString('en-US', { month: 'short' });
-                if (m !== seenM) {
-                    sortedMonths[weekCol] = m;
-                    seenM = m;
-                }
+    let lastMonth = '';
+    for (let col = 0; col < COLS; col++) {
+        for (let row = 0; row < ROWS; row++) {
+            const d = new Date(anchor);
+            d.setDate(anchor.getDate() + col * 7 + row);
+            if (d > today) continue; // future cells stay null
+            const iso = d.toISOString().slice(0, 10);
+            grid[col][row] = byDate[iso] ?? {
+                date: iso,
+                count: 0,
+                week: col,
+                day_of_week: row,
+                label: d.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                }),
+                is_today: iso === today.toISOString().slice(0, 10),
+            };
+            const m = d.toLocaleString('en-US', { month: 'short' });
+            if (m !== lastMonth) {
+                monthLabels[col] = m;
+                lastMonth = m;
             }
-        });
+        }
     }
+
+    const maxCount = Math.max(...days.map((d) => d.count), 1);
+    const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
         <div className="relative w-full select-none">
             {hovered && (
                 <div
-                    className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-gray-900/97 px-2.5 py-2 text-xs shadow-xl backdrop-blur-sm"
+                    className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-neutral-900/97 px-2.5 py-2 text-xs shadow-xl backdrop-blur-sm"
                     style={{
                         left: tipPos.x + 12,
                         top: tipPos.y - 8,
-                        minWidth: 128,
+                        minWidth: 130,
                     }}
                 >
                     <p className="font-bold text-white">
@@ -201,65 +220,70 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                 </div>
             )}
 
-            {/* Outer wrapper: day-label column + grid column */}
-            <div className="flex w-full items-start gap-1">
-                {/* Day-of-week labels — fixed width, sits beside the grid */}
+            {/* layout: day-labels | grid+months stacked */}
+            <div className="flex w-full items-start" style={{ gap: 4 }}>
+                {/* Day-of-week labels — push down by month-row height (~14px) */}
                 <div
-                    className="flex shrink-0 flex-col pt-4"
-                    style={{ gap: 2, width: 14 }}
+                    className="flex shrink-0 flex-col"
+                    style={{ gap: 2, marginTop: 16, width: 26 }}
                 >
-                    {DOW.map((l, i) => (
+                    {DOW_LABELS.map((l, i) => (
                         <div
                             key={i}
-                            className="text-right text-[8px] leading-none text-white/20"
+                            className="text-right text-[9px] leading-none text-white/25"
                             style={{ height: 11, lineHeight: '11px' }}
                         >
-                            {i % 2 === 1 ? l : ''}
+                            {i % 2 === 0 ? l : ''}
                         </div>
                     ))}
                 </div>
 
-                {/* Grid + month labels stacked */}
-                <div className="flex min-w-0 flex-1 flex-col">
-                    {/* Month labels — one per column, flex-1 so they align exactly */}
-                    <div className="mb-1 flex w-full" style={{ gap: 2 }}>
-                        {sortedMonths.map((m, i) => (
+                {/* months row + cell grid */}
+                <div
+                    className="flex min-w-0 flex-1 flex-col"
+                    style={{ gap: 2 }}
+                >
+                    {/* Month labels — one flex-1 slot per column, same gap as cell columns */}
+                    <div className="flex w-full" style={{ gap: 2 }}>
+                        {monthLabels.map((m, i) => (
                             <div
                                 key={i}
-                                className="flex-1 overflow-hidden text-[9px] leading-none text-white/25"
+                                className="flex-1 overflow-hidden text-[9px] leading-none text-white/30"
+                                style={{ height: 12 }}
                             >
                                 {m}
                             </div>
                         ))}
                     </div>
 
-                    {/* Week columns */}
+                    {/* Cell columns */}
                     <div className="flex w-full" style={{ gap: 2 }}>
-                        {Array.from({ length: 12 }, (_, week) => (
+                        {Array.from({ length: COLS }, (_, col) => (
                             <div
-                                key={week}
+                                key={col}
                                 className="flex flex-1 flex-col"
                                 style={{ gap: 2 }}
                             >
-                                {Array.from({ length: 7 }, (_, dow) => {
-                                    const cell = sortedGrid[dow][week];
+                                {Array.from({ length: ROWS }, (_, row) => {
+                                    const cell = grid[col][row];
                                     return (
                                         <div
-                                            key={dow}
-                                            className="w-full"
+                                            key={row}
+                                            className="w-full rounded-sm"
                                             style={{
                                                 height: 11,
-                                                borderRadius: 2,
                                                 background: cell
                                                     ? heatColor(
                                                           cell.count,
                                                           maxCount,
                                                       )
-                                                    : '#161b22',
+                                                    : 'transparent',
                                                 outline: cell?.is_today
                                                     ? '1.5px solid #6366f1'
                                                     : undefined,
-                                                cursor: 'default',
+                                                cursor: cell
+                                                    ? 'default'
+                                                    : undefined,
                                             }}
                                             onMouseEnter={
                                                 cell
@@ -356,7 +380,7 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
                 )}
             </div>
             {show && (
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-white/10 bg-gray-900/97 p-2 text-xs shadow-xl backdrop-blur-md">
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-white/10 bg-neutral-900/97 p-2 text-xs shadow-xl backdrop-blur-md">
                     <p className="mb-0.5 font-black text-white">{chip.breed}</p>
                     <p className={`text-[11px] ${cfg.text}`}>{cfg.label}</p>
                     <p className="text-white/40">
@@ -518,7 +542,7 @@ export default function Dashboard() {
                     ).map(({ label, value, trend, Icon, accent, inv }) => (
                         <div
                             key={label}
-                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-gray-900 p-5"
+                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-neutral-900 p-5"
                         >
                             <div
                                 className="pointer-events-none absolute -top-3 -right-3 h-16 w-16 rounded-full opacity-15 blur-xl"
@@ -590,7 +614,7 @@ export default function Dashboard() {
                     ).map(({ label, val, sub, Icon, a }) => (
                         <div
                             key={label}
-                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-gray-900 p-5"
+                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-neutral-900 p-5"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
@@ -621,159 +645,10 @@ export default function Dashboard() {
                     ))}
                 </div>
 
-                {/* ── Learning Pulse ───────────────────────────────────── */}
-                <div className="rounded-2xl border border-white/8 bg-gray-900 p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/25 bg-indigo-500/15">
-                                <Activity className="h-5 w-5 text-indigo-400" />
-                            </div>
-                            <div>
-                                <h2 className="font-bold text-white">
-                                    Learning Pulse
-                                </h2>
-                                <p className="text-xs text-white/35">
-                                    Daily corrections — last 10 days
-                                </p>
-                            </div>
-                        </div>
-                        <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-300">
-                            {tlTotal} total
-                        </span>
-                    </div>
-                    {learningTimeline.length === 0 ? (
-                        <p className="py-8 text-center text-sm text-white/20">
-                            No activity yet — submit corrections to see activity
-                        </p>
-                    ) : (
-                        <>
-                            <div className="flex h-36 items-end gap-2">
-                                {learningTimeline.map((d, idx) => {
-                                    const h =
-                                        d.corrections > 0
-                                            ? Math.max(
-                                                  8,
-                                                  (d.corrections / maxCor) *
-                                                      100,
-                                              )
-                                            : 3;
-                                    const hov = hoveredDay === idx;
-                                    return (
-                                        <div
-                                            key={d.date}
-                                            className="relative flex flex-1 flex-col items-center"
-                                            onMouseEnter={() =>
-                                                setHoveredDay(idx)
-                                            }
-                                            onMouseLeave={() =>
-                                                setHoveredDay(null)
-                                            }
-                                        >
-                                            {hov && (
-                                                <div
-                                                    className="absolute bottom-full z-20 mb-2 w-40 rounded-xl border border-white/12 bg-gray-900/95 p-3 text-xs shadow-2xl backdrop-blur-sm"
-                                                    style={{
-                                                        left: '50%',
-                                                        transform:
-                                                            'translateX(-50%)',
-                                                    }}
-                                                >
-                                                    <p className="mb-1.5 font-bold text-white">
-                                                        {d.is_today
-                                                            ? '📅 Today'
-                                                            : d.day}
-                                                    </p>
-                                                    <div className="space-y-1">
-                                                        <div className="flex justify-between">
-                                                            <span className="text-white/40">
-                                                                Corrections
-                                                            </span>
-                                                            <span className="font-bold text-indigo-300">
-                                                                {d.corrections}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-white/40">
-                                                                Scans
-                                                            </span>
-                                                            <span className="font-bold text-blue-300">
-                                                                {d.total_scans}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-white/40">
-                                                                High conf.
-                                                            </span>
-                                                            <span className="font-bold text-emerald-300">
-                                                                {
-                                                                    d.high_conf_rate
-                                                                }
-                                                                %
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div
-                                                className="w-full rounded-t-md transition-all duration-300"
-                                                style={{
-                                                    height: `${h}%`,
-                                                    minHeight: 3,
-                                                    background: d.is_today
-                                                        ? 'linear-gradient(to top,#6366f1,#818cf8)'
-                                                        : d.corrections > 0
-                                                          ? hov
-                                                              ? 'linear-gradient(to top,#3b82f6,#60a5fa)'
-                                                              : 'rgba(99,102,241,0.4)'
-                                                          : 'rgba(255,255,255,0.04)',
-                                                    boxShadow:
-                                                        d.corrections > 0
-                                                            ? '0 0 8px #6366f133'
-                                                            : 'none',
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="mt-2 flex gap-2">
-                                {learningTimeline.map((d) => (
-                                    <div
-                                        key={d.date}
-                                        className="flex flex-1 justify-center"
-                                    >
-                                        <span
-                                            className={
-                                                d.is_today
-                                                    ? 'font-bold text-indigo-400'
-                                                    : 'text-white/20'
-                                            }
-                                            style={{
-                                                fontSize: '0.6rem',
-                                                textAlign: 'center',
-                                                lineHeight: 1,
-                                            }}
-                                        >
-                                            {d.is_today ? 'Today' : d.day}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            {tlStatus && (
-                                <div
-                                    className={`mt-4 rounded-lg border px-4 py-2.5 text-xs font-medium ${tlStatus.cls}`}
-                                >
-                                    {tlStatus.text}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* ════════════════════════════════════════════════════════
+                {/* ════        {/* ════════════════════════════════════════════════════════
                         AI TRAINING ACTIVITY
                 ═══════════════════════════════════════════════════════════ */}
-                <div className="rounded-2xl border border-white/8 bg-gray-900">
+                <div className="rounded-2xl border border-white/8 bg-neutral-900">
                     {/* header */}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
                         <div className="flex items-center gap-3">
@@ -923,7 +798,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Recent Scans table ────────────────────────────────── */}
-                <div className="overflow-hidden rounded-2xl border border-white/8 bg-gray-900">
+                <div className="overflow-hidden rounded-2xl border border-white/8 bg-neutral-900">
                     <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
                         <div>
                             <h2 className="font-bold text-white">
