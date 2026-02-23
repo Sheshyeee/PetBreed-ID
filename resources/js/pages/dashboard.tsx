@@ -20,14 +20,11 @@ import {
     ChevronRight,
     ClipboardList,
     Database,
-    Flame,
     GraduationCap,
     LineChart,
     Minus,
     Sparkles,
     Target,
-    Trophy,
-    Zap,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
@@ -128,30 +125,21 @@ const LEVEL_CFG = {
     },
 };
 
-/* ─────────────────── heatmap cell colours ───────────────────────────────── */
+/* ─────────────────── GitHub-style compact heatmap ──────────────────────── */
 function heatColor(count: number, max: number): string {
-    if (count === 0) return 'rgba(255,255,255,0.04)';
+    if (count === 0) return '#161b22';
     const ratio = Math.min(count / Math.max(max, 1), 1);
-    // emerald ramp: light → vibrant
-    if (ratio < 0.25) return 'rgba(16,185,129,0.20)';
-    if (ratio < 0.5) return 'rgba(16,185,129,0.40)';
-    if (ratio < 0.75) return 'rgba(16,185,129,0.65)';
-    return 'rgba(16,185,129,0.90)';
+    if (ratio < 0.25) return '#0e4429';
+    if (ratio < 0.5) return '#006d32';
+    if (ratio < 0.75) return '#26a641';
+    return '#39d353';
 }
 
-/* ─────────────────── HeatmapGrid ───────────────────────────────────────── */
-function HeatmapGrid({
-    days,
-    summary,
-}: {
-    days: HeatmapDay[];
-    summary: HeatmapSummary;
-}) {
+function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const [hovered, setHovered] = useState<HeatmapDay | null>(null);
     const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
-
-    // Build a 7×12 grid (rows = day-of-week Sun–Sat, cols = weeks 0–11)
     const maxCount = Math.max(...days.map((d) => d.count), 1);
+
     const grid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
         Array(12).fill(null),
     );
@@ -159,39 +147,37 @@ function HeatmapGrid({
         grid[d.day_of_week][d.week] = d;
     });
 
-    const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-    // Month labels above columns — derive from first day of each week
     const weekMonths: string[] = Array(12).fill('');
-    let lastMonth = '';
+    let lastM = '';
     days.forEach((d) => {
         const m = new Date(d.date).toLocaleString('en-US', { month: 'short' });
-        if (m !== lastMonth) {
+        if (m !== lastM) {
             weekMonths[d.week] = m;
-            lastMonth = m;
+            lastM = m;
         }
     });
 
     return (
-        <div className="relative">
-            {/* Tooltip */}
+        <div className="relative inline-block select-none">
             {hovered && (
                 <div
-                    className="pointer-events-none fixed z-50 rounded-xl border border-white/15 bg-gray-900/97 px-3 py-2.5 text-xs shadow-2xl backdrop-blur-md"
+                    className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-gray-900/97 px-2.5 py-2 text-xs shadow-xl backdrop-blur-sm"
                     style={{
-                        left: tipPos.x + 14,
-                        top: tipPos.y - 10,
-                        minWidth: 148,
+                        left: tipPos.x + 12,
+                        top: tipPos.y - 8,
+                        minWidth: 128,
                     }}
                 >
-                    <p className="mb-1 font-black text-white">
+                    <p className="font-bold text-white">
                         {hovered.is_today ? '📅 Today' : hovered.label}
                     </p>
                     <p
                         className={
                             hovered.count > 0
                                 ? 'text-emerald-400'
-                                : 'text-white/25'
+                                : 'text-white/30'
                         }
                     >
                         {hovered.count > 0
@@ -202,92 +188,110 @@ function HeatmapGrid({
             )}
 
             {/* Month labels */}
-            <div className="mb-1 flex pl-8">
+            <div className="mb-1 flex" style={{ paddingLeft: 18 }}>
                 {weekMonths.map((m, i) => (
-                    <div key={i} className="flex-1 text-[10px] text-white/25">
+                    <div
+                        key={i}
+                        className="overflow-hidden text-[9px] leading-none text-white/25"
+                        style={{ width: 13, marginRight: 2 }}
+                    >
                         {m}
                     </div>
                 ))}
             </div>
 
-            {/* Grid */}
-            <div className="flex gap-0.5 pl-8">
-                {/* Week columns */}
-                {Array.from({ length: 12 }, (_, week) => (
-                    <div key={week} className="flex flex-1 flex-col gap-0.5">
-                        {Array.from({ length: 7 }, (_, dow) => {
-                            const cell = grid[dow][week];
-                            return (
-                                <div
-                                    key={dow}
-                                    className="aspect-square w-full cursor-default rounded-sm transition-all duration-150 hover:ring-1 hover:ring-white/30"
-                                    style={{
-                                        background: cell
-                                            ? heatColor(cell.count, maxCount)
-                                            : 'rgba(255,255,255,0.03)',
-                                        boxShadow: cell?.is_today
-                                            ? '0 0 0 1.5px #6366f1'
-                                            : undefined,
-                                    }}
-                                    onMouseEnter={
-                                        cell
-                                            ? (e) => {
-                                                  setHovered(cell);
-                                                  setTipPos({
-                                                      x: e.clientX,
-                                                      y: e.clientY,
-                                                  });
-                                              }
-                                            : undefined
-                                    }
-                                    onMouseMove={
-                                        cell
-                                            ? (e) =>
-                                                  setTipPos({
-                                                      x: e.clientX,
-                                                      y: e.clientY,
-                                                  })
-                                            : undefined
-                                    }
-                                    onMouseLeave={() => setHovered(null)}
-                                />
-                            );
-                        })}
-                    </div>
-                ))}
-            </div>
+            <div className="flex items-start gap-0">
+                {/* Day labels */}
+                <div className="mr-1.5 flex flex-col" style={{ gap: 2 }}>
+                    {DOW.map((l, i) => (
+                        <div
+                            key={i}
+                            className="text-right text-[8px] text-white/20"
+                            style={{
+                                width: 12,
+                                height: 11,
+                                lineHeight: '11px',
+                            }}
+                        >
+                            {i % 2 === 1 ? l : ''}
+                        </div>
+                    ))}
+                </div>
 
-            {/* Day-of-week labels (absolute left) */}
-            <div className="absolute top-6 left-0 flex flex-col gap-0.5">
-                {DAY_LABELS.map((l, i) => (
-                    <div
-                        key={i}
-                        className="flex h-full items-center text-[9px] leading-none text-white/20"
-                        style={{ height: 'calc((100% - 1.25rem) / 7)' }}
-                    >
-                        {i % 2 === 0 ? l : ''}
-                    </div>
-                ))}
+                {/* Cells */}
+                <div className="flex" style={{ gap: 2 }}>
+                    {Array.from({ length: 12 }, (_, week) => (
+                        <div
+                            key={week}
+                            className="flex flex-col"
+                            style={{ gap: 2 }}
+                        >
+                            {Array.from({ length: 7 }, (_, dow) => {
+                                const cell = grid[dow][week];
+                                return (
+                                    <div
+                                        key={dow}
+                                        style={{
+                                            width: 11,
+                                            height: 11,
+                                            borderRadius: 2,
+                                            background: cell
+                                                ? heatColor(
+                                                      cell.count,
+                                                      maxCount,
+                                                  )
+                                                : '#161b22',
+                                            outline: cell?.is_today
+                                                ? '1.5px solid #6366f1'
+                                                : undefined,
+                                            cursor: 'default',
+                                        }}
+                                        onMouseEnter={
+                                            cell
+                                                ? (e) => {
+                                                      setHovered(cell);
+                                                      setTipPos({
+                                                          x: e.clientX,
+                                                          y: e.clientY,
+                                                      });
+                                                  }
+                                                : undefined
+                                        }
+                                        onMouseMove={
+                                            cell
+                                                ? (e) =>
+                                                      setTipPos({
+                                                          x: e.clientX,
+                                                          y: e.clientY,
+                                                      })
+                                                : undefined
+                                        }
+                                        onMouseLeave={() => setHovered(null)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Legend */}
-            <div className="mt-3 flex items-center justify-between">
-                <span className="text-[10px] text-white/20">Less</span>
-                <div className="flex items-center gap-1">
-                    {[0, 0.2, 0.45, 0.7, 1].map((r, i) => (
+            <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-[9px] text-white/20">Less</span>
+                {['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'].map(
+                    (c, i) => (
                         <div
                             key={i}
-                            className="h-2.5 w-2.5 rounded-sm"
                             style={{
-                                background:
-                                    r === 0
-                                        ? 'rgba(255,255,255,0.04)'
-                                        : `rgba(16,185,129,${r * 0.9 + 0.1})`,
+                                width: 10,
+                                height: 10,
+                                borderRadius: 2,
+                                background: c,
                             }}
                         />
-                    ))}
-                </div>
-                <span className="text-[10px] text-white/20">More</span>
+                    ),
+                )}
+                <span className="text-[9px] text-white/20">More</span>
             </div>
         </div>
     );
@@ -301,12 +305,11 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
     return (
         <div className="relative">
             <div
-                className={`group flex cursor-default items-center gap-2 rounded-xl border px-3 py-2 transition-all duration-200 hover:brightness-110 ${cfg.bg} ${cfg.border}`}
+                className={`flex cursor-default items-center gap-1.5 rounded-full border px-2.5 py-1 transition-all duration-150 hover:brightness-110 ${cfg.bg} ${cfg.border}`}
                 onMouseEnter={() => setShow(true)}
                 onMouseLeave={() => setShow(false)}
             >
-                {/* Pulsing dot for well-trained */}
-                <span className="relative flex h-2 w-2 shrink-0">
+                <span className="relative flex h-1.5 w-1.5 shrink-0">
                     {(chip.level === 'trained' || chip.level === 'expert') && (
                         <span
                             className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-40"
@@ -317,35 +320,33 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
                         />
                     )}
                     <span
-                        className="relative inline-flex h-2 w-2 rounded-full"
+                        className="relative inline-flex h-1.5 w-1.5 rounded-full"
                         style={{ backgroundColor: cfg.dot }}
                     />
                 </span>
                 <span
-                    className={`truncate text-xs leading-none font-semibold ${cfg.text}`}
+                    className={`max-w-[96px] truncate text-[11px] leading-none font-semibold ${cfg.text}`}
                 >
                     {chip.breed}
                 </span>
                 {chip.times_taught > 1 && (
                     <span
-                        className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[9px] leading-none font-black ${cfg.bg} ${cfg.text}`}
+                        className={`text-[9px] leading-none font-black opacity-70 ${cfg.text}`}
                     >
                         ×{chip.times_taught}
                     </span>
                 )}
             </div>
             {show && (
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-40 -translate-x-1/2 rounded-xl border border-white/12 bg-gray-900/97 p-2.5 text-xs shadow-2xl backdrop-blur-md">
-                    <p className="mb-1 font-black text-white">{chip.breed}</p>
-                    <p className={cfg.text}>{cfg.label}</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-white/10 bg-gray-900/97 p-2 text-xs shadow-xl backdrop-blur-md">
+                    <p className="mb-0.5 font-black text-white">{chip.breed}</p>
+                    <p className={`text-[11px] ${cfg.text}`}>{cfg.label}</p>
                     <p className="text-white/40">
                         Taught {chip.times_taught}× by vet
                     </p>
-                    <p className="text-white/25">First: {chip.first_taught}</p>
+                    <p className="text-white/25">Since {chip.first_taught}</p>
                     {chip.days_ago === 0 && (
-                        <p className="mt-0.5 text-indigo-400">
-                            ✨ Added today!
-                        </p>
+                        <p className="mt-0.5 text-indigo-400">✨ Added today</p>
                     )}
                 </div>
             )}
@@ -425,7 +426,6 @@ export default function Dashboard() {
         };
     })();
 
-    // Group memory wall by level
     const expertChips = breedMemoryWall.filter((c) => c.level === 'expert');
     const trainedChips = breedMemoryWall.filter((c) => c.level === 'trained');
     const learningChips = breedMemoryWall.filter((c) => c.level === 'learning');
@@ -753,200 +753,112 @@ export default function Dashboard() {
                 </div>
 
                 {/* ════════════════════════════════════════════════════════
-                        AI TRAINING ACTIVITY — Heatmap + Memory Wall
+                        AI TRAINING ACTIVITY
                 ═══════════════════════════════════════════════════════════ */}
-                <div className="overflow-hidden rounded-2xl border border-white/8 bg-gray-950">
-                    {/* ── Section header ────────────────────────────────── */}
-                    <div
-                        className="relative overflow-hidden border-b border-white/8 p-6"
-                        style={{
-                            background:
-                                'linear-gradient(135deg,#0f172a 0%,#064e3b 60%,#0f172a 100%)',
-                        }}
-                    >
-                        <div className="pointer-events-none absolute top-0 left-1/4 h-48 w-48 rounded-full bg-emerald-600/8 blur-3xl" />
-                        <div className="pointer-events-none absolute right-1/3 bottom-0 h-32 w-32 rounded-full bg-teal-500/8 blur-2xl" />
-
-                        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            {/* Title */}
-                            <div className="flex items-center gap-4">
-                                <div
-                                    className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/35"
-                                    style={{
-                                        background:
-                                            'linear-gradient(135deg,#10b98118,#06b6d410)',
-                                        boxShadow: '0 0 20px #10b98133',
-                                    }}
-                                >
-                                    <Activity className="h-7 w-7 text-emerald-400" />
-                                    <div
-                                        className="absolute inset-0 animate-ping rounded-2xl opacity-10"
-                                        style={{
-                                            border: '2px solid #10b981',
-                                            animationDuration: '4s',
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black tracking-tight text-white">
-                                        AI Training Activity
-                                    </h2>
-                                    <p className="mt-0.5 text-sm text-white/35">
-                                        Every correction{' '}
-                                        <span className="text-emerald-400">
-                                            colours a square
-                                        </span>{' '}
-                                        — watch the AI's memory grow over 12
-                                        weeks
-                                    </p>
-                                </div>
+                <div className="rounded-2xl border border-white/8 bg-gray-900">
+                    {/* header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/25 bg-violet-500/15">
+                                <Sparkles className="h-5 w-5 text-violet-400" />
                             </div>
-
-                            {/* Summary stat pills */}
-                            {heatmapSummary && (
-                                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-center">
-                                        <p className="text-xl font-black text-emerald-400">
-                                            {heatmapSummary.total_in_range}
-                                        </p>
-                                        <p className="text-[10px] font-semibold tracking-wider text-emerald-400/50 uppercase">
-                                            12-Week Total
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-2 text-center">
-                                        <p className="text-xl font-black text-white">
-                                            {heatmapSummary.active_days}
-                                        </p>
-                                        <p className="text-[10px] font-semibold tracking-wider text-white/25 uppercase">
-                                            Active Days
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border border-orange-500/25 bg-orange-500/10 px-4 py-2 text-center">
-                                        <div className="flex items-center gap-1">
-                                            <Flame className="h-4 w-4 text-orange-400" />
-                                            <p className="text-xl font-black text-orange-300">
-                                                {heatmapSummary.current_streak}
-                                            </p>
-                                        </div>
-                                        <p className="text-[10px] font-semibold tracking-wider text-orange-400/50 uppercase">
-                                            Day Streak
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            <div>
+                                <h2 className="font-bold text-white">
+                                    AI Training Activity
+                                </h2>
+                                <p className="text-xs text-white/35">
+                                    12-week correction history &amp; breed
+                                    memory
+                                </p>
+                            </div>
                         </div>
-
-                        {/* Best day badge */}
-                        {heatmapSummary &&
-                            heatmapSummary.best_day_count > 0 && (
-                                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-3 py-1.5">
-                                    <Trophy className="h-3 w-3 text-emerald-400" />
-                                    <span className="text-xs font-medium text-emerald-300">
-                                        Best day:{' '}
-                                        <strong>
-                                            {heatmapSummary.best_day_count}{' '}
-                                            corrections
-                                        </strong>
-                                        <span className="ml-1 text-emerald-400/50">
-                                            on {heatmapSummary.best_day_label}
+                        {heatmapSummary && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+                                <span>
+                                    <span className="font-bold text-white">
+                                        {heatmapSummary.total_in_range}
+                                    </span>{' '}
+                                    corrections
+                                </span>
+                                <span className="text-white/15">·</span>
+                                <span>
+                                    <span className="font-bold text-white">
+                                        {heatmapSummary.active_days}
+                                    </span>{' '}
+                                    active days
+                                </span>
+                                {heatmapSummary.current_streak > 0 && (
+                                    <>
+                                        <span className="text-white/15">·</span>
+                                        <span className="font-bold text-orange-400">
+                                            🔥 {heatmapSummary.current_streak}
+                                            -day streak
                                         </span>
-                                    </span>
-                                </div>
-                            )}
-                    </div>
-
-                    {/* ── Training Heatmap ──────────────────────────────── */}
-                    <div className="border-b border-white/6 p-6">
-                        <div className="mb-4 flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-emerald-400" />
-                            <h3 className="text-sm font-bold text-white">
-                                12-Week Correction Heatmap
-                            </h3>
-                            <span className="ml-auto text-[10px] text-white/20">
-                                Like GitHub contributions — darker = more
-                                corrections that day
-                            </span>
-                        </div>
-                        {learningHeatmap.length > 0 ? (
-                            <HeatmapGrid
-                                days={learningHeatmap}
-                                summary={
-                                    heatmapSummary ?? {
-                                        active_days: 0,
-                                        total_in_range: 0,
-                                        current_streak: 0,
-                                        best_day_count: 0,
-                                        best_day_label: '',
-                                    }
-                                }
-                            />
-                        ) : (
-                            <p className="py-8 text-center text-sm text-white/20">
-                                No heatmap data — submit corrections to start
-                                building history
-                            </p>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </div>
 
-                    {/* ── Breed Memory Wall ─────────────────────────────── */}
-                    <div className="p-6">
-                        <div className="mb-4 flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-violet-400" />
-                                <h3 className="text-sm font-bold text-white">
-                                    Breed Memory Wall
-                                </h3>
-                            </div>
-                            <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-0.5 text-xs font-bold text-violet-300">
-                                {breedMemoryWall.length} breed
-                                {breedMemoryWall.length !== 1 ? 's' : ''} stored
-                            </span>
-                            <span className="ml-auto text-[10px] text-white/20">
-                                Hover a chip for details
-                            </span>
+                    <div className="flex flex-col gap-6 p-5 lg:flex-row lg:items-start">
+                        {/* ── Compact GitHub heatmap ── */}
+                        <div className="shrink-0">
+                            <p className="mb-3 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                                Correction Heatmap
+                            </p>
+                            {learningHeatmap.length > 0 ? (
+                                <CompactHeatmap days={learningHeatmap} />
+                            ) : (
+                                <p className="text-xs text-white/20">
+                                    No data yet
+                                </p>
+                            )}
                         </div>
 
-                        {breedMemoryWall.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-white/20">
-                                No breeds in memory yet — submit your first
-                                correction to add a breed
-                            </p>
-                        ) : (
-                            <div className="space-y-4">
-                                {/* Level legend */}
-                                <div className="flex flex-wrap gap-3 rounded-xl border border-white/6 bg-white/[0.02] p-3">
+                        {/* ── Divider ── */}
+                        <div className="hidden w-px self-stretch bg-white/6 lg:block" />
+                        <div className="h-px w-full bg-white/6 lg:hidden" />
+
+                        {/* ── Breed Memory Wall ── */}
+                        <div className="min-w-0 flex-1">
+                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                                <p className="text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                                    Breed Memory Wall
+                                </p>
+                                <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+                                    {breedMemoryWall.length} breeds
+                                </span>
+                                <div className="ml-auto flex flex-wrap items-center gap-2">
                                     {Object.entries(LEVEL_CFG)
                                         .reverse()
-                                        .map(([key, cfg]) => (
+                                        .map(([k, c]) => (
                                             <div
-                                                key={key}
-                                                className="flex items-center gap-1.5"
+                                                key={k}
+                                                className="flex items-center gap-1"
                                             >
                                                 <span
-                                                    className="h-2 w-2 rounded-full"
+                                                    className="h-1.5 w-1.5 rounded-full"
                                                     style={{
-                                                        backgroundColor:
-                                                            cfg.dot,
+                                                        backgroundColor: c.dot,
                                                     }}
                                                 />
-                                                <span className="text-[11px] text-white/35">
-                                                    {cfg.label}
+                                                <span className="text-[9px] text-white/25">
+                                                    {c.label}
                                                 </span>
                                             </div>
                                         ))}
-                                    <span className="ml-auto text-[10px] text-white/15">
-                                        expert ≥5× · trained ≥3× · learning ≥2×
-                                        · new = 1×
-                                    </span>
                                 </div>
+                            </div>
 
-                                {/* Expert row */}
-                                {expertChips.length > 0 && (
-                                    <div>
-                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-emerald-500/50 uppercase">
-                                            Expert ({expertChips.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
+                            {breedMemoryWall.length === 0 ? (
+                                <p className="text-xs text-white/20">
+                                    No breeds yet — submit a correction to
+                                    populate memory
+                                </p>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {expertChips.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
                                             {expertChips.map((c) => (
                                                 <MemoryChipCard
                                                     key={c.breed}
@@ -954,16 +866,9 @@ export default function Dashboard() {
                                                 />
                                             ))}
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* Trained row */}
-                                {trainedChips.length > 0 && (
-                                    <div>
-                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-green-500/50 uppercase">
-                                            Trained ({trainedChips.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
+                                    )}
+                                    {trainedChips.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
                                             {trainedChips.map((c) => (
                                                 <MemoryChipCard
                                                     key={c.breed}
@@ -971,16 +876,9 @@ export default function Dashboard() {
                                                 />
                                             ))}
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* Learning row */}
-                                {learningChips.length > 0 && (
-                                    <div>
-                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-blue-500/50 uppercase">
-                                            Learning ({learningChips.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
+                                    )}
+                                    {learningChips.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
                                             {learningChips.map((c) => (
                                                 <MemoryChipCard
                                                     key={c.breed}
@@ -988,16 +886,9 @@ export default function Dashboard() {
                                                 />
                                             ))}
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* New row */}
-                                {newChips.length > 0 && (
-                                    <div>
-                                        <p className="mb-2 text-[10px] font-bold tracking-widest text-amber-500/50 uppercase">
-                                            New ({newChips.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
+                                    )}
+                                    {newChips.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
                                             {newChips.map((c) => (
                                                 <MemoryChipCard
                                                     key={c.breed}
@@ -1005,10 +896,10 @@ export default function Dashboard() {
                                                 />
                                             ))}
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1090,35 +981,34 @@ export default function Dashboard() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {[
+                                            {(
                                                 [
-                                                    80,
-                                                    'High',
-                                                    'bg-emerald-500/12 text-emerald-400 border-emerald-500/20',
-                                                ],
-                                                [
-                                                    60,
-                                                    'Medium',
-                                                    'bg-blue-500/12 text-blue-400 border-blue-500/20',
-                                                ],
-                                                [
-                                                    40,
-                                                    'Low',
-                                                    'bg-amber-500/12 text-amber-400 border-amber-500/20',
-                                                ],
-                                                [
-                                                    0,
-                                                    'Very Low',
-                                                    'bg-red-500/12 text-red-400 border-red-500/20',
-                                                ],
-                                            ]
+                                                    [
+                                                        80,
+                                                        'High',
+                                                        'bg-emerald-500/12 text-emerald-400 border-emerald-500/20',
+                                                    ],
+                                                    [
+                                                        60,
+                                                        'Medium',
+                                                        'bg-blue-500/12 text-blue-400 border-blue-500/20',
+                                                    ],
+                                                    [
+                                                        40,
+                                                        'Low',
+                                                        'bg-amber-500/12 text-amber-400 border-amber-500/20',
+                                                    ],
+                                                    [
+                                                        0,
+                                                        'Very Low',
+                                                        'bg-red-500/12 text-red-400 border-red-500/20',
+                                                    ],
+                                                ] as [number, string, string][]
+                                            )
                                                 .map(([thresh, label, cls]) =>
-                                                    r.confidence >=
-                                                    (thresh as number) ? (
+                                                    r.confidence >= thresh ? (
                                                         <span
-                                                            key={
-                                                                label as string
-                                                            }
+                                                            key={label}
                                                             className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${cls}`}
                                                         >
                                                             {label}
