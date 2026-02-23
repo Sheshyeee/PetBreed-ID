@@ -1317,7 +1317,6 @@ PROMPT;
 
 
 
-
     // ============================================================
     // 3. extractBreedFromGeminiResponse()
     // Kept intact — still used by any other code paths that may
