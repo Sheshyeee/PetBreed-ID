@@ -1150,9 +1150,9 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 3024,
+                        'maxOutputTokens' => 2100,  // JSON output ~150 tokens, 1500 = safe buffer
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 3024,
+                            'thinkingBudget' => 2100, // Sufficient for accurate breed ID, ~8-12s
                         ],
                     ],
                     'safetySettings' => [
@@ -1212,18 +1212,41 @@ PROMPT;
 
             $parsed = json_decode($jsonText, true);
 
+            // ── TRUNCATED JSON RECOVERY ───────────────────────────────────────
+            // If Gemini's output was cut mid-JSON, extract primary_breed via
+            // regex before giving up and falling back to YOLO's wrong answer.
             if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
-                Log::error('✗ Failed to parse combined Gemini JSON. Raw: ' . $jsonText);
+                Log::warning('JSON parse failed — attempting truncation recovery. Raw: ' . $jsonText);
+                $recovered = [];
+                if (preg_match('/"primary_breed"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['primary_breed'] = $m[1];
+                if (preg_match('/"primary_confidence"\s*:\s*([\d.]+)/', $jsonText, $m))
+                    $recovered['primary_confidence'] = (float) $m[1];
+                if (preg_match('/"classification_type"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['classification_type'] = $m[1];
+                $recovered['recognized_hybrid_name'] = null;
+                if (preg_match('/"recognized_hybrid_name"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['recognized_hybrid_name'] = $m[1];
+                $recovered['alternatives'] = [];
+                preg_match_all(
+                    '/"breed"\s*:\s*"([^"]+)"\s*,\s*"confidence"\s*:\s*([\d.]+)/',
+                    $jsonText, $altMatches, PREG_SET_ORDER
+                );
+                foreach ($altMatches as $alt)
+                    $recovered['alternatives'][] = ['breed' => $alt[1], 'confidence' => (float) $alt[2]];
 
-                if (isset($result['error'])) {
-                    return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
+                if (!empty($recovered['primary_breed'])) {
+                    Log::info('✓ Truncated JSON recovered — breed: ' . $recovered['primary_breed']);
+                    $parsed = $recovered;
+                } else {
+                    Log::error('✗ JSON recovery failed. Raw: ' . $jsonText);
+                    if (isset($result['error']))
+                        return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
+                    $finishReason = $result['candidates'][0]['finishReason'] ?? '';
+                    if (in_array($finishReason, ['SAFETY', 'RECITATION']))
+                        return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
+                    return ['success' => false, 'error' => 'Failed to parse Gemini response'];
                 }
-                $finishReason = $result['candidates'][0]['finishReason'] ?? '';
-                if (in_array($finishReason, ['SAFETY', 'RECITATION'])) {
-                    return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
-                }
-
-                return ['success' => false, 'error' => 'Failed to parse Gemini response'];
             }
 
             // ----------------------------------------------------------------
@@ -2244,8 +2267,28 @@ Be verbose and detailed. Output ONLY the JSON.";
                     'range'      => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : 'Low'),
                 ]);
 
-                // Generate AI descriptions — identical to original
-                $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
+                // Generate AI descriptions — check DB cache first to avoid ~10s Flash call
+                // If we've scanned this breed before, reuse description/health/origin data
+                $cachedResult = Results::where('breed', $detectedBreed)
+                    ->whereNotNull('description')
+                    ->where('description', '!=', '')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($cachedResult && !empty($cachedResult->description)) {
+                    Log::info('⚡ Using cached AI description for breed: ' . $detectedBreed);
+                    $aiData = [
+                        'description'    => $cachedResult->description,
+                        'origin_history' => is_string($cachedResult->origin_history)
+                            ? json_decode($cachedResult->origin_history, true)
+                            : ($cachedResult->origin_history ?? []),
+                        'health_risks'   => is_string($cachedResult->health_risks)
+                            ? json_decode($cachedResult->health_risks, true)
+                            : ($cachedResult->health_risks ?? []),
+                    ];
+                } else {
+                    $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
+                }
 
                 // Initialize simulation data — identical to original
                 $simulationData = [
