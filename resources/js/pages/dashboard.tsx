@@ -142,34 +142,36 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
 
     const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-    // Sort days chronologically so week/day_of_week indices are correct
+    // Sort oldest→newest. Recalculate week col from scratch so column 0 is
+    // always the oldest Sunday-aligned week and column 11 is the latest.
     const sorted = [...days].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
+
     const sortedGrid: (HeatmapDay | null)[][] = Array.from({ length: 7 }, () =>
         Array(12).fill(null),
     );
-    sorted.forEach((d) => {
-        if (
-            d.week >= 0 &&
-            d.week < 12 &&
-            d.day_of_week >= 0 &&
-            d.day_of_week < 7
-        ) {
-            sortedGrid[d.day_of_week][d.week] = d;
-        }
-    });
-
-    // Derive month labels from sorted days so they align with week columns
     const sortedMonths: string[] = Array(12).fill('');
     let seenM = '';
-    sorted.forEach((d) => {
-        const m = new Date(d.date).toLocaleString('en-US', { month: 'short' });
-        if (m !== seenM) {
-            sortedMonths[d.week] = m;
-            seenM = m;
-        }
-    });
+
+    if (sorted.length > 0) {
+        const oldest = new Date(sorted[0].date).getTime();
+        sorted.forEach((d) => {
+            const dt = new Date(d.date);
+            const dow = dt.getDay(); // 0=Sun … 6=Sat
+            const diffMs = dt.getTime() - oldest;
+            const weekCol = Math.floor(diffMs / (7 * 86400000)); // 0-based week column
+
+            if (weekCol >= 0 && weekCol < 12) {
+                sortedGrid[dow][weekCol] = d;
+                const m = dt.toLocaleString('en-US', { month: 'short' });
+                if (m !== seenM) {
+                    sortedMonths[weekCol] = m;
+                    seenM = m;
+                }
+            }
+        });
+    }
 
     return (
         <div className="relative w-full select-none">
