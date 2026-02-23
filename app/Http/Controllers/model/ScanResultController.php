@@ -31,326 +31,426 @@ class ScanResultController extends Controller
      * Fetches data from ML API instead of local file
      * ==========================================
      */
-    private function calculateBreedLearningProgress()
+    private function calculateBreedLearningProgress(): array
     {
         try {
             Log::info('🔍 Starting breed learning progress calculation');
 
-            // Fetch learning data from ML API
-            $mlApiService = app(\App\Services\MLApiService::class);
-            $statsResponse = $mlApiService->getMemoryStats();
+            // ---------------------------------------------------------------
+            // STEP 1: Gather all unique breeds corrected in the DB
+            // This is the non-negotiable source of truth.
+            // If this is empty, there is genuinely nothing to show yet.
+            // ---------------------------------------------------------------
+            $dbBreedRows = BreedCorrection::selectRaw(
+                'LOWER(TRIM(corrected_breed)) as breed_key, corrected_breed'
+            )
+                ->groupBy('breed_key', 'corrected_breed')
+                ->get();
 
-            // Check if ML API returned data successfully
-            if (!$statsResponse['success']) {
-                Log::warning('❌ Failed to fetch ML API memory stats', [
-                    'error' => $statsResponse['error'] ?? 'Unknown error'
-                ]);
+            if ($dbBreedRows->isEmpty()) {
+                Log::info('ℹ️ No corrections in DB yet — breed table will be empty');
                 return [];
             }
 
-            $mlData = $statsResponse['data'];
-
-            if (empty($mlData['breeds'])) {
-                Log::info('ℹ️ No breeds learned yet in ML API memory', [
-                    'total_examples' => $mlData['total_examples'] ?? 0
-                ]);
-                return [];
+            // Build a map: lowercase_key => original_casing_name
+            // Keep the most recently used casing if there are duplicates
+            $dbBreeds = [];
+            foreach ($dbBreedRows as $row) {
+                $dbBreeds[$row->breed_key] = $row->corrected_breed;
             }
 
-            Log::info('✓ ML API returned learning data', [
-                'total_examples' => $mlData['total_examples'] ?? 0,
-                'unique_breeds' => $mlData['unique_breeds'] ?? 0,
-                'breeds' => array_keys($mlData['breeds'])
-            ]);
+            // ---------------------------------------------------------------
+            // STEP 2: Try to get ML memory counts (optional enrichment)
+            // If the ML API call fails for ANY reason, we gracefully fall back
+            // to using the correction count as a proxy for "examples_learned"
+            // ---------------------------------------------------------------
+            $mlBreedCounts = []; // lowercase_key => int count
+            try {
+                $mlApiService = app(\App\Services\MLApiService::class);
+                $statsResponse = $mlApiService->getMemoryStats();
 
+                if ($statsResponse['success'] && !empty($statsResponse['data']['breeds'])) {
+                    foreach ($statsResponse['data']['breeds'] as $mlBreed => $count) {
+                        $mlBreedCounts[strtolower(trim($mlBreed))] = (int) $count;
+                    }
+                    Log::info('✓ ML API memory counts loaded', [
+                        'count' => count($mlBreedCounts),
+                    ]);
+                } else {
+                    Log::warning('⚠️ ML API unavailable or empty — breed table will use DB-only data', [
+                        'error' => $statsResponse['error'] ?? 'No data',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('⚠️ ML API exception — breed table will use DB-only data', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // ---------------------------------------------------------------
+            // STEP 3: Build learning stats for ALL corrected breeds
+            // ---------------------------------------------------------------
             $breedLearning = [];
 
-            // Iterate through breeds that ML API has actually learned
-            foreach ($mlData['breeds'] as $breed => $exampleCount) {
-                // Get correction history for this breed from Laravel database
-                $corrections = BreedCorrection::where('corrected_breed', $breed)
+            foreach ($dbBreeds as $breedKey => $originalBreedName) {
+                // All corrections for this breed (case-insensitive)
+                $corrections = BreedCorrection::whereRaw(
+                    'LOWER(TRIM(corrected_breed)) = ?',
+                    [$breedKey]
+                )
                     ->orderBy('created_at', 'asc')
                     ->get();
 
                 if ($corrections->isEmpty()) {
-                    // ML API has this breed, but no Laravel correction record
-                    Log::debug('Breed in ML API but no Laravel corrections', [
-                        'breed' => $breed,
-                        'ml_examples' => $exampleCount
-                    ]);
-                    continue;
+                    continue; // Shouldn't happen, but guard anyway
                 }
 
                 $firstCorrectionDate = $corrections->first()->created_at;
+                $correctionCount     = $corrections->count();
 
-                // Get scans AFTER corrections started for this breed
-                $scansAfterLearning = Results::where('breed', $breed)
+                // ML memory examples — exact lowercase match, fallback to correction count
+                $mlExamples = $mlBreedCounts[$breedKey] ?? $correctionCount;
+
+                // Average confidence for scans of this breed AFTER corrections started
+                $avgConfidenceAfter = Results::whereRaw('LOWER(TRIM(breed)) = ?', [$breedKey])
                     ->where('created_at', '>=', $firstCorrectionDate)
-                    ->get();
+                    ->avg('confidence') ?? 0;
 
-                $avgConfidenceAfter = $scansAfterLearning->avg('confidence') ?? 0;
-
-                // Calculate success rate from recent scans (last 10)
-                $recentScans = Results::where('breed', $breed)
+                // Recent 10 scans for success-rate calculation
+                $recentScans = Results::whereRaw('LOWER(TRIM(breed)) = ?', [$breedKey])
                     ->latest()
                     ->take(10)
                     ->get();
 
                 $recentHighConfidence = $recentScans->where('confidence', '>=', 80)->count();
-                $successRate = $recentScans->count() > 0
-                    ? ($recentHighConfidence / $recentScans->count()) * 100
-                    : 0;
 
-                $breedLearning[$breed] = [
-                    'breed' => $breed,
-                    'examples_learned' => $exampleCount, // From ML API memory
-                    'corrections_made' => $corrections->count(), // From Laravel DB
-                    'avg_confidence' => round($avgConfidenceAfter, 1),
-                    'success_rate' => round($successRate, 1),
-                    'first_learned' => $firstCorrectionDate->format('M d, Y'),
-                    'days_learning' => $firstCorrectionDate->diffInDays(now()),
-                    'recent_scans' => $recentScans->count(),
+                if ($recentScans->count() > 0) {
+                    $successRate = ($recentHighConfidence / $recentScans->count()) * 100;
+                } else {
+                    // No scan records yet for this breed — estimate from corrections
+                    // Each correction = 10 points, capped at 90 (never 100 without real data)
+                    $successRate = min(90, $correctionCount * 10);
+                }
+
+                $breedLearning[] = [
+                    'breed'            => $originalBreedName,
+                    'examples_learned' => $mlExamples,
+                    'corrections_made' => $correctionCount,
+                    'avg_confidence'   => round($avgConfidenceAfter, 1),
+                    'success_rate'     => round($successRate, 1),
+                    'first_learned'    => $firstCorrectionDate->format('M d, Y'),
+                    'days_learning'    => (int) $firstCorrectionDate->diffInDays(now()),
+                    'recent_scans'     => $recentScans->count(),
                 ];
 
-                Log::debug('✓ Breed learning stats calculated', [
-                    'breed' => $breed,
-                    'examples' => $exampleCount,
-                    'success_rate' => $successRate
+                Log::debug('✓ Breed stats calculated', [
+                    'breed'          => $originalBreedName,
+                    'corrections'    => $correctionCount,
+                    'ml_examples'    => $mlExamples,
+                    'success_rate'   => $successRate,
                 ]);
             }
 
-            // Sort by success rate descending
+            if (empty($breedLearning)) {
+                Log::info('ℹ️ No breed learning data to display after processing');
+                return [];
+            }
+
+            // Sort: success rate desc, then corrections_made desc as tiebreaker
             usort($breedLearning, function ($a, $b) {
-                return $b['success_rate'] <=> $a['success_rate'];
+                if ($b['success_rate'] !== $a['success_rate']) {
+                    return $b['success_rate'] <=> $a['success_rate'];
+                }
+                return $b['corrections_made'] <=> $a['corrections_made'];
             });
 
-            $topBreeds = array_slice($breedLearning, 0, 10); // Top 10 breeds
+            $topBreeds = array_slice($breedLearning, 0, 10);
 
             Log::info('✓ Breed learning progress calculated successfully', [
                 'total_breeds_with_data' => count($breedLearning),
-                'top_breeds_returned' => count($topBreeds)
+                'top_breeds_returned'    => count($topBreeds),
             ]);
 
             return $topBreeds;
         } catch (\Exception $e) {
             Log::error('❌ Error calculating breed learning progress', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return [];
         }
     }
 
+    private function getLearningTimeline(int $days = 10): array
+    {
+        $timeline = [];
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $dayStart = Carbon::now()->subDays($i)->startOfDay();
+            $dayEnd   = Carbon::now()->subDays($i)->endOfDay();
+
+            // Human-readable label
+            if ($i === 0) {
+                $label = 'Today';
+            } elseif ($i === 1) {
+                $label = 'Yesterday';
+            } else {
+                $label = $dayStart->format('M j'); // e.g. "Jun 3"
+            }
+
+            $corrections = BreedCorrection::whereBetween('created_at', [$dayStart, $dayEnd])
+                ->count();
+
+            $totalScans = Results::whereBetween('created_at', [$dayStart, $dayEnd])
+                ->count();
+
+            $highConfScans = Results::whereBetween('created_at', [$dayStart, $dayEnd])
+                ->where('confidence', '>=', 80)
+                ->count();
+
+            $highConfRate = $totalScans > 0
+                ? round(($highConfScans / $totalScans) * 100, 1)
+                : 0;
+
+            // Running total of all corrections up to and including this day
+            // This gives the "total memory size" line in the chart
+            $totalCorrectionsToDate = BreedCorrection::where('created_at', '<=', $dayEnd)->count();
+
+            $timeline[] = [
+                'day'                       => $label,
+                'date'                      => $dayStart->format('Y-m-d'),
+                'is_today'                  => $i === 0,
+                'corrections'               => $corrections,
+                'total_scans'               => $totalScans,
+                'high_confidence'           => $highConfScans,
+                'high_conf_rate'            => $highConfRate,
+                'total_corrections_to_date' => $totalCorrectionsToDate,
+            ];
+        }
+
+        return $timeline;
+    }
+
 
     public function dashboard()
     {
-        $results = Results::latest()->take(6)->get();
+        // Recent scans for the dashboard table — include full image URL
+        $baseUrl = config('filesystems.disks.object-storage.url');
 
-        $correctedBreed = BreedCorrection::get();
+        $results = Results::latest()->take(6)->get()->map(function ($r) use ($baseUrl) {
+            $r->image = $baseUrl . '/' . $r->image;
+            return $r;
+        });
+
+        $correctedBreed      = BreedCorrection::get();
         $correctedBreedCount = $correctedBreed->count();
-        $result = Results::get();
-        $resultCount = $result->count();
+        $result              = Results::get();
+        $resultCount         = $result->count();
 
-        // Get scan IDs that have been corrected
-        $correctedScanIds = BreedCorrection::pluck('scan_id');
-
-        // Calculate pending review count (scans not yet corrected)
+        // Pending review = scans not yet corrected
+        $correctedScanIds  = BreedCorrection::pluck('scan_id');
         $pendingReviewCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
 
-        $lowConfidenceCount = $result->where('confidence', '<=', 40)->count();
+        $lowConfidenceCount  = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
-        $oneWeekAgo = Carbon::now()->subDays(7);
+        $oneWeekAgo  = Carbon::now()->subDays(7);
         $twoWeeksAgo = Carbon::now()->subDays(14);
         $oneMonthAgo = Carbon::now()->subDays(30);
 
-        // ============================================================================
-        // BREED-SPECIFIC LEARNING PROGRESS - Shows learning per breed
-        // ============================================================================
+        // -------------------------------------------------------------------------
+        // Breed-specific learning progress (table data)
+        // -------------------------------------------------------------------------
         $breedLearningProgress = $this->calculateBreedLearningProgress();
 
-        // ============================================================================
-        // FIXED: FETCH MEMORY STATS FROM ML API (NOT LOCAL FILE)
-        // ============================================================================
-        $memoryCount = 0;
+        // -------------------------------------------------------------------------
+        // Day-by-day learning timeline — 10 days (NEW FEATURE)
+        // -------------------------------------------------------------------------
+        $learningTimeline = $this->getLearningTimeline(10);
+
+        // -------------------------------------------------------------------------
+        // ML API memory stats
+        // -------------------------------------------------------------------------
+        $memoryCount  = 0;
         $uniqueBreeds = [];
 
         try {
-            $mlApiService = app(\App\Services\MLApiService::class);
+            $mlApiService  = app(\App\Services\MLApiService::class);
             $statsResponse = $mlApiService->getMemoryStats();
 
             if ($statsResponse['success'] && !empty($statsResponse['data'])) {
-                $memoryCount = $statsResponse['data']['total_examples'] ?? 0;
+                $memoryCount  = $statsResponse['data']['total_examples'] ?? 0;
                 $uniqueBreeds = array_keys($statsResponse['data']['breeds'] ?? []);
 
                 Log::info('✓ Memory stats fetched from ML API', [
-                    'memory_count' => $memoryCount,
-                    'unique_breeds' => count($uniqueBreeds)
+                    'memory_count'   => $memoryCount,
+                    'unique_breeds'  => count($uniqueBreeds),
                 ]);
             } else {
                 Log::warning('⚠️ ML API memory stats unavailable', [
-                    'error' => $statsResponse['error'] ?? 'Unknown'
+                    'error' => $statsResponse['error'] ?? 'Unknown',
                 ]);
             }
         } catch (\Exception $e) {
             Log::error('❌ Failed to fetch ML API stats in dashboard', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
+        // -------------------------------------------------------------------------
+        // Memory hit rate (how many recent scans had a prior correction)
+        // -------------------------------------------------------------------------
         $recentCorrectionsCount = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
-        $currentWeekResults = Results::where('created_at', '>=', $oneWeekAgo)->get();
+        $currentWeekResults     = Results::where('created_at', '>=', $oneWeekAgo)->get();
 
         $memoryAssistedScans = 0;
         foreach ($currentWeekResults as $scan) {
-            $hasCorrection = BreedCorrection::where('scan_id', $scan->scan_id)->exists();
-            if ($hasCorrection) {
+            if (BreedCorrection::where('scan_id', $scan->scan_id)->exists()) {
                 $memoryAssistedScans++;
             }
         }
 
-        $weeklyScans = $currentWeekResults->count();
+        $weeklyScans   = $currentWeekResults->count();
         $memoryHitRate = $weeklyScans > 0 ? ($memoryAssistedScans / $weeklyScans) * 100 : 0;
 
-        // ============================================================================
-        // LEARNING PROGRESS SCORE - Reliable metric that doesn't depend on image quality
-        // ============================================================================
-
+        // -------------------------------------------------------------------------
+        // Learning Progress Score (composite 0-100)
+        // -------------------------------------------------------------------------
         $firstCorrection = BreedCorrection::oldest()->first();
 
         if ($firstCorrection) {
-            // 1. Knowledge Base Growth (total corrections made)
             $knowledgeBaseGrowth = BreedCorrection::count();
 
-            // 2. Memory Utilization (how much of the ML memory is being used)
-            // Assuming max capacity of 500 examples for a well-trained system
             $memoryUtilization = min(100, ($memoryCount / 500) * 100);
 
-            // 3. Breed Coverage (unique breeds learned)
             $uniqueBreedsLearned = count($uniqueBreeds);
-            // Assuming 50 common breeds as a baseline for good coverage
-            $breedDiversity = min(100, ($uniqueBreedsLearned / 50) * 100);
+            $breedDiversity      = min(100, ($uniqueBreedsLearned / 50) * 100);
 
-            // 4. Learning Consistency Score (corrections spread over time)
             $daysSinceLearningStarted = max(1, $firstCorrection->created_at->diffInDays(now()));
-            $avgCorrectionsPerDay = $knowledgeBaseGrowth / $daysSinceLearningStarted;
-            // Score increases with consistency (more corrections per day = better)
-            $learningConsistency = min(100, $avgCorrectionsPerDay * 20);
+            $avgCorrectionsPerDay     = $knowledgeBaseGrowth / $daysSinceLearningStarted;
+            $learningConsistency      = min(100, $avgCorrectionsPerDay * 20);
 
-            // 5. Recent Activity Score (how active has learning been recently)
-            $recentCorrections = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
-            $recentActivityScore = min(100, $recentCorrections * 10); // 10 corrections in a week = 100 points
+            $recentCorrections    = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
+            $recentActivityScore  = min(100, $recentCorrections * 10);
 
-            // COMPOSITE LEARNING PROGRESS SCORE (0-100)
-            // Weighted formula for overall learning health
             $learningProgressScore = (
-                (min(100, ($knowledgeBaseGrowth / 100) * 100) * 0.25) + // 25% weight: knowledge base
-                ($memoryUtilization * 0.20) + // 20% weight: memory usage
-                ($breedDiversity * 0.25) + // 25% weight: breed variety
-                ($learningConsistency * 0.15) + // 15% weight: consistency
-                ($recentActivityScore * 0.15) // 15% weight: recent activity
+                (min(100, ($knowledgeBaseGrowth / 100) * 100) * 0.25) +
+                ($memoryUtilization * 0.20) +
+                ($breedDiversity * 0.25) +
+                ($learningConsistency * 0.15) +
+                ($recentActivityScore * 0.15)
             );
 
             $learningProgressScore = min(100, round($learningProgressScore, 1));
 
-            // For display purposes
-            $accuracyBeforeCorrections = 0; // Not used anymore
-            $accuracyAfterCorrections = $learningProgressScore; // The main score
-            $accuracyImprovement = $learningProgressScore; // This displays as the hero metric
+            $accuracyBeforeCorrections = 0;
+            $accuracyAfterCorrections  = $learningProgressScore;
+            $accuracyImprovement       = $learningProgressScore;
 
-            // Additional breakdown metrics for detailed view
             $learningBreakdown = [
-                'knowledge_base' => $knowledgeBaseGrowth,
-                'memory_usage' => round($memoryUtilization, 1),
-                'breed_coverage' => $uniqueBreedsLearned,
-                'avg_corrections_per_day' => round($avgCorrectionsPerDay, 1),
-                'recent_activity' => $recentCorrections
+                'knowledge_base'           => $knowledgeBaseGrowth,
+                'memory_usage'             => round($memoryUtilization, 1),
+                'breed_coverage'           => $uniqueBreedsLearned,
+                'avg_corrections_per_day'  => round($avgCorrectionsPerDay, 1),
+                'recent_activity'          => $recentCorrections,
             ];
         } else {
             $accuracyBeforeCorrections = 0;
-            $accuracyAfterCorrections = 0;
-            $accuracyImprovement = 0;
+            $accuracyAfterCorrections  = 0;
+            $accuracyImprovement       = 0;
             $learningBreakdown = [
-                'knowledge_base' => 0,
-                'memory_usage' => 0,
-                'breed_coverage' => 0,
-                'avg_corrections_per_day' => 0,
-                'recent_activity' => 0
+                'knowledge_base'           => 0,
+                'memory_usage'             => 0,
+                'breed_coverage'           => 0,
+                'avg_corrections_per_day'  => 0,
+                'recent_activity'          => 0,
             ];
         }
 
+        // -------------------------------------------------------------------------
+        // Confidence trends
+        // -------------------------------------------------------------------------
         $avgConfidence = $currentWeekResults->avg('confidence') ?? 0;
 
-        $previousWeekResults = Results::where('created_at', '>=', $twoWeeksAgo)
+        $previousWeekResults    = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->get();
-        $previousAvgConfidence = $previousWeekResults->avg('confidence') ?? 0;
+        $previousAvgConfidence  = $previousWeekResults->avg('confidence') ?? 0;
 
-        $confidenceTrend = 0;
-        if ($previousAvgConfidence > 0) {
-            $confidenceTrend = $avgConfidence - $previousAvgConfidence;
-        }
+        $confidenceTrend = $previousAvgConfidence > 0
+            ? $avgConfidence - $previousAvgConfidence
+            : 0;
 
+        // -------------------------------------------------------------------------
+        // Breed coverage
+        // -------------------------------------------------------------------------
         $totalCorrections = BreedCorrection::count();
-        $breedCoverage = $totalCorrections > 0 ? (count($uniqueBreeds) / $totalCorrections) * 100 : 0;
+        $breedCoverage    = $totalCorrections > 0
+            ? (count($uniqueBreeds) / $totalCorrections) * 100
+            : 0;
 
-        $currentWeekScans = Results::where('created_at', '>=', $oneWeekAgo)->count();
+        // -------------------------------------------------------------------------
+        // Weekly trends for the 4 key metrics
+        // -------------------------------------------------------------------------
+        $currentWeekScans       = Results::where('created_at', '>=', $oneWeekAgo)->count();
         $previousWeekScansCount = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->count();
-        $totalScansWeeklyTrend = $previousWeekScansCount > 0
+        $totalScansWeeklyTrend  = $previousWeekScansCount > 0
             ? (($currentWeekScans - $previousWeekScansCount) / $previousWeekScansCount) * 100
             : 0;
 
-        $currentWeekCorrected = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
+        $currentWeekCorrected  = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
         $previousWeekCorrected = BreedCorrection::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->count();
-        $correctedWeeklyTrend = $previousWeekCorrected > 0
+        $correctedWeeklyTrend  = $previousWeekCorrected > 0
             ? (($currentWeekCorrected - $previousWeekCorrected) / $previousWeekCorrected) * 100
             : 0;
 
-        $currentWeekHigh = Results::where('created_at', '>=', $oneWeekAgo)
+        $currentWeekHigh         = Results::where('created_at', '>=', $oneWeekAgo)
             ->where('confidence', '>=', 80)->count();
-        $previousWeekHigh = Results::where('created_at', '>=', $twoWeeksAgo)
-            ->where('created_at', '<', $oneWeekAgo)
-            ->where('confidence', '>=', 80)->count();
+        $previousWeekHigh        = Results::where('created_at', '>=', $twoWeeksAgo)
+            ->where('created_at', '<', $oneWeekAgo)->where('confidence', '>=', 80)->count();
         $highConfidenceWeeklyTrend = $previousWeekHigh > 0
             ? (($currentWeekHigh - $previousWeekHigh) / $previousWeekHigh) * 100
             : 0;
 
-        $currentWeekLow = Results::where('created_at', '>=', $oneWeekAgo)
+        $currentWeekLow         = Results::where('created_at', '>=', $oneWeekAgo)
             ->where('confidence', '<=', 40)->count();
-        $previousWeekLow = Results::where('created_at', '>=', $twoWeeksAgo)
-            ->where('created_at', '<', $oneWeekAgo)
-            ->where('confidence', '<=', 40)->count();
+        $previousWeekLow        = Results::where('created_at', '>=', $twoWeeksAgo)
+            ->where('created_at', '<', $oneWeekAgo)->where('confidence', '<=', 40)->count();
         $lowConfidenceWeeklyTrend = $previousWeekLow > 0
             ? (($currentWeekLow - $previousWeekLow) / $previousWeekLow) * 100
             : 0;
 
         $lastMilestone = floor($correctedBreedCount / 5) * 5;
 
+        // -------------------------------------------------------------------------
+        // Return to Inertia — learningTimeline is the new addition
+        // -------------------------------------------------------------------------
         return inertia('dashboard', [
-            'results' => $results,
-            'correctedBreedCount' => $correctedBreedCount,
-            'resultCount' => $resultCount,
-            'pendingReviewCount' => $pendingReviewCount,
-            'lowConfidenceCount' => $lowConfidenceCount,
-            'highConfidenceCount' => $highConfidenceCount,
-            'totalScansWeeklyTrend' => round($totalScansWeeklyTrend, 1),
-            'correctedWeeklyTrend' => round($correctedWeeklyTrend, 1),
+            'results'                   => $results,
+            'correctedBreedCount'       => $correctedBreedCount,
+            'resultCount'               => $resultCount,
+            'pendingReviewCount'        => $pendingReviewCount,
+            'lowConfidenceCount'        => $lowConfidenceCount,
+            'highConfidenceCount'       => $highConfidenceCount,
+            'totalScansWeeklyTrend'     => round($totalScansWeeklyTrend, 1),
+            'correctedWeeklyTrend'      => round($correctedWeeklyTrend, 1),
             'highConfidenceWeeklyTrend' => round($highConfidenceWeeklyTrend, 1),
-            'lowConfidenceWeeklyTrend' => round($lowConfidenceWeeklyTrend, 1),
-            'memoryCount' => $memoryCount,
-            'uniqueBreedsLearned' => count($uniqueBreeds),
-            'recentCorrectionsCount' => $recentCorrectionsCount,
-            'avgConfidence' => round($avgConfidence, 2),
-            'confidenceTrend' => round($confidenceTrend, 2),
-            'memoryHitRate' => round($memoryHitRate, 2),
-            'accuracyImprovement' => round($accuracyImprovement, 2),
-            'breedCoverage' => round($breedCoverage, 2),
+            'lowConfidenceWeeklyTrend'  => round($lowConfidenceWeeklyTrend, 1),
+            'memoryCount'               => $memoryCount,
+            'uniqueBreedsLearned'       => count($uniqueBreeds),
+            'recentCorrectionsCount'    => $recentCorrectionsCount,
+            'avgConfidence'             => round($avgConfidence, 2),
+            'confidenceTrend'           => round($confidenceTrend, 2),
+            'memoryHitRate'             => round($memoryHitRate, 2),
+            'accuracyImprovement'       => round($accuracyImprovement, 2),
+            'breedCoverage'             => round($breedCoverage, 2),
             'accuracyBeforeCorrections' => round($accuracyBeforeCorrections, 2),
-            'accuracyAfterCorrections' => round($accuracyAfterCorrections, 2),
-            'lastCorrectionCount' => $lastMilestone,
-            'breedLearningProgress' => $breedLearningProgress,
-            'learningBreakdown' => $learningBreakdown ?? [],
+            'accuracyAfterCorrections'  => round($accuracyAfterCorrections, 2),
+            'lastCorrectionCount'       => $lastMilestone,
+            'breedLearningProgress'     => $breedLearningProgress,
+            'learningBreakdown'         => $learningBreakdown ?? [],
+            'learningTimeline'          => $learningTimeline,  // ← NEW
         ]);
     }
 
