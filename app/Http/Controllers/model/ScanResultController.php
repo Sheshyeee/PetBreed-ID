@@ -1479,12 +1479,24 @@ PROMPT;
                 ]);
             }
 
+            // ── TITLE-CASE FIX ───────────────────────────────────────────────────
+            // YOLO model returns lowercase breed names (e.g. "shih tzu", "golden retriever")
+            // ucwords() capitalizes first letter of every word → "Shih Tzu", "Golden Retriever"
+            $breedName = ucwords(strtolower(trim($result['breed'])));
+
+            // Fix top_predictions breed names too
+            $topPredictions = array_map(function ($prediction) {
+                $prediction['breed'] = ucwords(strtolower(trim($prediction['breed'] ?? '')));
+                return $prediction;
+            }, $result['top_predictions'] ?? []);
+            // ─────────────────────────────────────────────────────────────────────
+
             return [
                 'success'          => true,
                 'method'           => $result['method'],   // 'model' or 'memory'
-                'breed'            => $result['breed'],
+                'breed'            => $breedName,
                 'confidence'       => $result['confidence'] * 100, // 0–1 scale → percentage
-                'top_predictions'  => $result['top_predictions'],
+                'top_predictions'  => $topPredictions,
                 'metadata'         => array_merge(
                     $result['metadata'] ?? [],
                     ['execution_time' => $executionTime]
