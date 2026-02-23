@@ -15,7 +15,7 @@ import {
     ArrowDown,
     ArrowUp,
     BarChart3,
-    CheckCircle2,
+    Brain,
     ChevronRight,
     ClipboardList,
     Database,
@@ -27,14 +27,11 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
-/* ─────────────────── breadcrumbs ────────────────────────────────────────── */
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
 ];
 
-/* ─────────────────── types ──────────────────────────────────────────────── */
 type Result = { scan_id: string; breed: string; confidence: number };
-
 type HeatmapDay = {
     date: string;
     count: number;
@@ -43,7 +40,6 @@ type HeatmapDay = {
     label: string;
     is_today: boolean;
 };
-
 type HeatmapSummary = {
     active_days: number;
     total_in_range: number;
@@ -51,7 +47,6 @@ type HeatmapSummary = {
     best_day_count: number;
     best_day_label: string;
 };
-
 type MemoryChip = {
     breed: string;
     times_taught: number;
@@ -59,7 +54,6 @@ type MemoryChip = {
     days_ago: number;
     level: 'new' | 'learning' | 'trained' | 'expert';
 };
-
 type TimelineDay = {
     day: string;
     date: string;
@@ -92,125 +86,169 @@ type PageProps = {
     breedMemoryWall?: MemoryChip[];
 };
 
-/* ─────────────────── level config ───────────────────────────────────────── */
+/* ── level config ─────────────────────────────────────────────────────────── */
 const LEVEL_CFG = {
     expert: {
         bg: 'bg-emerald-500/15',
-        border: 'border-emerald-500/35',
+        border: 'border-emerald-500/30',
         text: 'text-emerald-300',
         dot: '#10b981',
         label: 'Expert',
     },
     trained: {
-        bg: 'bg-green-500/12',
-        border: 'border-green-500/30',
+        bg: 'bg-green-500/10',
+        border: 'border-green-500/25',
         text: 'text-green-300',
         dot: '#22c55e',
         label: 'Trained',
     },
     learning: {
-        bg: 'bg-blue-500/12',
-        border: 'border-blue-500/30',
+        bg: 'bg-blue-500/10',
+        border: 'border-blue-500/25',
         text: 'text-blue-300',
         dot: '#3b82f6',
         label: 'Learning',
     },
     new: {
-        bg: 'bg-amber-500/12',
-        border: 'border-amber-500/30',
+        bg: 'bg-amber-500/10',
+        border: 'border-amber-500/25',
         text: 'text-amber-300',
         dot: '#f59e0b',
         label: 'New',
     },
 };
 
-/* ─────────────────── GitHub-style compact heatmap ──────────────────────── */
-function heatColor(count: number, max: number): string {
-    if (count === 0) return '#161b22';
-    const ratio = Math.min(count / Math.max(max, 1), 1);
-    if (ratio < 0.25) return '#0e4429';
-    if (ratio < 0.5) return '#006d32';
-    if (ratio < 0.75) return '#26a641';
-    return '#39d353';
+/* ── heatmap colours (GitHub green palette) ──────────────────────────────── */
+function heatColor(count: number, max: number, isDark: boolean): string {
+    if (count === 0) return isDark ? '#21262d' : '#ebedf0';
+    const r = Math.min(count / Math.max(max, 1), 1);
+    if (isDark) {
+        if (r < 0.25) return '#0e4429';
+        if (r < 0.5) return '#006d32';
+        if (r < 0.75) return '#26a641';
+        return '#39d353';
+    } else {
+        if (r < 0.25) return '#9be9a8';
+        if (r < 0.5) return '#40c463';
+        if (r < 0.75) return '#30a14e';
+        return '#216e39';
+    }
 }
 
+/* ── CompactHeatmap ───────────────────────────────────────────────────────── */
 function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const [hovered, setHovered] = useState<HeatmapDay | null>(null);
     const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
+    const [isDark, setIsDark] = useState(true);
 
-    // ── GitHub algorithm ───────────────────────────────────────────────────
-    // 1. Build a lookup: dateString → HeatmapDay
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        // also check html class (Tailwind dark mode)
+        const check = () =>
+            setIsDark(
+                document.documentElement.classList.contains('dark') ||
+                    mq.matches,
+            );
+        check();
+        const obs = new MutationObserver(check);
+        obs.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+        mq.addEventListener('change', check);
+        return () => {
+            obs.disconnect();
+            mq.removeEventListener('change', check);
+        };
+    }, []);
+
+    /* Build lookup */
     const byDate: Record<string, HeatmapDay> = {};
     days.forEach((d) => {
         byDate[d.date] = d;
     });
 
-    // 2. Anchor: the Sunday on or before 83 days ago (= start of week 0)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const anchor = new Date(today);
-    anchor.setDate(today.getDate() - 83); // go back 83 days (84-day window)
-    const dow0 = anchor.getDay(); // 0=Sun … 6=Sat
-    anchor.setDate(anchor.getDate() - dow0); // rewind to the Sunday of that week
+    /*
+     * GitHub algorithm:
+     * - The LAST column = the week containing TODAY (rightmost).
+     * - The FIRST column = 11 weeks before that (leftmost).
+     * - Each column starts on SUNDAY (row 0) and ends on SATURDAY (row 6).
+     * - We work BACKWARDS from today to find the Sunday that starts col 11,
+     *   then fill all 12 × 7 cells from that anchor forward.
+     */
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const todayISO = todayDate.toISOString().slice(0, 10);
 
-    // 3. Build 12 columns × 7 rows. col 0 = oldest week (left), col 11 = this week (right)
-    //    row 0 = Sunday, row 6 = Saturday
-    const COLS = 12;
-    const ROWS = 7;
+    // Sunday of this week (the start of column 11)
+    const lastColSunday = new Date(todayDate);
+    lastColSunday.setDate(todayDate.getDate() - todayDate.getDay()); // rewind to Sunday
+
+    // Sunday of column 0  = 11 weeks before lastColSunday
+    const anchor = new Date(lastColSunday);
+    anchor.setDate(lastColSunday.getDate() - 11 * 7);
+
+    const COLS = 12,
+        ROWS = 7;
     const grid: (HeatmapDay | null)[][] = Array.from({ length: COLS }, () =>
         Array(ROWS).fill(null),
     );
     const monthLabels: string[] = Array(COLS).fill('');
-
     let lastMonth = '';
+
     for (let col = 0; col < COLS; col++) {
         for (let row = 0; row < ROWS; row++) {
-            const d = new Date(anchor);
-            d.setDate(anchor.getDate() + col * 7 + row);
-            if (d > today) continue; // future cells stay null
-            const iso = d.toISOString().slice(0, 10);
+            const cell = new Date(anchor);
+            cell.setDate(anchor.getDate() + col * 7 + row);
+            if (cell > todayDate) continue; // skip future
+            const iso = cell.toISOString().slice(0, 10);
             grid[col][row] = byDate[iso] ?? {
                 date: iso,
                 count: 0,
                 week: col,
                 day_of_week: row,
-                label: d.toLocaleDateString('en-US', {
+                label: cell.toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric',
                 }),
-                is_today: iso === today.toISOString().slice(0, 10),
+                is_today: iso === todayISO,
             };
-            const m = d.toLocaleString('en-US', { month: 'short' });
-            if (m !== lastMonth) {
-                monthLabels[col] = m;
-                lastMonth = m;
+            // Month label on first cell of a new month in this column
+            if (row === 0) {
+                const m = cell.toLocaleString('en-US', { month: 'short' });
+                if (m !== lastMonth) {
+                    monthLabels[col] = m;
+                    lastMonth = m;
+                }
             }
         }
     }
 
     const maxCount = Math.max(...days.map((d) => d.count), 1);
     const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const emptyColor = isDark ? '#21262d' : '#ebedf0';
 
     return (
         <div className="relative w-full select-none">
+            {/* Tooltip */}
             {hovered && (
                 <div
-                    className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-neutral-900/97 px-2.5 py-2 text-xs shadow-xl backdrop-blur-sm"
+                    className="pointer-events-none fixed z-50 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900"
                     style={{
                         left: tipPos.x + 12,
                         top: tipPos.y - 8,
-                        minWidth: 130,
+                        minWidth: 138,
                     }}
                 >
-                    <p className="font-bold text-white">
+                    <p className="font-bold text-neutral-900 dark:text-white">
                         {hovered.is_today ? '📅 Today' : hovered.label}
                     </p>
                     <p
                         className={
                             hovered.count > 0
-                                ? 'text-emerald-400'
-                                : 'text-white/30'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-neutral-400 dark:text-white/30'
                         }
                     >
                         {hovered.count > 0
@@ -220,42 +258,40 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                 </div>
             )}
 
-            {/* layout: day-labels | grid+months stacked */}
             <div className="flex w-full items-start" style={{ gap: 4 }}>
-                {/* Day-of-week labels — push down by month-row height (~14px) */}
+                {/* Day-of-week labels */}
                 <div
                     className="flex shrink-0 flex-col"
-                    style={{ gap: 2, marginTop: 16, width: 26 }}
+                    style={{ gap: 2, marginTop: 16, width: 28 }}
                 >
                     {DOW_LABELS.map((l, i) => (
                         <div
                             key={i}
-                            className="text-right text-[9px] leading-none text-white/25"
-                            style={{ height: 11, lineHeight: '11px' }}
+                            className="text-right text-[9px] leading-none text-neutral-400 dark:text-white/25"
+                            style={{ height: 13, lineHeight: '13px' }}
                         >
                             {i % 2 === 0 ? l : ''}
                         </div>
                     ))}
                 </div>
 
-                {/* months row + cell grid */}
+                {/* Month labels + cells */}
                 <div
                     className="flex min-w-0 flex-1 flex-col"
                     style={{ gap: 2 }}
                 >
-                    {/* Month labels — one flex-1 slot per column, same gap as cell columns */}
+                    {/* Month row */}
                     <div className="flex w-full" style={{ gap: 2 }}>
                         {monthLabels.map((m, i) => (
                             <div
                                 key={i}
-                                className="flex-1 overflow-hidden text-[9px] leading-none text-white/30"
-                                style={{ height: 12 }}
+                                className="flex-1 overflow-hidden text-[9px] leading-none text-neutral-400 dark:text-white/30"
+                                style={{ height: 14 }}
                             >
                                 {m}
                             </div>
                         ))}
                     </div>
-
                     {/* Cell columns */}
                     <div className="flex w-full" style={{ gap: 2 }}>
                         {Array.from({ length: COLS }, (_, col) => (
@@ -265,30 +301,34 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                                 style={{ gap: 2 }}
                             >
                                 {Array.from({ length: ROWS }, (_, row) => {
-                                    const cell = grid[col][row];
+                                    const c = grid[col][row];
                                     return (
                                         <div
                                             key={row}
                                             className="w-full rounded-sm"
                                             style={{
-                                                height: 11,
-                                                background: cell
+                                                height: 13,
+                                                background: c
                                                     ? heatColor(
-                                                          cell.count,
+                                                          c.count,
                                                           maxCount,
+                                                          isDark,
                                                       )
-                                                    : 'transparent',
-                                                outline: cell?.is_today
-                                                    ? '1.5px solid #6366f1'
+                                                    : emptyColor,
+                                                outline: c?.is_today
+                                                    ? '2px solid #6366f1'
                                                     : undefined,
-                                                cursor: cell
+                                                outlineOffset: c?.is_today
+                                                    ? '1px'
+                                                    : undefined,
+                                                cursor: c
                                                     ? 'default'
                                                     : undefined,
                                             }}
                                             onMouseEnter={
-                                                cell
+                                                c
                                                     ? (e) => {
-                                                          setHovered(cell);
+                                                          setHovered(c);
                                                           setTipPos({
                                                               x: e.clientX,
                                                               y: e.clientY,
@@ -297,7 +337,7 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                                                     : undefined
                                             }
                                             onMouseMove={
-                                                cell
+                                                c
                                                     ? (e) =>
                                                           setTipPos({
                                                               x: e.clientX,
@@ -318,32 +358,36 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
             </div>
 
             {/* Legend */}
-            <div className="mt-2 flex items-center gap-1.5">
-                <span className="text-[9px] text-white/20">Less</span>
-                {['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'].map(
-                    (c, i) => (
-                        <div
-                            key={i}
-                            style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 2,
-                                background: c,
-                            }}
-                        />
-                    ),
-                )}
-                <span className="text-[9px] text-white/20">More</span>
+            <div className="mt-3 flex items-center gap-1.5">
+                <span className="text-[9px] text-neutral-400 dark:text-white/25">
+                    Less
+                </span>
+                {[0, 0.2, 0.5, 0.75, 1].map((r, i) => (
+                    <div
+                        key={i}
+                        style={{
+                            width: 11,
+                            height: 11,
+                            borderRadius: 2,
+                            background:
+                                r === 0
+                                    ? emptyColor
+                                    : heatColor(r * maxCount, maxCount, isDark),
+                        }}
+                    />
+                ))}
+                <span className="text-[9px] text-neutral-400 dark:text-white/25">
+                    More
+                </span>
             </div>
         </div>
     );
 }
 
-/* ─────────────────── MemoryChipCard ─────────────────────────────────────── */
+/* ── MemoryChipCard ───────────────────────────────────────────────────────── */
 function MemoryChipCard({ chip }: { chip: MemoryChip }) {
     const cfg = LEVEL_CFG[chip.level];
     const [show, setShow] = useState(false);
-
     return (
         <div className="relative">
             <div
@@ -380,15 +424,21 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
                 )}
             </div>
             {show && (
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-white/10 bg-neutral-900/97 p-2 text-xs shadow-xl backdrop-blur-md">
-                    <p className="mb-0.5 font-black text-white">{chip.breed}</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-black/8 bg-white p-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900">
+                    <p className="mb-0.5 font-black text-neutral-900 dark:text-white">
+                        {chip.breed}
+                    </p>
                     <p className={`text-[11px] ${cfg.text}`}>{cfg.label}</p>
-                    <p className="text-white/40">
+                    <p className="text-neutral-500 dark:text-white/40">
                         Taught {chip.times_taught}× by vet
                     </p>
-                    <p className="text-white/25">Since {chip.first_taught}</p>
+                    <p className="text-neutral-400 dark:text-white/25">
+                        Since {chip.first_taught}
+                    </p>
                     {chip.days_ago === 0 && (
-                        <p className="mt-0.5 text-indigo-400">✨ Added today</p>
+                        <p className="mt-0.5 text-indigo-500 dark:text-indigo-400">
+                            ✨ Added today
+                        </p>
                     )}
                 </div>
             )}
@@ -396,29 +446,56 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
     );
 }
 
-/* ─────────────────── Main Dashboard ─────────────────────────────────────── */
+/* ── Card wrapper with beautiful gradient bg ──────────────────────────────── */
+function StatCard({
+    accent,
+    children,
+}: {
+    accent: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div
+            className="group relative overflow-hidden rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-white/[0.06] dark:bg-neutral-900"
+            style={{ background: undefined }}
+        >
+            {/* subtle gradient wash */}
+            <div
+                className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.07]"
+                style={{
+                    background: `radial-gradient(ellipse at top right, ${accent} 0%, transparent 70%)`,
+                }}
+            />
+            {/* bottom edge accent line */}
+            <div
+                className="pointer-events-none absolute bottom-0 left-0 h-[2px] w-full opacity-30"
+                style={{
+                    background: `linear-gradient(to right, transparent, ${accent}, transparent)`,
+                }}
+            />
+            {children}
+        </div>
+    );
+}
+
+/* ── Main Dashboard ───────────────────────────────────────────────────────── */
 export default function Dashboard() {
     const {
         results,
         correctedBreedCount,
         resultCount,
         pendingReviewCount = 0,
-        highConfidenceCount = 0,
         totalScansWeeklyTrend = 0,
         correctedWeeklyTrend = 0,
-        highConfidenceWeeklyTrend = 0,
         memoryCount = 0,
         avgConfidence = 0,
         confidenceTrend = 0,
         memoryHitRate = 0,
         accuracyImprovement = 0,
-        learningTimeline = [],
         learningHeatmap = [],
         heatmapSummary,
         breedMemoryWall = [],
     } = usePage<PageProps>().props;
-
-    const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
     const fmt = (t: number) => `${t >= 0 ? '+' : ''}${t.toFixed(1)}%`;
     const tIcon = (t: number) =>
@@ -432,41 +509,16 @@ export default function Dashboard() {
     const tClr = (t: number, inv = false) => {
         if (inv)
             return t < 0
-                ? 'text-emerald-400'
+                ? 'text-emerald-500 dark:text-emerald-400'
                 : t > 0
-                  ? 'text-red-400'
-                  : 'text-gray-400';
+                  ? 'text-red-500 dark:text-red-400'
+                  : 'text-neutral-400';
         return t > 0
-            ? 'text-emerald-400'
+            ? 'text-emerald-500 dark:text-emerald-400'
             : t < 0
-              ? 'text-red-400'
-              : 'text-gray-400';
+              ? 'text-red-500 dark:text-red-400'
+              : 'text-neutral-400';
     };
-
-    const maxCor = Math.max(...learningTimeline.map((d) => d.corrections), 1);
-    const tlTotal = learningTimeline.reduce((s, d) => s + d.corrections, 0);
-    const todayEntry = learningTimeline.find((d) => d.is_today);
-
-    const tlStatus = (() => {
-        if (!todayEntry) return null;
-        if (todayEntry.corrections > 0)
-            return {
-                text: `✅ ${todayEntry.corrections} correction${todayEntry.corrections !== 1 ? 's' : ''} today — AI is actively learning!`,
-                cls: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300',
-            };
-        const r3 = learningTimeline
-            .slice(-3)
-            .reduce((s, d) => s + d.corrections, 0);
-        if (r3 > 0)
-            return {
-                text: `🟡 No corrections today — ${r3} in the last 3 days. Keep going!`,
-                cls: 'bg-amber-500/10 border-amber-500/25 text-amber-300',
-            };
-        return {
-            text: '🔴 No recent corrections — review pending scans to keep training the AI.',
-            cls: 'bg-red-500/10 border-red-500/25 text-red-300',
-        };
-    })();
 
     const expertChips = breedMemoryWall.filter((c) => c.level === 'expert');
     const trainedChips = breedMemoryWall.filter((c) => c.level === 'trained');
@@ -482,7 +534,6 @@ export default function Dashboard() {
                         'learningHeatmap',
                         'heatmapSummary',
                         'correctedBreedCount',
-                        'learningTimeline',
                     ],
                 }),
             30000,
@@ -490,200 +541,208 @@ export default function Dashboard() {
         return () => clearInterval(iv);
     }, []);
 
+    /* ── 4 top metric cards ─────────────────────────────────────────────── */
+    const metricCards = [
+        {
+            label: 'Total Scans',
+            value: resultCount,
+            trend: totalScansWeeklyTrend,
+            Icon: BarChart3,
+            accent: '#3b82f6',
+            inv: false,
+        },
+        {
+            label: 'Corrections Made',
+            value: correctedBreedCount,
+            trend: correctedWeeklyTrend,
+            Icon: GraduationCap,
+            accent: '#8b5cf6',
+            inv: false,
+        },
+        {
+            label: 'Avg Confidence',
+            value: avgConfidence,
+            trend: confidenceTrend,
+            Icon: Brain,
+            accent: '#10b981',
+            inv: false,
+            suffix: '%',
+        },
+        {
+            label: 'Pending Review',
+            value: pendingReviewCount,
+            trend: -correctedWeeklyTrend,
+            Icon: ClipboardList,
+            accent: '#f59e0b',
+            inv: true,
+        },
+    ] as {
+        label: string;
+        value: number;
+        trend: number;
+        Icon: React.ElementType;
+        accent: string;
+        inv: boolean;
+        suffix?: string;
+    }[];
+
+    /* ── 3 mini stat cards ──────────────────────────────────────────────── */
+    const miniCards = [
+        {
+            label: 'Learning Progress',
+            val: `${accuracyImprovement.toFixed(0)}/100`,
+            sub: 'Composite score',
+            Icon: Target,
+            a: '#10b981',
+        },
+        {
+            label: 'Memory Usage Rate',
+            val: `${memoryHitRate.toFixed(1)}%`,
+            sub: `${memoryCount} patterns stored`,
+            Icon: Database,
+            a: '#8b5cf6',
+        },
+        {
+            label: 'Avg Confidence',
+            val: `${avgConfidence.toFixed(1)}%`,
+            sub: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}% this week`,
+            Icon: LineChart,
+            a: '#3b82f6',
+        },
+    ] as const;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="AI Learning Dashboard" />
 
-            <div className="flex h-full flex-col gap-6 p-4 md:p-6">
-                {/* ── 4 metric cards ───────────────────────────────────── */}
+            <div className="flex h-full flex-col gap-5 p-4 md:p-6">
+                {/* ── 4 metric cards ──────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {(
-                        [
-                            {
-                                label: 'Total Scans',
-                                value: resultCount,
-                                trend: totalScansWeeklyTrend,
-                                Icon: BarChart3,
-                                accent: '#3b82f6',
-                                inv: false,
-                            },
-                            {
-                                label: 'Corrections Made',
-                                value: correctedBreedCount,
-                                trend: correctedWeeklyTrend,
-                                Icon: GraduationCap,
-                                accent: '#8b5cf6',
-                                inv: false,
-                            },
-                            {
-                                label: 'High Confidence',
-                                value: highConfidenceCount,
-                                trend: highConfidenceWeeklyTrend,
-                                Icon: CheckCircle2,
-                                accent: '#10b981',
-                                inv: false,
-                            },
-                            {
-                                label: 'Pending Review',
-                                value: pendingReviewCount,
-                                trend: -correctedWeeklyTrend,
-                                Icon: ClipboardList,
-                                accent: '#f59e0b',
-                                inv: true,
-                            },
-                        ] as {
-                            label: string;
-                            value: number;
-                            trend: number;
-                            Icon: React.ElementType;
-                            accent: string;
-                            inv: boolean;
-                        }[]
-                    ).map(({ label, value, trend, Icon, accent, inv }) => (
-                        <div
-                            key={label}
-                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-neutral-900 p-5"
-                        >
-                            <div
-                                className="pointer-events-none absolute -top-3 -right-3 h-16 w-16 rounded-full opacity-15 blur-xl"
-                                style={{ background: accent }}
-                            />
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-white/40">
-                                        {label}
-                                    </p>
-                                    <div className="mt-2 flex items-baseline gap-2">
-                                        <p className="text-3xl font-black text-white">
-                                            {value}
+                    {metricCards.map(
+                        ({
+                            label,
+                            value,
+                            trend,
+                            Icon,
+                            accent,
+                            inv,
+                            suffix,
+                        }) => (
+                            <StatCard key={label} accent={accent}>
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                            {label}
                                         </p>
-                                        <div
-                                            className={`flex items-center gap-0.5 text-sm font-bold ${tClr(trend, inv)}`}
-                                        >
-                                            {tIcon(trend)}
-                                            <span>{fmt(trend)}</span>
+                                        <div className="mt-2 flex items-baseline gap-2">
+                                            <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                                {suffix
+                                                    ? `${value.toFixed(1)}${suffix}`
+                                                    : value}
+                                            </p>
+                                            <div
+                                                className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(trend, inv)}`}
+                                            >
+                                                {tIcon(trend)}
+                                                <span>{fmt(trend)}</span>
+                                            </div>
                                         </div>
+                                        <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                            vs last week
+                                        </p>
                                     </div>
-                                    <p className="mt-0.5 text-xs text-white/20">
-                                        vs last week
-                                    </p>
+                                    <div
+                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                        style={{
+                                            background: `${accent}18`,
+                                            border: `1px solid ${accent}30`,
+                                        }}
+                                    >
+                                        <Icon
+                                            className="h-5 w-5"
+                                            style={{ color: accent }}
+                                        />
+                                    </div>
                                 </div>
-                                <div
-                                    className="flex h-11 w-11 items-center justify-center rounded-xl"
-                                    style={{
-                                        background: `${accent}20`,
-                                        border: `1px solid ${accent}35`,
-                                    }}
-                                >
-                                    <Icon
-                                        className="h-5 w-5"
-                                        style={{ color: accent }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                            </StatCard>
+                        ),
+                    )}
                 </div>
 
-                {/* ── 3 mini stats ─────────────────────────────────────── */}
+                {/* ── 3 mini stats ────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {(
-                        [
-                            {
-                                label: 'Learning Progress',
-                                val: `${accuracyImprovement.toFixed(0)}/100`,
-                                sub: 'Composite score',
-                                Icon: Target,
-                                a: '#10b981',
-                            },
-                            {
-                                label: 'Avg Confidence',
-                                val: `${avgConfidence.toFixed(1)}%`,
-                                sub: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}% this week`,
-                                Icon: LineChart,
-                                a: '#3b82f6',
-                            },
-                            {
-                                label: 'Memory Usage Rate',
-                                val: `${memoryHitRate.toFixed(1)}%`,
-                                sub: `${memoryCount} patterns stored`,
-                                Icon: Database,
-                                a: '#8b5cf6',
-                            },
-                        ] as const
-                    ).map(({ label, val, sub, Icon, a }) => (
-                        <div
-                            key={label}
-                            className="relative overflow-hidden rounded-2xl border border-white/8 bg-neutral-900 p-5"
-                        >
+                    {miniCards.map(({ label, val, sub, Icon, a }) => (
+                        <StatCard key={label} accent={a}>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-white/40">
+                                    <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
                                         {label}
                                     </p>
-                                    <p className="mt-1 text-2xl font-black text-white">
+                                    <p className="mt-1 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
                                         {val}
                                     </p>
-                                    <p className="mt-0.5 text-xs text-white/25">
+                                    <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-white/25">
                                         {sub}
                                     </p>
                                 </div>
                                 <div
-                                    className="flex h-12 w-12 items-center justify-center rounded-full"
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                                     style={{
-                                        background: `${a}20`,
-                                        border: `1px solid ${a}30`,
+                                        background: `${a}18`,
+                                        border: `1px solid ${a}28`,
                                     }}
                                 >
                                     <Icon
-                                        className="h-6 w-6"
+                                        className="h-5 w-5"
                                         style={{ color: a }}
                                     />
                                 </div>
                             </div>
-                        </div>
+                        </StatCard>
                     ))}
                 </div>
 
-                {/* ════        {/* ════════════════════════════════════════════════════════
-                        AI TRAINING ACTIVITY
-                ═══════════════════════════════════════════════════════════ */}
-                <div className="rounded-2xl border border-white/8 bg-neutral-900">
+                {/* ── AI Training Activity ─────────────────────────────── */}
+                <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
                     {/* header */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-white/[0.06]">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/25 bg-violet-500/15">
-                                <Sparkles className="h-5 w-5 text-violet-400" />
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 dark:border-violet-500/25 dark:bg-violet-500/15">
+                                <Sparkles className="h-4 w-4 text-violet-500 dark:text-violet-400" />
                             </div>
                             <div>
-                                <h2 className="font-bold text-white">
+                                <h2 className="font-bold text-neutral-900 dark:text-white">
                                     AI Training Activity
                                 </h2>
-                                <p className="text-xs text-white/35">
+                                <p className="text-xs text-neutral-400 dark:text-white/35">
                                     12-week correction history &amp; breed
                                     memory
                                 </p>
                             </div>
                         </div>
                         {heatmapSummary && (
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
-                                <span>
-                                    <span className="font-bold text-white">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                <span className="text-neutral-500 dark:text-white/30">
+                                    <span className="font-bold text-neutral-900 dark:text-white">
                                         {heatmapSummary.total_in_range}
                                     </span>{' '}
                                     corrections
                                 </span>
-                                <span className="text-white/15">·</span>
-                                <span>
-                                    <span className="font-bold text-white">
+                                <span className="text-neutral-300 dark:text-white/15">
+                                    ·
+                                </span>
+                                <span className="text-neutral-500 dark:text-white/30">
+                                    <span className="font-bold text-neutral-900 dark:text-white">
                                         {heatmapSummary.active_days}
                                     </span>{' '}
                                     active days
                                 </span>
                                 {heatmapSummary.current_streak > 0 && (
                                     <>
-                                        <span className="text-white/15">·</span>
-                                        <span className="font-bold text-orange-400">
+                                        <span className="text-neutral-300 dark:text-white/15">
+                                            ·
+                                        </span>
+                                        <span className="font-semibold text-orange-500 dark:text-orange-400">
                                             🔥 {heatmapSummary.current_streak}
                                             -day streak
                                         </span>
@@ -693,33 +752,33 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    {/* ── 50 / 50 split body ─────────────────────────────── */}
+                    {/* 50/50 body */}
                     <div className="flex flex-col lg:flex-row">
-                        {/* LEFT — heatmap, exactly half */}
+                        {/* Heatmap */}
                         <div className="w-full p-5 lg:w-1/2">
-                            <p className="mb-3 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                            <p className="mb-3 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
                                 Correction Heatmap
                             </p>
                             {learningHeatmap.length > 0 ? (
                                 <CompactHeatmap days={learningHeatmap} />
                             ) : (
-                                <p className="text-xs text-white/20">
+                                <p className="text-xs text-neutral-400 dark:text-white/20">
                                     No data yet
                                 </p>
                             )}
                         </div>
 
                         {/* Divider */}
-                        <div className="hidden w-px bg-white/6 lg:block" />
-                        <div className="mx-5 h-px bg-white/6 lg:hidden" />
+                        <div className="hidden w-px bg-neutral-100 lg:block dark:bg-white/[0.06]" />
+                        <div className="mx-5 h-px bg-neutral-100 lg:hidden dark:bg-white/[0.06]" />
 
-                        {/* RIGHT — memory wall, exactly half */}
+                        {/* Memory Wall */}
                         <div className="w-full p-5 lg:w-1/2">
                             <div className="mb-3 flex flex-wrap items-center gap-2">
-                                <p className="text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                                <p className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
                                     Breed Memory Wall
                                 </p>
-                                <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+                                <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-600 dark:border-violet-500/25 dark:bg-violet-500/10 dark:text-violet-300">
                                     {breedMemoryWall.length} breeds
                                 </span>
                                 <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -736,7 +795,7 @@ export default function Dashboard() {
                                                         backgroundColor: c.dot,
                                                     }}
                                                 />
-                                                <span className="text-[9px] text-white/25">
+                                                <span className="text-[9px] text-neutral-400 dark:text-white/25">
                                                     {c.label}
                                                 </span>
                                             </div>
@@ -745,7 +804,7 @@ export default function Dashboard() {
                             </div>
 
                             {breedMemoryWall.length === 0 ? (
-                                <p className="text-xs text-white/20">
+                                <p className="text-xs text-neutral-400 dark:text-white/20">
                                     No breeds yet — submit a correction to
                                     populate memory
                                 </p>
@@ -797,14 +856,14 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* ── Recent Scans table ────────────────────────────────── */}
-                <div className="overflow-hidden rounded-2xl border border-white/8 bg-neutral-900">
-                    <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
+                {/* ── Recent Scans ─────────────────────────────────────── */}
+                <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
+                    <div className="flex items-center justify-between border-b border-neutral-100 px-6 py-4 dark:border-white/[0.06]">
                         <div>
-                            <h2 className="font-bold text-white">
+                            <h2 className="font-bold text-neutral-900 dark:text-white">
                                 Recent Scans
                             </h2>
-                            <p className="text-xs text-white/35">
+                            <p className="text-xs text-neutral-400 dark:text-white/35">
                                 Latest AI predictions
                             </p>
                         </div>
@@ -812,7 +871,7 @@ export default function Dashboard() {
                             variant="outline"
                             size="sm"
                             onClick={() => router.visit('/model/scan-results')}
-                            className="border-white/10 bg-white/4 text-white/50 hover:bg-white/8 hover:text-white"
+                            className="border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:border-white/10 dark:bg-white/4 dark:text-white/50 dark:hover:bg-white/8 dark:hover:text-white"
                         >
                             View All <ChevronRight className="ml-1 h-4 w-4" />
                         </Button>
@@ -820,7 +879,7 @@ export default function Dashboard() {
                     <div className="overflow-x-auto px-5">
                         <Table>
                             <TableHeader>
-                                <TableRow className="border-white/5">
+                                <TableRow className="border-neutral-100 dark:border-white/5">
                                     {[
                                         'Scan ID',
                                         'Breed',
@@ -829,7 +888,7 @@ export default function Dashboard() {
                                     ].map((h) => (
                                         <TableHead
                                             key={h}
-                                            className="text-white/30"
+                                            className="text-neutral-400 dark:text-white/30"
                                         >
                                             {h}
                                         </TableHead>
@@ -840,17 +899,17 @@ export default function Dashboard() {
                                 {results?.map((r) => (
                                     <TableRow
                                         key={r.scan_id}
-                                        className="border-white/5"
+                                        className="border-neutral-100 dark:border-white/5"
                                     >
-                                        <TableCell className="font-mono text-xs text-white/30">
+                                        <TableCell className="font-mono text-xs text-neutral-400 dark:text-white/30">
                                             {r.scan_id}
                                         </TableCell>
-                                        <TableCell className="font-medium text-white">
+                                        <TableCell className="font-semibold text-neutral-800 dark:text-white">
                                             {r.breed}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/8">
+                                                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-neutral-100 dark:bg-white/8">
                                                     <div
                                                         className="h-full rounded-full"
                                                         style={{
@@ -869,7 +928,7 @@ export default function Dashboard() {
                                                         }}
                                                     />
                                                 </div>
-                                                <span className="text-sm font-bold text-white/60">
+                                                <span className="text-sm font-bold text-neutral-600 dark:text-white/60">
                                                     {r.confidence}%
                                                 </span>
                                             </div>
@@ -880,22 +939,22 @@ export default function Dashboard() {
                                                     [
                                                         80,
                                                         'High',
-                                                        'bg-emerald-500/12 text-emerald-400 border-emerald-500/20',
+                                                        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/12 dark:text-emerald-400 dark:border-emerald-500/20',
                                                     ],
                                                     [
                                                         60,
                                                         'Medium',
-                                                        'bg-blue-500/12 text-blue-400 border-blue-500/20',
+                                                        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/12 dark:text-blue-400 dark:border-blue-500/20',
                                                     ],
                                                     [
                                                         40,
                                                         'Low',
-                                                        'bg-amber-500/12 text-amber-400 border-amber-500/20',
+                                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/12 dark:text-amber-400 dark:border-amber-500/20',
                                                     ],
                                                     [
                                                         0,
                                                         'Very Low',
-                                                        'bg-red-500/12 text-red-400 border-red-500/20',
+                                                        'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/12 dark:text-red-400 dark:border-red-500/20',
                                                     ],
                                                 ] as [number, string, string][]
                                             )
@@ -903,7 +962,7 @@ export default function Dashboard() {
                                                     r.confidence >= thresh ? (
                                                         <span
                                                             key={label}
-                                                            className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${cls}`}
+                                                            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${cls}`}
                                                         >
                                                             {label}
                                                         </span>
