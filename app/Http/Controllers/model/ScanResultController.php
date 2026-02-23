@@ -1150,9 +1150,9 @@ PROMPT;
                     ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 1024,
+                        'maxOutputTokens' => 3024,
                         'thinkingConfig'  => [
-                            'thinkingBudget' => 1024,
+                            'thinkingBudget' => 3024,
                         ],
                     ],
                     'safetySettings' => [
