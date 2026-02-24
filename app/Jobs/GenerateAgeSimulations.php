@@ -67,12 +67,12 @@ class GenerateAgeSimulations implements ShouldQueue
       ];
 
       if (isset($simulations['1_year']) && $simulations['1_year']) {
-        $savedPaths['1_years'] = $this->saveImage($simulations['1_year'], '1_year', $this->resultId);
+        $savedPaths['1_years'] = $this->saveImage($simulations['1_year'], '1_year', $this->resultId, $imageData);
         Log::info("✅ 1-year saved: {$savedPaths['1_years']}");
       }
 
       if (isset($simulations['3_years']) && $simulations['3_years']) {
-        $savedPaths['3_years'] = $this->saveImage($simulations['3_years'], '3_years', $this->resultId);
+        $savedPaths['3_years'] = $this->saveImage($simulations['3_years'], '3_years', $this->resultId, $imageData);
         Log::info("✅ 3-years saved: {$savedPaths['3_years']}");
       }
 
@@ -232,64 +232,77 @@ class GenerateAgeSimulations implements ShouldQueue
    */
   private function buildAgingPrompt($profile, $years)
   {
-    $breed    = $profile['breed'];
-    $size     = $profile['size_category'];
-    $coat     = $profile['coat_type'];
+    $breed   = $profile['breed'];
+    $size    = $profile['size_category'];
+    $coat    = $profile['coat_type'];
     $isBrachy = $profile['brachycephalic'];
-    $grows    = $profile['grows_significantly'];
+    $grows   = $profile['grows_significantly'];
 
-    // ── Build a vivid, specific description of what this dog looks like RIGHT NOW (puppy) ──
-    $currentDesc = $this->describePuppyStage($size, $coat, $isBrachy);
-
-    // ── Build a vivid, specific description of what adult looks like ──
-    $adultDesc = $this->describeAdultStage($profile, $years);
-
-    // ── Aging-specific physical changes ──
+    $adultDesc      = $this->describeAdultStage($profile, $years);
     $physicalChanges = $this->describePhysicalChanges($profile, $years);
+    $currentDesc    = $this->describePuppyStage($size, $coat, $isBrachy);
 
     $lines = [];
-    $lines[] = "PHOTO EDITING TASK: Transform this puppy into an adult {$breed} aged {$years} year(s) older.";
+
+    // ── STEP 1: Immediately establish this is a photo EDIT, not a generation ──
+    $lines[] = "THIS IS A PHOTO EDITING TASK — NOT IMAGE GENERATION.";
+    $lines[] = "You are editing the attached photograph. You must preserve everything except the dog's age.";
     $lines[] = "";
-    $lines[] = "================================================================";
-    $lines[] = "SCENE PRESERVATION (copy these EXACTLY, pixel-perfect):";
-    $lines[] = "================================================================";
-    $lines[] = "- Background: every object, color, texture, lighting — IDENTICAL";
-    $lines[] = "- Camera angle and zoom — IDENTICAL";
-    $lines[] = "- If the dog is being held, the hands/arms stay in the same position";
-    $lines[] = "- All people, furniture, floor visible in the photo — IDENTICAL";
-    $lines[] = "- Photo quality, grain, brightness — IDENTICAL";
-    $lines[] = "FORBIDDEN: white background, studio backdrop, different camera angle, removed people";
+
+    // ── STEP 2: Scene lock — described BEFORE any dog details ──
+    $lines[] = "STEP 1 — MEMORIZE THE SCENE (do this before anything else):";
+    $lines[] = "Look at the input photo and memorize every detail of the environment:";
+    $lines[] = "- The exact background (walls, floor, grass, furniture, objects, sky, trees)";
+    $lines[] = "- The exact camera angle and distance";
+    $lines[] = "- The exact lighting (direction, quality, shadows)";
+    $lines[] = "- The exact position and pose of the dog in the frame";
+    $lines[] = "- Everything visible besides the dog";
+    $lines[] = "All of this will be reproduced EXACTLY in the output. Nothing in the environment changes.";
     $lines[] = "";
-    $lines[] = "================================================================";
-    $lines[] = "THE DOG RIGHT NOW (puppy features to REPLACE):";
-    $lines[] = "================================================================";
+    $lines[] = "STEP 2 — WHAT MUST NEVER CHANGE (hard constraints):";
+    $lines[] = "  NO: different or new background environment";
+    $lines[] = "  NO: black, white, or studio backdrop (even if the dog grows)";
+    $lines[] = "  NO: different camera angle or viewpoint";
+    $lines[] = "  NO: zooming in or out — the dog stays the same size relative to the frame";
+    $lines[] = "  NO: different pose or body orientation from the original";
+    $lines[] = "  NO: removing people, hands, objects or furniture from the scene";
+    $lines[] = "  NO: cropping or changing the image dimensions";
+    $lines[] = "  NO: changing image aspect ratio";
+    $lines[] = "";
+
+    // ── STEP 3: The actual aging task ──
+    $lines[] = "STEP 3 — AGE THE DOG ONLY (apply all changes only to the dog):";
+    $lines[] = "Breed: {$breed}";
+    $lines[] = "Age the dog forward by {$years} year(s).";
+    $lines[] = "";
+    $lines[] = "CURRENT DOG ASSESSMENT:";
     $lines[] = $currentDesc;
     $lines[] = "";
-    $lines[] = "================================================================";
-    $lines[] = "WHAT THE DOG MUST LOOK LIKE IN {$years} YEAR(S) (apply ALL of these):";
-    $lines[] = "================================================================";
+    $lines[] = "TARGET APPEARANCE AFTER {$years} YEAR(S):";
     $lines[] = $adultDesc;
     $lines[] = "";
-    $lines[] = "================================================================";
-    $lines[] = "SPECIFIC PHYSICAL CHANGES TO MAKE:";
-    $lines[] = "================================================================";
+    $lines[] = "SPECIFIC PHYSICAL CHANGES TO APPLY:";
     $lines[] = $physicalChanges;
     $lines[] = "";
-    $lines[] = "================================================================";
-    $lines[] = "HEALTH RULE — the dog must look:";
-    $lines[] = "================================================================";
-    $lines[] = "- Healthy, well-fed, well-groomed, clean coat";
-    $lines[] = "- Happy or calm expression — NOT sad, sick, thin, or neglected";
-    $lines[] = "- Natural biological aging — this dog is THRIVING";
+
+    // ── STEP 4: Health rule ──
+    $lines[] = "STEP 4 — HEALTH RULE:";
+    $lines[] = "The dog must look: healthy, well-fed, clean, well-groomed, happy or calm.";
+    $lines[] = "NOT sick, thin, matted, sad, or neglected. This dog is thriving.";
     $lines[] = "";
-    $lines[] = "VERIFY BEFORE OUTPUTTING:";
-    $lines[] = "[ ] Dog is visibly and clearly older/bigger than in the input photo";
-    $lines[] = "[ ] Background matches input exactly";
-    $lines[] = "[ ] Coat color and markings are preserved";
-    $lines[] = "[ ] Dog looks healthy and well-groomed";
-    $lines[] = "[ ] Puppy proportions (big head, small body) are gone — replaced by adult proportions";
+
+    // ── STEP 5: Final check — background repeated again as last instruction ──
+    $lines[] = "STEP 5 — FINAL VERIFICATION before outputting:";
+    $lines[] = "Ask yourself: Does the output background look EXACTLY like the input background?";
+    $lines[] = "  - Same room / outdoor scene? YES / NO";
+    $lines[] = "  - Same floor / ground? YES / NO";
+    $lines[] = "  - Same camera angle? YES / NO";
+    $lines[] = "  - Same framing / zoom level? YES / NO";
+    $lines[] = "  - Dog looks clearly older than input? YES / NO";
+    $lines[] = "  - Dog looks healthy? YES / NO";
+    $lines[] = "If ANY answer is NO — regenerate until all are YES.";
     $lines[] = "";
-    $lines[] = "Output the transformed image now.";
+    $lines[] = "Now output the edited photograph.";
 
     return implode("
 ", $lines);
@@ -300,16 +313,25 @@ class GenerateAgeSimulations implements ShouldQueue
    */
   private function describePuppyStage($size, $coat, $isBrachy)
   {
+    // We describe what we see NOW — could be puppy OR adult dog
+    // The AI should read the actual photo and apply aging relative to current age
     $lines = [];
-    $lines[] = "- Oversized head relative to body (puppy proportion)";
-    $lines[] = "- Short, stubby legs relative to body";
-    $lines[] = "- Round, soft puppy face with chubby cheeks";
-    $lines[] = "- Small, compact body";
-    $lines[] = "- Soft, thin puppy coat (not fully developed)";
-    $lines[] = "- Wide, innocent, large-looking eyes relative to face";
-    $lines[] = "- Small, underdeveloped muzzle";
-    $lines[] = "- Belly may be slightly round/pudgy (puppy belly)";
-    $lines[] = "- Floppy, unsteady energy — everything looks soft and small";
+    $lines[] = "Look at the dog in the input photo carefully. Determine if it appears to be:";
+    $lines[] = "  (A) A puppy — small, round head, short legs, soft features, underdeveloped coat";
+    $lines[] = "  (B) A young adult — already adult proportions but not fully mature";
+    $lines[] = "  (C) A mature adult — fully grown, defined features";
+    $lines[] = "";
+    $lines[] = "The aging transformation should be applied RELATIVE to what the dog currently is.";
+    $lines[] = "Do NOT assume every dog in the photo is a puppy.";
+    $lines[] = "If the dog already looks like an adult, apply subtle maturity aging only (slight graying, settled expression).";
+    $lines[] = "If the dog is a puppy, apply full growth transformation.";
+    $lines[] = "";
+    $lines[] = "Puppy indicators (if present in this photo):";
+    $lines[] = "- Oversized round head relative to body";
+    $lines[] = "- Short stubby legs relative to body length";
+    $lines[] = "- Round soft face, chubby cheeks, large innocent eyes";
+    $lines[] = "- Underdeveloped thin coat";
+    $lines[] = "- Small compact body with pudgy belly";
     return implode("
 ", $lines);
   }
@@ -413,14 +435,17 @@ class GenerateAgeSimulations implements ShouldQueue
     $grows     = $profile['grows_significantly'];
 
     $lines = [];
-    $lines[] = "REMOVE these puppy features from the dog in the photo:";
-    $lines[] = "  - Oversized round head relative to body → replace with proportionate adult head";
-    $lines[] = "  - Short stubby legs → replace with longer, more muscular adult legs";
-    $lines[] = "  - Chubby, round, soft face → replace with defined adult facial structure";
-    $lines[] = "  - Thin, underdeveloped puppy coat → replace with full adult coat";
-    $lines[] = "  - Pudgy, round puppy belly → replace with leaner adult torso";
-    $lines[] = "  - Wide innocent puppy eyes relative to face → eyes now proportionate to adult head";
-    $lines[] = "  - Wobbly, uncertain puppy posture → confident adult stance";
+    $lines[] = "If the dog in the photo is a PUPPY, apply these changes:";
+    $lines[] = "  REMOVE: oversized round head, short stubby legs, chubby soft face,";
+    $lines[] = "           underdeveloped thin coat, pudgy belly, wide innocent eyes";
+    $lines[] = "  ADD: adult proportions per the breed description above";
+    $lines[] = "";
+    $lines[] = "If the dog in the photo is already an ADULT, apply only these subtle changes:";
+    $lines[] = "  - Slightly more settled, mature expression";
+    $lines[] = "  - Minor coat texture changes appropriate to age";
+    $lines[] = "  - Subtle graying if breed-appropriate";
+    $lines[] = "  - Marginally deeper chest / more filled-out musculature";
+    $lines[] = "  - Do NOT make dramatic size changes to an already adult-sized dog";
     $lines[] = "";
 
     if ($years === 1) {
@@ -1207,12 +1232,18 @@ class GenerateAgeSimulations implements ShouldQueue
         $imageInfo = @getimagesizefromstring($imageContents);
         if ($imageInfo === false) throw new \Exception('Invalid image');
 
-        $width  = $imageInfo[0];
-        $height = $imageInfo[1];
-        $targetSize = 1024; // Smaller = faster API response
+        $origWidth  = $imageInfo[0];
+        $origHeight = $imageInfo[1];
+        $targetSize = 1024;
 
-        if ($width > $targetSize || $height > $targetSize) {
+        if ($origWidth > $targetSize || $origHeight > $targetSize) {
           $imageContents = $this->resizeImage($imageContents, $targetSize);
+          $resized = @getimagesizefromstring($imageContents);
+          $width   = $resized[0];
+          $height  = $resized[1];
+        } else {
+          $width  = $origWidth;
+          $height = $origHeight;
         }
 
         $img = imagecreatefromstring($imageContents);
@@ -1223,8 +1254,17 @@ class GenerateAgeSimulations implements ShouldQueue
         $optimized = ob_get_clean();
         imagedestroy($img);
 
-        Log::info("✅ Image prepared: " . round(strlen($optimized) / 1024, 2) . " KB");
-        return ['base64' => base64_encode($optimized), 'mimeType' => 'image/jpeg'];
+        Log::info("✅ Image prepared: {$width}x{$height} — " . round(strlen($optimized) / 1024, 2) . " KB");
+
+        return [
+          'base64'       => base64_encode($optimized),
+          'mimeType'     => 'image/jpeg',
+          'width'        => $width,
+          'height'       => $height,
+          'origWidth'    => $origWidth,
+          'origHeight'   => $origHeight,
+          'aspectRatio'  => round($origWidth / $origHeight, 4),
+        ];
       });
     } catch (\Exception $e) {
       Log::error("Image prep failed: " . $e->getMessage());
@@ -1255,11 +1295,28 @@ class GenerateAgeSimulations implements ShouldQueue
     return $output;
   }
 
-  private function saveImage($imageOutput, $type, $resultId)
+  private function saveImage($imageOutput, $type, $resultId, $imageData = null)
   {
     try {
       $img = imagecreatefromstring($imageOutput);
       if ($img === false) throw new \Exception('Failed to create output image');
+
+      $outW = imagesx($img);
+      $outH = imagesy($img);
+
+      // Resize output to match original image dimensions if we have them
+      if ($imageData && isset($imageData['origWidth'], $imageData['origHeight'])) {
+        $targetW = $imageData['origWidth'];
+        $targetH = $imageData['origHeight'];
+
+        if ($outW !== $targetW || $outH !== $targetH) {
+          $resized = imagecreatetruecolor($targetW, $targetH);
+          imagecopyresampled($resized, $img, 0, 0, 0, 0, $targetW, $targetH, $outW, $outH);
+          imagedestroy($img);
+          $img = $resized;
+          Log::info("🔧 Resized output: {$outW}x{$outH} → {$targetW}x{$targetH}");
+        }
+      }
 
       ob_start();
       imagewebp($img, null, 88);
