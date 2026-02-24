@@ -216,25 +216,94 @@ class ScanResultController extends Controller
 
     private function getLearningHeatmap(): array
     {
-        $days   = 84; // 12 weeks
-        $result = [];
+        $today = \Carbon\Carbon::now()->startOfDay();
 
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $date  = \Carbon\Carbon::now()->subDays($i)->startOfDay();
-            $count = \App\Models\BreedCorrection::whereDate('created_at', $date->toDateString())->count();
+        // ── Grid start: the Sunday of the week that is 11 full weeks before
+        //   the Sunday of the CURRENT week.  This gives us 12 complete columns
+        //   of 7 days each, just like GitHub. ──────────────────────────────────
+        $startOfCurrentWeek = $today->copy()->startOfWeek(\Carbon\Carbon::SUNDAY);
+        $gridStart = $startOfCurrentWeek->copy()->subWeeks(11);   // 11 weeks back → col 0
+
+        // ── Grid end: the last day of the current month. ─────────────────────
+        //   This ensures the rightmost column always shows through the end of
+        //   the month, never stopping mid-week on "today".
+        $gridEnd = $today->copy()->endOfMonth()->startOfDay();
+
+        // ── Fetch all correction counts in the full range (past + future = 0) ─
+        $rawCounts = \App\Models\BreedCorrection::whereBetween('created_at', [
+            $gridStart,
+            $today->copy()->endOfDay(),
+        ])
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as cnt')
+            ->groupBy('day')
+            ->pluck('cnt', 'day')
+            ->toArray();
+
+        $todayISO = $today->toDateString();
+        $result   = [];
+        $col      = 0;
+
+        $cursor = $gridStart->copy();
+        while ($cursor <= $gridEnd) {
+            $iso      = $cursor->toDateString();
+            $isFuture = $cursor->gt($today);
+            $count    = $isFuture ? 0 : (int) ($rawCounts[$iso] ?? 0);
+            $dow      = (int) $cursor->dayOfWeek;   // 0 = Sun … 6 = Sat
+
+            // Advance column index every Sunday (except the very first cell)
+            if ($dow === 0 && $iso !== $gridStart->toDateString()) {
+                $col++;
+            }
 
             $result[] = [
-                'date'        => $date->toDateString(),       // "2026-02-15"
+                'date'        => $iso,
                 'count'       => $count,
-                'week'        => (int) floor(($days - 1 - $i) / 7),  // 0–11
-                'day_of_week' => (int) $date->dayOfWeek,              // 0=Sun … 6=Sat
-                'label'       => $date->format('M j, Y'),             // "Feb 15, 2026"
-                'is_today'    => $i === 0,
+                'week'        => $col,
+                'day_of_week' => $dow,
+                'label'       => $cursor->format('M j, Y'),
+                'is_today'    => $iso === $todayISO,
+                'is_future'   => $isFuture,
             ];
+
+            $cursor->addDay();
         }
 
         return $result;
     }
+
+
+    /**
+     * =============================================================================
+     *  REPLACEMENT: getHeatmapSummary()
+     *
+     *  Unchanged in logic but updated to ignore future cells when computing stats.
+     * =============================================================================
+     */
+    private function getHeatmapSummary(array $heatmap): array
+    {
+        $past = array_filter($heatmap, fn($d) => !($d['is_future'] ?? false));
+
+        $activeDays   = count(array_filter($past, fn($d) => $d['count'] > 0));
+        $totalInRange = array_sum(array_column(array_values($past), 'count'));
+        $streak       = 0;
+
+        foreach (array_reverse(array_values($past)) as $day) {
+            if ($day['count'] > 0) $streak++;
+            else break;
+        }
+
+        $maxDay = collect($past)->sortByDesc('count')->first();
+
+        return [
+            'active_days'    => $activeDays,
+            'total_in_range' => $totalInRange,
+            'current_streak' => $streak,
+            'best_day_count' => $maxDay ? $maxDay['count'] : 0,
+            'best_day_label' => $maxDay ? $maxDay['label'] : '',
+        ];
+    }
+
+
 
     /**
      * Returns one chip per unique corrected breed for the memory wall.
@@ -277,28 +346,7 @@ class ScanResultController extends Controller
     /**
      * Returns a small summary for the heatmap header stats.
      */
-    private function getHeatmapSummary(array $heatmap): array
-    {
-        $activeDays   = count(array_filter($heatmap, fn($d) => $d['count'] > 0));
-        $totalInRange = array_sum(array_column($heatmap, 'count'));
-        $streak       = 0;
 
-        // Count current streak (consecutive days ending today with ≥1 correction)
-        foreach (array_reverse($heatmap) as $day) {
-            if ($day['count'] > 0) $streak++;
-            else break;
-        }
-
-        $maxDay = collect($heatmap)->sortByDesc('count')->first();
-
-        return [
-            'active_days'    => $activeDays,
-            'total_in_range' => $totalInRange,
-            'current_streak' => $streak,
-            'best_day_count' => $maxDay ? $maxDay['count'] : 0,
-            'best_day_label' => $maxDay ? $maxDay['label'] : '',
-        ];
-    }
 
 
 
@@ -325,7 +373,7 @@ class ScanResultController extends Controller
         $resultCount         = $result->count();
 
         // Pending review = scans not yet corrected
-        $correctedScanIds  = BreedCorrection::pluck('scan_id');
+        $correctedScanIds   = BreedCorrection::pluck('scan_id');
         $pendingReviewCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
 
         $lowConfidenceCount  = $result->where('confidence', '<=', 40)->count();
@@ -336,18 +384,17 @@ class ScanResultController extends Controller
         $oneMonthAgo = Carbon::now()->subDays(30);
 
         // -------------------------------------------------------------------------
-        // AI Training Activity — heatmap + breed memory wall (replaces old
-        // breedLearningProgress table).  Zero dependency on ML API.
+        // AI Training Activity — heatmap + breed memory wall
         // -------------------------------------------------------------------------
-        $learningHeatmap   = $this->getLearningHeatmap();
-        $heatmapSummary    = $this->getHeatmapSummary($learningHeatmap);
-        $breedMemoryWall   = $this->getBreedMemoryWall();
+        $learningHeatmap = $this->getLearningHeatmap();
+        $heatmapSummary  = $this->getHeatmapSummary($learningHeatmap);
+        $breedMemoryWall = $this->getBreedMemoryWall();
 
         // Keep the old variable as an empty array so nothing else breaks
         $breedLearningProgress = [];
 
         // -------------------------------------------------------------------------
-        // Day-by-day learning timeline — 10 days (NEW FEATURE)
+        // Day-by-day learning timeline — 10 days
         // -------------------------------------------------------------------------
         $learningTimeline = $this->getLearningTimeline(10);
 
@@ -366,8 +413,8 @@ class ScanResultController extends Controller
                 $uniqueBreeds = array_keys($statsResponse['data']['breeds'] ?? []);
 
                 Log::info('✓ Memory stats fetched from ML API', [
-                    'memory_count'   => $memoryCount,
-                    'unique_breeds'  => count($uniqueBreeds),
+                    'memory_count'  => $memoryCount,
+                    'unique_breeds' => count($uniqueBreeds),
                 ]);
             } else {
                 Log::warning('⚠️ ML API memory stats unavailable', [
@@ -413,8 +460,8 @@ class ScanResultController extends Controller
             $avgCorrectionsPerDay     = $knowledgeBaseGrowth / $daysSinceLearningStarted;
             $learningConsistency      = min(100, $avgCorrectionsPerDay * 20);
 
-            $recentCorrections    = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
-            $recentActivityScore  = min(100, $recentCorrections * 10);
+            $recentCorrections   = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
+            $recentActivityScore = min(100, $recentCorrections * 10);
 
             $learningProgressScore = (
                 (min(100, ($knowledgeBaseGrowth / 100) * 100) * 0.25) +
@@ -431,22 +478,22 @@ class ScanResultController extends Controller
             $accuracyImprovement       = $learningProgressScore;
 
             $learningBreakdown = [
-                'knowledge_base'           => $knowledgeBaseGrowth,
-                'memory_usage'             => round($memoryUtilization, 1),
-                'breed_coverage'           => $uniqueBreedsLearned,
-                'avg_corrections_per_day'  => round($avgCorrectionsPerDay, 1),
-                'recent_activity'          => $recentCorrections,
+                'knowledge_base'          => $knowledgeBaseGrowth,
+                'memory_usage'            => round($memoryUtilization, 1),
+                'breed_coverage'          => $uniqueBreedsLearned,
+                'avg_corrections_per_day' => round($avgCorrectionsPerDay, 1),
+                'recent_activity'         => $recentCorrections,
             ];
         } else {
             $accuracyBeforeCorrections = 0;
             $accuracyAfterCorrections  = 0;
             $accuracyImprovement       = 0;
             $learningBreakdown = [
-                'knowledge_base'           => 0,
-                'memory_usage'             => 0,
-                'breed_coverage'           => 0,
-                'avg_corrections_per_day'  => 0,
-                'recent_activity'          => 0,
+                'knowledge_base'          => 0,
+                'memory_usage'            => 0,
+                'breed_coverage'          => 0,
+                'avg_corrections_per_day' => 0,
+                'recent_activity'         => 0,
             ];
         }
 
@@ -455,9 +502,9 @@ class ScanResultController extends Controller
         // -------------------------------------------------------------------------
         $avgConfidence = $currentWeekResults->avg('confidence') ?? 0;
 
-        $previousWeekResults    = Results::where('created_at', '>=', $twoWeeksAgo)
+        $previousWeekResults   = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->get();
-        $previousAvgConfidence  = $previousWeekResults->avg('confidence') ?? 0;
+        $previousAvgConfidence = $previousWeekResults->avg('confidence') ?? 0;
 
         $confidenceTrend = $previousAvgConfidence > 0
             ? $avgConfidence - $previousAvgConfidence
@@ -472,7 +519,7 @@ class ScanResultController extends Controller
             : 0;
 
         // -------------------------------------------------------------------------
-        // Weekly trends for the 4 key metrics
+        // Weekly trends for the 4 key metric cards
         // -------------------------------------------------------------------------
         $currentWeekScans       = Results::where('created_at', '>=', $oneWeekAgo)->count();
         $previousWeekScansCount = Results::where('created_at', '>=', $twoWeeksAgo)
@@ -488,26 +535,44 @@ class ScanResultController extends Controller
             ? (($currentWeekCorrected - $previousWeekCorrected) / $previousWeekCorrected) * 100
             : 0;
 
-        $currentWeekHigh         = Results::where('created_at', '>=', $oneWeekAgo)
+        $currentWeekHigh          = Results::where('created_at', '>=', $oneWeekAgo)
             ->where('confidence', '>=', 80)->count();
-        $previousWeekHigh        = Results::where('created_at', '>=', $twoWeeksAgo)
+        $previousWeekHigh         = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->where('confidence', '>=', 80)->count();
         $highConfidenceWeeklyTrend = $previousWeekHigh > 0
             ? (($currentWeekHigh - $previousWeekHigh) / $previousWeekHigh) * 100
             : 0;
 
-        $currentWeekLow         = Results::where('created_at', '>=', $oneWeekAgo)
+        $currentWeekLow           = Results::where('created_at', '>=', $oneWeekAgo)
             ->where('confidence', '<=', 40)->count();
-        $previousWeekLow        = Results::where('created_at', '>=', $twoWeeksAgo)
+        $previousWeekLow          = Results::where('created_at', '>=', $twoWeeksAgo)
             ->where('created_at', '<', $oneWeekAgo)->where('confidence', '<=', 40)->count();
         $lowConfidenceWeeklyTrend = $previousWeekLow > 0
             ? (($currentWeekLow - $previousWeekLow) / $previousWeekLow) * 100
             : 0;
 
+        // -------------------------------------------------------------------------
+        // NEW: Breeds Taught weekly trend
+        // Counts distinct breeds corrected this week vs last week.
+        // Used by the "Breeds Taught" card replacing the duplicate Avg Confidence.
+        // -------------------------------------------------------------------------
+        $currentWeekBreeds  = BreedCorrection::where('created_at', '>=', $oneWeekAgo)
+            ->distinct('corrected_breed')
+            ->count('corrected_breed');
+
+        $previousWeekBreeds = BreedCorrection::where('created_at', '>=', $twoWeeksAgo)
+            ->where('created_at', '<', $oneWeekAgo)
+            ->distinct('corrected_breed')
+            ->count('corrected_breed');
+
+        $breedsTaughtTrend = $previousWeekBreeds > 0
+            ? round((($currentWeekBreeds - $previousWeekBreeds) / $previousWeekBreeds) * 100, 1)
+            : 0;
+
         $lastMilestone = floor($correctedBreedCount / 5) * 5;
 
         // -------------------------------------------------------------------------
-        // Return to Inertia — learningTimeline is the new addition
+        // Return to Inertia
         // -------------------------------------------------------------------------
         return inertia('dashboard', [
             'results'                   => $results,
@@ -522,6 +587,7 @@ class ScanResultController extends Controller
             'lowConfidenceWeeklyTrend'  => round($lowConfidenceWeeklyTrend, 1),
             'memoryCount'               => $memoryCount,
             'uniqueBreedsLearned'       => count($uniqueBreeds),
+            'breedsTaughtTrend'         => $breedsTaughtTrend,        // ← NEW
             'recentCorrectionsCount'    => $recentCorrectionsCount,
             'avgConfidence'             => round($avgConfidence, 2),
             'confidenceTrend'           => round($confidenceTrend, 2),
@@ -534,9 +600,9 @@ class ScanResultController extends Controller
             'breedLearningProgress'     => $breedLearningProgress,
             'learningBreakdown'         => $learningBreakdown ?? [],
             'learningTimeline'          => $learningTimeline,
-            'learningHeatmap'           => $learningHeatmap,    // ← NEW
-            'heatmapSummary'            => $heatmapSummary,     // ← NEW
-            'breedMemoryWall'           => $breedMemoryWall,    // ← NEW
+            'learningHeatmap'           => $learningHeatmap,
+            'heatmapSummary'            => $heatmapSummary,
+            'breedMemoryWall'           => $breedMemoryWall,
         ]);
     }
 

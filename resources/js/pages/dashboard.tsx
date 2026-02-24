@@ -17,21 +17,22 @@ import {
     BarChart3,
     Brain,
     ChevronRight,
-    ClipboardList,
     Database,
     GraduationCap,
     LineChart,
     Minus,
+    PawPrint,
     Sparkles,
     Target,
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
 ];
 
 type Result = { scan_id: string; breed: string; confidence: number };
+
 type HeatmapDay = {
     date: string;
     count: number;
@@ -39,7 +40,9 @@ type HeatmapDay = {
     day_of_week: number;
     label: string;
     is_today: boolean;
+    is_future?: boolean;
 };
+
 type HeatmapSummary = {
     active_days: number;
     total_in_range: number;
@@ -47,6 +50,7 @@ type HeatmapSummary = {
     best_day_count: number;
     best_day_label: string;
 };
+
 type MemoryChip = {
     breed: string;
     times_taught: number;
@@ -54,6 +58,7 @@ type MemoryChip = {
     days_ago: number;
     level: 'new' | 'learning' | 'trained' | 'expert';
 };
+
 type TimelineDay = {
     day: string;
     date: string;
@@ -75,6 +80,8 @@ type PageProps = {
     totalScansWeeklyTrend?: number;
     correctedWeeklyTrend?: number;
     highConfidenceWeeklyTrend?: number;
+    uniqueBreedsLearned?: number;
+    breedsTaughtTrend?: number;
     memoryCount?: number;
     avgConfidence?: number;
     confidenceTrend?: number;
@@ -86,7 +93,7 @@ type PageProps = {
     breedMemoryWall?: MemoryChip[];
 };
 
-/* ── level config ─────────────────────────────────────────────────────────── */
+/* ── level config ──────────────────────────────────────────────────────────── */
 const LEVEL_CFG = {
     expert: {
         bg: 'bg-emerald-500/15',
@@ -116,219 +123,208 @@ const LEVEL_CFG = {
         dot: '#f59e0b',
         label: 'New',
     },
-};
+} as const;
 
-/* ── heatmap colours (GitHub green palette) ──────────────────────────────── */
-function heatColor(count: number, max: number, isDark: boolean): string {
-    if (count === 0) return isDark ? '#21262d' : '#ebedf0';
-    const r = Math.min(count / Math.max(max, 1), 1);
-    if (isDark) {
-        if (r < 0.25) return '#0e4429';
-        if (r < 0.5) return '#006d32';
-        if (r < 0.75) return '#26a641';
-        return '#39d353';
-    } else {
-        if (r < 0.25) return '#9be9a8';
-        if (r < 0.5) return '#40c463';
-        if (r < 0.75) return '#30a14e';
-        return '#216e39';
-    }
-}
+/* ── detect dark mode reliably ─────────────────────────────────────────────── */
+function useDarkMode(): boolean {
+    const [dark, setDark] = useState(() => {
+        if (typeof document === 'undefined') return true;
+        return document.documentElement.classList.contains('dark');
+    });
 
-/* ── CompactHeatmap ───────────────────────────────────────────────────────── */
-function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
-    const [hovered, setHovered] = useState<HeatmapDay | null>(null);
-    const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
-    const [isDark, setIsDark] = useState(true);
-
-    useEffect(() => {
-        const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        // also check html class (Tailwind dark mode)
+    useLayoutEffect(() => {
         const check = () =>
-            setIsDark(
-                document.documentElement.classList.contains('dark') ||
-                    mq.matches,
-            );
+            setDark(document.documentElement.classList.contains('dark'));
         check();
         const obs = new MutationObserver(check);
         obs.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ['class'],
         });
-        mq.addEventListener('change', check);
-        return () => {
-            obs.disconnect();
-            mq.removeEventListener('change', check);
-        };
+        return () => obs.disconnect();
     }, []);
 
-    /* Build lookup */
-    const byDate: Record<string, HeatmapDay> = {};
+    return dark;
+}
+
+/* ── heatmap cell colours ──────────────────────────────────────────────────── */
+// GitHub green scale — light & dark variants
+const HEAT_DARK = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
+const HEAT_LIGHT = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+const FUTURE_DARK = '#0d1117'; // near-invisible future cells
+const FUTURE_LIGHT = '#f6f8fa';
+
+function levelIndex(count: number, max: number): number {
+    if (count === 0) return 0;
+    const r = count / Math.max(max, 1);
+    if (r < 0.25) return 1;
+    if (r < 0.5) return 2;
+    if (r < 0.75) return 3;
+    return 4;
+}
+
+/* ── CompactHeatmap ────────────────────────────────────────────────────────── */
+function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
+    const dark = useDarkMode();
+    const [hovered, setHovered] = useState<HeatmapDay | null>(null);
+    const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
+
+    const palette = dark ? HEAT_DARK : HEAT_LIGHT;
+
+    /* ── build week columns ──────────────────────────────────────────── */
+    // Find total number of columns
+    const numCols = (days[days.length - 1]?.week ?? 0) + 1;
+
+    // Initialise a (numCols × 7) grid filled with null
+    const grid: (HeatmapDay | null)[][] = Array.from({ length: numCols }, () =>
+        Array(7).fill(null),
+    );
+
     days.forEach((d) => {
-        byDate[d.date] = d;
+        if (d.week < numCols && d.day_of_week < 7) {
+            grid[d.week][d.day_of_week] = d;
+        }
     });
 
-    /*
-     * GitHub algorithm:
-     * - The LAST column = the week containing TODAY (rightmost).
-     * - The FIRST column = 11 weeks before that (leftmost).
-     * - Each column starts on SUNDAY (row 0) and ends on SATURDAY (row 6).
-     * - We work BACKWARDS from today to find the Sunday that starts col 11,
-     *   then fill all 12 × 7 cells from that anchor forward.
-     */
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-    const todayISO = todayDate.toISOString().slice(0, 10);
-
-    // Sunday of this week (the start of column 11)
-    const lastColSunday = new Date(todayDate);
-    lastColSunday.setDate(todayDate.getDate() - todayDate.getDay()); // rewind to Sunday
-
-    // Sunday of column 0  = 11 weeks before lastColSunday
-    const anchor = new Date(lastColSunday);
-    anchor.setDate(lastColSunday.getDate() - 11 * 7);
-
-    const COLS = 12,
-        ROWS = 7;
-    const grid: (HeatmapDay | null)[][] = Array.from({ length: COLS }, () =>
-        Array(ROWS).fill(null),
-    );
-    const monthLabels: string[] = Array(COLS).fill('');
+    // Month label per column (shown above col if month changes on its Sunday)
+    const monthLabels: string[] = Array(numCols).fill('');
     let lastMonth = '';
-
-    for (let col = 0; col < COLS; col++) {
-        for (let row = 0; row < ROWS; row++) {
-            const cell = new Date(anchor);
-            cell.setDate(anchor.getDate() + col * 7 + row);
-            if (cell > todayDate) continue; // skip future
-            const iso = cell.toISOString().slice(0, 10);
-            grid[col][row] = byDate[iso] ?? {
-                date: iso,
-                count: 0,
-                week: col,
-                day_of_week: row,
-                label: cell.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                }),
-                is_today: iso === todayISO,
-            };
-            // Month label on first cell of a new month in this column
-            if (row === 0) {
-                const m = cell.toLocaleString('en-US', { month: 'short' });
-                if (m !== lastMonth) {
-                    monthLabels[col] = m;
-                    lastMonth = m;
-                }
+    for (let col = 0; col < numCols; col++) {
+        const sunday = grid[col][0];
+        if (sunday) {
+            const m = sunday.date.slice(5, 7); // "02"
+            const label = new Date(sunday.date + 'T00:00:00').toLocaleString(
+                'en-US',
+                { month: 'short' },
+            );
+            if (m !== lastMonth) {
+                monthLabels[col] = label;
+                lastMonth = m;
             }
         }
     }
 
-    const maxCount = Math.max(...days.map((d) => d.count), 1);
-    const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const emptyColor = isDark ? '#21262d' : '#ebedf0';
+    const maxCount = Math.max(
+        ...days.filter((d) => !d.is_future).map((d) => d.count),
+        1,
+    );
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const emptyBg = dark ? HEAT_DARK[0] : HEAT_LIGHT[0];
 
     return (
         <div className="relative w-full select-none">
-            {/* Tooltip */}
+            {/* Floating tooltip */}
             {hovered && (
                 <div
                     className="pointer-events-none fixed z-50 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900"
                     style={{
-                        left: tipPos.x + 12,
-                        top: tipPos.y - 8,
-                        minWidth: 138,
+                        left: tipPos.x + 14,
+                        top: tipPos.y - 10,
+                        minWidth: 148,
                     }}
                 >
                     <p className="font-bold text-neutral-900 dark:text-white">
-                        {hovered.is_today ? '📅 Today' : hovered.label}
+                        {hovered.is_today ? '📅 Today — ' : ''}
+                        {hovered.label}
                     </p>
-                    <p
-                        className={
-                            hovered.count > 0
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-neutral-400 dark:text-white/30'
-                        }
-                    >
-                        {hovered.count > 0
-                            ? `${hovered.count} correction${hovered.count !== 1 ? 's' : ''}`
-                            : 'No activity'}
-                    </p>
+                    {hovered.is_future ? (
+                        <p className="text-neutral-400 dark:text-white/30">
+                            Future date
+                        </p>
+                    ) : hovered.count > 0 ? (
+                        <p className="text-emerald-600 dark:text-emerald-400">
+                            {hovered.count} correction
+                            {hovered.count !== 1 ? 's' : ''}
+                        </p>
+                    ) : (
+                        <p className="text-neutral-400 dark:text-white/30">
+                            No activity
+                        </p>
+                    )}
                 </div>
             )}
 
-            <div className="flex w-full items-start" style={{ gap: 4 }}>
+            <div className="flex w-full items-start" style={{ gap: 3 }}>
                 {/* Day-of-week labels */}
                 <div
                     className="flex shrink-0 flex-col"
-                    style={{ gap: 2, marginTop: 16, width: 28 }}
+                    style={{ gap: 2, marginTop: 18, width: 26 }}
                 >
-                    {DOW_LABELS.map((l, i) => (
+                    {DOW.map((l, i) => (
                         <div
                             key={i}
                             className="text-right text-[9px] leading-none text-neutral-400 dark:text-white/25"
-                            style={{ height: 13, lineHeight: '13px' }}
+                            style={{ height: 12, lineHeight: '12px' }}
                         >
-                            {i % 2 === 0 ? l : ''}
+                            {/* Show only Sun / Tue / Thu / Sat to avoid crowding */}
+                            {[0, 2, 4, 6].includes(i) ? l : ''}
                         </div>
                     ))}
                 </div>
 
-                {/* Month labels + cells */}
+                {/* Grid */}
                 <div
                     className="flex min-w-0 flex-1 flex-col"
                     style={{ gap: 2 }}
                 >
-                    {/* Month row */}
-                    <div className="flex w-full" style={{ gap: 2 }}>
+                    {/* Month labels row */}
+                    <div className="flex w-full" style={{ gap: 3 }}>
                         {monthLabels.map((m, i) => (
                             <div
                                 key={i}
-                                className="flex-1 overflow-hidden text-[9px] leading-none text-neutral-400 dark:text-white/30"
+                                className="flex-1 truncate overflow-hidden text-[9px] leading-none text-neutral-400 dark:text-white/30"
                                 style={{ height: 14 }}
                             >
                                 {m}
                             </div>
                         ))}
                     </div>
-                    {/* Cell columns */}
-                    <div className="flex w-full" style={{ gap: 2 }}>
-                        {Array.from({ length: COLS }, (_, col) => (
+
+                    {/* Columns × rows */}
+                    <div className="flex w-full" style={{ gap: 3 }}>
+                        {Array.from({ length: numCols }, (_, col) => (
                             <div
                                 key={col}
                                 className="flex flex-1 flex-col"
                                 style={{ gap: 2 }}
                             >
-                                {Array.from({ length: ROWS }, (_, row) => {
-                                    const c = grid[col][row];
+                                {Array.from({ length: 7 }, (_, row) => {
+                                    const cell = grid[col][row];
+                                    const bg = !cell
+                                        ? emptyBg
+                                        : cell.is_future
+                                          ? dark
+                                              ? FUTURE_DARK
+                                              : FUTURE_LIGHT
+                                          : palette[
+                                                levelIndex(cell.count, maxCount)
+                                            ];
+
                                     return (
                                         <div
                                             key={row}
-                                            className="w-full rounded-sm"
+                                            className="w-full rounded-sm transition-opacity"
                                             style={{
-                                                height: 13,
-                                                background: c
-                                                    ? heatColor(
-                                                          c.count,
-                                                          maxCount,
-                                                          isDark,
-                                                      )
-                                                    : emptyColor,
-                                                outline: c?.is_today
-                                                    ? '2px solid #6366f1'
+                                                height: 12,
+                                                background: bg,
+                                                outline: cell?.is_today
+                                                    ? `2px solid ${dark ? '#818cf8' : '#6366f1'}`
                                                     : undefined,
-                                                outlineOffset: c?.is_today
+                                                outlineOffset: cell?.is_today
                                                     ? '1px'
                                                     : undefined,
-                                                cursor: c
+                                                cursor: cell
                                                     ? 'default'
                                                     : undefined,
+                                                opacity: cell?.is_future
+                                                    ? 0.35
+                                                    : 1,
                                             }}
                                             onMouseEnter={
-                                                c
+                                                cell
                                                     ? (e) => {
-                                                          setHovered(c);
+                                                          setHovered(cell);
                                                           setTipPos({
                                                               x: e.clientX,
                                                               y: e.clientY,
@@ -337,7 +333,7 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                                                     : undefined
                                             }
                                             onMouseMove={
-                                                c
+                                                cell
                                                     ? (e) =>
                                                           setTipPos({
                                                               x: e.clientX,
@@ -362,29 +358,29 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                 <span className="text-[9px] text-neutral-400 dark:text-white/25">
                     Less
                 </span>
-                {[0, 0.2, 0.5, 0.75, 1].map((r, i) => (
+                {palette.map((c, i) => (
                     <div
                         key={i}
                         style={{
                             width: 11,
                             height: 11,
                             borderRadius: 2,
-                            background:
-                                r === 0
-                                    ? emptyColor
-                                    : heatColor(r * maxCount, maxCount, isDark),
+                            background: c,
                         }}
                     />
                 ))}
                 <span className="text-[9px] text-neutral-400 dark:text-white/25">
                     More
                 </span>
+                <span className="ml-3 text-[9px] text-neutral-400 dark:text-white/20">
+                    · Future days shown dimmed
+                </span>
             </div>
         </div>
     );
 }
 
-/* ── MemoryChipCard ───────────────────────────────────────────────────────── */
+/* ── MemoryChipCard ─────────────────────────────────────────────────────────── */
 function MemoryChipCard({ chip }: { chip: MemoryChip }) {
     const cfg = LEVEL_CFG[chip.level];
     const [show, setShow] = useState(false);
@@ -446,7 +442,7 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
     );
 }
 
-/* ── Card wrapper with beautiful gradient bg ──────────────────────────────── */
+/* ── StatCard ───────────────────────────────────────────────────────────────── */
 function StatCard({
     accent,
     children,
@@ -455,18 +451,13 @@ function StatCard({
     children: React.ReactNode;
 }) {
     return (
-        <div
-            className="group relative overflow-hidden rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-white/[0.06] dark:bg-neutral-900"
-            style={{ background: undefined }}
-        >
-            {/* subtle gradient wash */}
+        <div className="group relative overflow-hidden rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-white/[0.06] dark:bg-neutral-900">
             <div
                 className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.07]"
                 style={{
                     background: `radial-gradient(ellipse at top right, ${accent} 0%, transparent 70%)`,
                 }}
             />
-            {/* bottom edge accent line */}
             <div
                 className="pointer-events-none absolute bottom-0 left-0 h-[2px] w-full opacity-30"
                 style={{
@@ -478,7 +469,7 @@ function StatCard({
     );
 }
 
-/* ── Main Dashboard ───────────────────────────────────────────────────────── */
+/* ── Main Dashboard ─────────────────────────────────────────────────────────── */
 export default function Dashboard() {
     const {
         results,
@@ -487,6 +478,9 @@ export default function Dashboard() {
         pendingReviewCount = 0,
         totalScansWeeklyTrend = 0,
         correctedWeeklyTrend = 0,
+        highConfidenceWeeklyTrend = 0,
+        uniqueBreedsLearned = 0,
+        breedsTaughtTrend = 0,
         memoryCount = 0,
         avgConfidence = 0,
         confidenceTrend = 0,
@@ -534,6 +528,7 @@ export default function Dashboard() {
                         'learningHeatmap',
                         'heatmapSummary',
                         'correctedBreedCount',
+                        'uniqueBreedsLearned',
                     ],
                 }),
             30000,
@@ -542,10 +537,12 @@ export default function Dashboard() {
     }, []);
 
     /* ── 4 top metric cards ─────────────────────────────────────────────── */
+    // Replaced duplicate "Avg Confidence" with "Breeds Taught" (unique breeds)
     const metricCards = [
         {
             label: 'Total Scans',
             value: resultCount,
+            display: String(resultCount),
             trend: totalScansWeeklyTrend,
             Icon: BarChart3,
             accent: '#3b82f6',
@@ -554,6 +551,7 @@ export default function Dashboard() {
         {
             label: 'Corrections Made',
             value: correctedBreedCount,
+            display: String(correctedBreedCount),
             trend: correctedWeeklyTrend,
             Icon: GraduationCap,
             accent: '#8b5cf6',
@@ -562,31 +560,27 @@ export default function Dashboard() {
         {
             label: 'Avg Confidence',
             value: avgConfidence,
+            display: `${avgConfidence.toFixed(1)}%`,
             trend: confidenceTrend,
             Icon: Brain,
             accent: '#10b981',
             inv: false,
-            suffix: '%',
         },
         {
-            label: 'Pending Review',
-            value: pendingReviewCount,
-            trend: -correctedWeeklyTrend,
-            Icon: ClipboardList,
+            // ← REPLACED DUPLICATE: now shows unique breed count, not avg confidence again
+            label: 'Breeds Taught',
+            value: uniqueBreedsLearned,
+            display: String(uniqueBreedsLearned),
+            trend: breedsTaughtTrend,
+            Icon: PawPrint,
             accent: '#f59e0b',
-            inv: true,
+            inv: false,
         },
-    ] as {
-        label: string;
-        value: number;
-        trend: number;
-        Icon: React.ElementType;
-        accent: string;
-        inv: boolean;
-        suffix?: string;
-    }[];
+    ];
 
     /* ── 3 mini stat cards ──────────────────────────────────────────────── */
+    // Bottom row: Learning Progress / Memory Usage Rate / Avg Confidence trend
+    // (Avg Confidence appears only here now, not duplicated above)
     const miniCards = [
         {
             label: 'Learning Progress',
@@ -603,11 +597,11 @@ export default function Dashboard() {
             a: '#8b5cf6',
         },
         {
-            label: 'Avg Confidence',
-            val: `${avgConfidence.toFixed(1)}%`,
-            sub: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}% this week`,
+            label: 'Confidence Trend',
+            val: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}%`,
+            sub: 'This week vs last week',
             Icon: LineChart,
-            a: '#3b82f6',
+            a: confidenceTrend >= 0 ? '#10b981' : '#f59e0b',
         },
     ] as const;
 
@@ -616,18 +610,10 @@ export default function Dashboard() {
             <Head title="AI Learning Dashboard" />
 
             <div className="flex h-full flex-col gap-5 p-4 md:p-6">
-                {/* ── 4 metric cards ──────────────────────────────────── */}
+                {/* ── 4 metric cards ────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {metricCards.map(
-                        ({
-                            label,
-                            value,
-                            trend,
-                            Icon,
-                            accent,
-                            inv,
-                            suffix,
-                        }) => (
+                        ({ label, display, trend, Icon, accent, inv }) => (
                             <StatCard key={label} accent={accent}>
                                 <div className="flex items-start justify-between">
                                     <div>
@@ -636,9 +622,7 @@ export default function Dashboard() {
                                         </p>
                                         <div className="mt-2 flex items-baseline gap-2">
                                             <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
-                                                {suffix
-                                                    ? `${value.toFixed(1)}${suffix}`
-                                                    : value}
+                                                {display}
                                             </p>
                                             <div
                                                 className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(trend, inv)}`}
@@ -669,7 +653,7 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                {/* ── 3 mini stats ────────────────────────────────────── */}
+                {/* ── 3 mini stats ──────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {miniCards.map(({ label, val, sub, Icon, a }) => (
                         <StatCard key={label} accent={a}>
@@ -702,9 +686,9 @@ export default function Dashboard() {
                     ))}
                 </div>
 
-                {/* ── AI Training Activity ─────────────────────────────── */}
+                {/* ── AI Training Activity ───────────────────────────────── */}
                 <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
-                    {/* header */}
+                    {/* Header */}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-white/[0.06]">
                         <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 dark:border-violet-500/25 dark:bg-violet-500/15">
@@ -752,7 +736,7 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    {/* 50/50 body */}
+                    {/* 50/50 split: heatmap | memory wall */}
                     <div className="flex flex-col lg:flex-row">
                         {/* Heatmap */}
                         <div className="w-full p-5 lg:w-1/2">
@@ -763,7 +747,8 @@ export default function Dashboard() {
                                 <CompactHeatmap days={learningHeatmap} />
                             ) : (
                                 <p className="text-xs text-neutral-400 dark:text-white/20">
-                                    No data yet
+                                    No data yet — submit corrections to see
+                                    activity
                                 </p>
                             )}
                         </div>
@@ -782,7 +767,12 @@ export default function Dashboard() {
                                     {breedMemoryWall.length} breeds
                                 </span>
                                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                                    {Object.entries(LEVEL_CFG)
+                                    {(
+                                        Object.entries(LEVEL_CFG) as [
+                                            string,
+                                            (typeof LEVEL_CFG)[keyof typeof LEVEL_CFG],
+                                        ][]
+                                    )
                                         .reverse()
                                         .map(([k, c]) => (
                                             <div
@@ -856,7 +846,7 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* ── Recent Scans ─────────────────────────────────────── */}
+                {/* ── Recent Scans ───────────────────────────────────────── */}
                 <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
                     <div className="flex items-center justify-between border-b border-neutral-100 px-6 py-4 dark:border-white/[0.06]">
                         <div>
