@@ -379,6 +379,12 @@ class ScanResultController extends Controller
         $lowConfidenceCount  = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
+        // High Confidence Rate — always 0-100%, never negative, always reassuring
+        // "X% of all scans scored above 80% confidence"
+        $highConfidenceRate = $resultCount > 0
+            ? round(($result->where('confidence', '>=', 80)->count() / $resultCount) * 100, 1)
+            : 0;
+
         $oneWeekAgo  = Carbon::now()->subDays(7);
         $twoWeeksAgo = Carbon::now()->subDays(14);
         $oneMonthAgo = Carbon::now()->subDays(30);
@@ -551,24 +557,6 @@ class ScanResultController extends Controller
             ? (($currentWeekLow - $previousWeekLow) / $previousWeekLow) * 100
             : 0;
 
-        // -------------------------------------------------------------------------
-        // NEW: Breeds Taught weekly trend
-        // Counts distinct breeds corrected this week vs last week.
-        // Used by the "Breeds Taught" card replacing the duplicate Avg Confidence.
-        // -------------------------------------------------------------------------
-        $currentWeekBreeds  = BreedCorrection::where('created_at', '>=', $oneWeekAgo)
-            ->distinct('corrected_breed')
-            ->count('corrected_breed');
-
-        $previousWeekBreeds = BreedCorrection::where('created_at', '>=', $twoWeeksAgo)
-            ->where('created_at', '<', $oneWeekAgo)
-            ->distinct('corrected_breed')
-            ->count('corrected_breed');
-
-        $breedsTaughtTrend = $previousWeekBreeds > 0
-            ? round((($currentWeekBreeds - $previousWeekBreeds) / $previousWeekBreeds) * 100, 1)
-            : 0;
-
         $lastMilestone = floor($correctedBreedCount / 5) * 5;
 
         // -------------------------------------------------------------------------
@@ -581,13 +569,13 @@ class ScanResultController extends Controller
             'pendingReviewCount'        => $pendingReviewCount,
             'lowConfidenceCount'        => $lowConfidenceCount,
             'highConfidenceCount'       => $highConfidenceCount,
+            'highConfidenceRate'        => $highConfidenceRate,        // ← NEW
             'totalScansWeeklyTrend'     => round($totalScansWeeklyTrend, 1),
             'correctedWeeklyTrend'      => round($correctedWeeklyTrend, 1),
             'highConfidenceWeeklyTrend' => round($highConfidenceWeeklyTrend, 1),
             'lowConfidenceWeeklyTrend'  => round($lowConfidenceWeeklyTrend, 1),
             'memoryCount'               => $memoryCount,
             'uniqueBreedsLearned'       => count($uniqueBreeds),
-            'breedsTaughtTrend'         => $breedsTaughtTrend,        // ← NEW
             'recentCorrectionsCount'    => $recentCorrectionsCount,
             'avgConfidence'             => round($avgConfidence, 2),
             'confidenceTrend'           => round($confidenceTrend, 2),

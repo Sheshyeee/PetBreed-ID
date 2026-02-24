@@ -17,13 +17,14 @@ import {
     BarChart3,
     Brain,
     ChevronRight,
+    ClipboardList,
     Database,
     GraduationCap,
     LineChart,
     Minus,
-    PawPrint,
     Sparkles,
     Target,
+    ShieldCheck,
 } from 'lucide-react';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 
@@ -59,17 +60,6 @@ type MemoryChip = {
     level: 'new' | 'learning' | 'trained' | 'expert';
 };
 
-type TimelineDay = {
-    day: string;
-    date: string;
-    is_today: boolean;
-    corrections: number;
-    total_scans: number;
-    high_confidence: number;
-    high_conf_rate: number;
-    total_corrections_to_date: number;
-};
-
 type PageProps = {
     results?: Result[];
     correctedBreedCount: number;
@@ -77,17 +67,15 @@ type PageProps = {
     pendingReviewCount: number;
     lowConfidenceCount: number;
     highConfidenceCount: number;
+    highConfidenceRate?: number;
     totalScansWeeklyTrend?: number;
     correctedWeeklyTrend?: number;
     highConfidenceWeeklyTrend?: number;
-    uniqueBreedsLearned?: number;
-    breedsTaughtTrend?: number;
     memoryCount?: number;
     avgConfidence?: number;
     confidenceTrend?: number;
     memoryHitRate?: number;
     accuracyImprovement?: number;
-    learningTimeline?: TimelineDay[];
     learningHeatmap?: HeatmapDay[];
     heatmapSummary?: HeatmapSummary;
     breedMemoryWall?: MemoryChip[];
@@ -125,7 +113,7 @@ const LEVEL_CFG = {
     },
 } as const;
 
-/* ── detect dark mode reliably ─────────────────────────────────────────────── */
+/* ── dark mode detection ───────────────────────────────────────────────────── */
 function useDarkMode(): boolean {
     const [dark, setDark] = useState(() => {
         if (typeof document === 'undefined') return true;
@@ -147,18 +135,17 @@ function useDarkMode(): boolean {
     return dark;
 }
 
-/* ── heatmap cell colours ──────────────────────────────────────────────────── */
-// GitHub green scale — light & dark variants
-const HEAT_DARK = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
+/* ── heatmap colour palettes ───────────────────────────────────────────────── */
+const HEAT_DARK  = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
 const HEAT_LIGHT = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
-const FUTURE_DARK = '#0d1117'; // near-invisible future cells
+const FUTURE_DARK  = '#0d1117';
 const FUTURE_LIGHT = '#f6f8fa';
 
 function levelIndex(count: number, max: number): number {
     if (count === 0) return 0;
     const r = count / Math.max(max, 1);
     if (r < 0.25) return 1;
-    if (r < 0.5) return 2;
+    if (r < 0.5)  return 2;
     if (r < 0.75) return 3;
     return 4;
 }
@@ -167,35 +154,32 @@ function levelIndex(count: number, max: number): number {
 function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const dark = useDarkMode();
     const [hovered, setHovered] = useState<HeatmapDay | null>(null);
-    const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
+    const [tipPos, setTipPos]   = useState({ x: 0, y: 0 });
 
-    const palette = dark ? HEAT_DARK : HEAT_LIGHT;
+    const palette  = dark ? HEAT_DARK : HEAT_LIGHT;
+    const emptyBg  = palette[0];
+    const numCols  = (days[days.length - 1]?.week ?? 0) + 1;
 
-    /* ── build week columns ──────────────────────────────────────────── */
-    // Find total number of columns
-    const numCols = (days[days.length - 1]?.week ?? 0) + 1;
-
-    // Initialise a (numCols × 7) grid filled with null
-    const grid: (HeatmapDay | null)[][] = Array.from({ length: numCols }, () =>
-        Array(7).fill(null),
+    /* Build (numCols × 7) grid */
+    const grid: (HeatmapDay | null)[][] = Array.from(
+        { length: numCols },
+        () => Array(7).fill(null),
     );
-
     days.forEach((d) => {
         if (d.week < numCols && d.day_of_week < 7) {
             grid[d.week][d.day_of_week] = d;
         }
     });
 
-    // Month label per column (shown above col if month changes on its Sunday)
+    /* Month labels — shown on the first column of each new month */
     const monthLabels: string[] = Array(numCols).fill('');
     let lastMonth = '';
     for (let col = 0; col < numCols; col++) {
         const sunday = grid[col][0];
         if (sunday) {
-            const m = sunday.date.slice(5, 7); // "02"
+            const m = sunday.date.slice(5, 7);
             const label = new Date(sunday.date + 'T00:00:00').toLocaleString(
-                'en-US',
-                { month: 'short' },
+                'en-US', { month: 'short' },
             );
             if (m !== lastMonth) {
                 monthLabels[col] = label;
@@ -208,39 +192,28 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
         ...days.filter((d) => !d.is_future).map((d) => d.count),
         1,
     );
-    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    const emptyBg = dark ? HEAT_DARK[0] : HEAT_LIGHT[0];
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
         <div className="relative w-full select-none">
-            {/* Floating tooltip */}
+            {/* Tooltip */}
             {hovered && (
                 <div
                     className="pointer-events-none fixed z-50 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900"
-                    style={{
-                        left: tipPos.x + 14,
-                        top: tipPos.y - 10,
-                        minWidth: 148,
-                    }}
+                    style={{ left: tipPos.x + 14, top: tipPos.y - 10, minWidth: 148 }}
                 >
                     <p className="font-bold text-neutral-900 dark:text-white">
-                        {hovered.is_today ? '📅 Today — ' : ''}
-                        {hovered.label}
+                        {hovered.is_today ? '📅 Today — ' : ''}{hovered.label}
                     </p>
                     {hovered.is_future ? (
-                        <p className="text-neutral-400 dark:text-white/30">
-                            Future date
-                        </p>
+                        <p className="text-neutral-400 dark:text-white/30">Future date</p>
                     ) : hovered.count > 0 ? (
                         <p className="text-emerald-600 dark:text-emerald-400">
-                            {hovered.count} correction
-                            {hovered.count !== 1 ? 's' : ''}
+                            {hovered.count} correction{hovered.count !== 1 ? 's' : ''}
                         </p>
                     ) : (
-                        <p className="text-neutral-400 dark:text-white/30">
-                            No activity
-                        </p>
+                        <p className="text-neutral-400 dark:text-white/30">No activity</p>
                     )}
                 </div>
             )}
@@ -257,23 +230,19 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                             className="text-right text-[9px] leading-none text-neutral-400 dark:text-white/25"
                             style={{ height: 12, lineHeight: '12px' }}
                         >
-                            {/* Show only Sun / Tue / Thu / Sat to avoid crowding */}
                             {[0, 2, 4, 6].includes(i) ? l : ''}
                         </div>
                     ))}
                 </div>
 
                 {/* Grid */}
-                <div
-                    className="flex min-w-0 flex-1 flex-col"
-                    style={{ gap: 2 }}
-                >
-                    {/* Month labels row */}
+                <div className="flex min-w-0 flex-1 flex-col" style={{ gap: 2 }}>
+                    {/* Month row */}
                     <div className="flex w-full" style={{ gap: 3 }}>
                         {monthLabels.map((m, i) => (
                             <div
                                 key={i}
-                                className="flex-1 truncate overflow-hidden text-[9px] leading-none text-neutral-400 dark:text-white/30"
+                                className="flex-1 overflow-hidden truncate text-[9px] leading-none text-neutral-400 dark:text-white/30"
                                 style={{ height: 14 }}
                             >
                                 {m}
@@ -281,7 +250,7 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                         ))}
                     </div>
 
-                    {/* Columns × rows */}
+                    {/* Columns */}
                     <div className="flex w-full" style={{ gap: 3 }}>
                         {Array.from({ length: numCols }, (_, col) => (
                             <div
@@ -294,56 +263,31 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                                     const bg = !cell
                                         ? emptyBg
                                         : cell.is_future
-                                          ? dark
-                                              ? FUTURE_DARK
-                                              : FUTURE_LIGHT
-                                          : palette[
-                                                levelIndex(cell.count, maxCount)
-                                            ];
+                                          ? dark ? FUTURE_DARK : FUTURE_LIGHT
+                                          : palette[levelIndex(cell.count, maxCount)];
 
                                     return (
                                         <div
                                             key={row}
-                                            className="w-full rounded-sm transition-opacity"
+                                            className="w-full rounded-sm"
                                             style={{
                                                 height: 12,
                                                 background: bg,
+                                                opacity: cell?.is_future ? 0.35 : 1,
                                                 outline: cell?.is_today
                                                     ? `2px solid ${dark ? '#818cf8' : '#6366f1'}`
                                                     : undefined,
-                                                outlineOffset: cell?.is_today
-                                                    ? '1px'
-                                                    : undefined,
-                                                cursor: cell
-                                                    ? 'default'
-                                                    : undefined,
-                                                opacity: cell?.is_future
-                                                    ? 0.35
-                                                    : 1,
+                                                outlineOffset: cell?.is_today ? '1px' : undefined,
+                                                cursor: cell ? 'default' : undefined,
                                             }}
-                                            onMouseEnter={
-                                                cell
-                                                    ? (e) => {
-                                                          setHovered(cell);
-                                                          setTipPos({
-                                                              x: e.clientX,
-                                                              y: e.clientY,
-                                                          });
-                                                      }
-                                                    : undefined
-                                            }
-                                            onMouseMove={
-                                                cell
-                                                    ? (e) =>
-                                                          setTipPos({
-                                                              x: e.clientX,
-                                                              y: e.clientY,
-                                                          })
-                                                    : undefined
-                                            }
-                                            onMouseLeave={() =>
-                                                setHovered(null)
-                                            }
+                                            onMouseEnter={cell ? (e) => {
+                                                setHovered(cell);
+                                                setTipPos({ x: e.clientX, y: e.clientY });
+                                            } : undefined}
+                                            onMouseMove={cell
+                                                ? (e) => setTipPos({ x: e.clientX, y: e.clientY })
+                                                : undefined}
+                                            onMouseLeave={() => setHovered(null)}
                                         />
                                     );
                                 })}
@@ -355,23 +299,14 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
 
             {/* Legend */}
             <div className="mt-3 flex items-center gap-1.5">
-                <span className="text-[9px] text-neutral-400 dark:text-white/25">
-                    Less
-                </span>
+                <span className="text-[9px] text-neutral-400 dark:text-white/25">Less</span>
                 {palette.map((c, i) => (
                     <div
                         key={i}
-                        style={{
-                            width: 11,
-                            height: 11,
-                            borderRadius: 2,
-                            background: c,
-                        }}
+                        style={{ width: 11, height: 11, borderRadius: 2, background: c }}
                     />
                 ))}
-                <span className="text-[9px] text-neutral-400 dark:text-white/25">
-                    More
-                </span>
+                <span className="text-[9px] text-neutral-400 dark:text-white/25">More</span>
                 <span className="ml-3 text-[9px] text-neutral-400 dark:text-white/20">
                     · Future days shown dimmed
                 </span>
@@ -395,10 +330,7 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
                     {(chip.level === 'trained' || chip.level === 'expert') && (
                         <span
                             className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-40"
-                            style={{
-                                backgroundColor: cfg.dot,
-                                animationDuration: '2.5s',
-                            }}
+                            style={{ backgroundColor: cfg.dot, animationDuration: '2.5s' }}
                         />
                     )}
                     <span
@@ -406,35 +338,25 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
                         style={{ backgroundColor: cfg.dot }}
                     />
                 </span>
-                <span
-                    className={`max-w-[96px] truncate text-[11px] leading-none font-semibold ${cfg.text}`}
-                >
+                <span className={`max-w-[96px] truncate text-[11px] font-semibold leading-none ${cfg.text}`}>
                     {chip.breed}
                 </span>
                 {chip.times_taught > 1 && (
-                    <span
-                        className={`text-[9px] leading-none font-black opacity-70 ${cfg.text}`}
-                    >
+                    <span className={`text-[9px] font-black leading-none opacity-70 ${cfg.text}`}>
                         ×{chip.times_taught}
                     </span>
                 )}
             </div>
             {show && (
                 <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-36 -translate-x-1/2 rounded-xl border border-black/8 bg-white p-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900">
-                    <p className="mb-0.5 font-black text-neutral-900 dark:text-white">
-                        {chip.breed}
-                    </p>
+                    <p className="mb-0.5 font-black text-neutral-900 dark:text-white">{chip.breed}</p>
                     <p className={`text-[11px] ${cfg.text}`}>{cfg.label}</p>
                     <p className="text-neutral-500 dark:text-white/40">
                         Taught {chip.times_taught}× by vet
                     </p>
-                    <p className="text-neutral-400 dark:text-white/25">
-                        Since {chip.first_taught}
-                    </p>
+                    <p className="text-neutral-400 dark:text-white/25">Since {chip.first_taught}</p>
                     {chip.days_ago === 0 && (
-                        <p className="mt-0.5 text-indigo-500 dark:text-indigo-400">
-                            ✨ Added today
-                        </p>
+                        <p className="mt-0.5 text-indigo-500 dark:text-indigo-400">✨ Added today</p>
                     )}
                 </div>
             )}
@@ -443,13 +365,7 @@ function MemoryChipCard({ chip }: { chip: MemoryChip }) {
 }
 
 /* ── StatCard ───────────────────────────────────────────────────────────────── */
-function StatCard({
-    accent,
-    children,
-}: {
-    accent: string;
-    children: React.ReactNode;
-}) {
+function StatCard({ accent, children }: { accent: string; children: React.ReactNode }) {
     return (
         <div className="group relative overflow-hidden rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-white/[0.06] dark:bg-neutral-900">
             <div
@@ -476,11 +392,10 @@ export default function Dashboard() {
         correctedBreedCount,
         resultCount,
         pendingReviewCount = 0,
+        highConfidenceRate = 0,
         totalScansWeeklyTrend = 0,
         correctedWeeklyTrend = 0,
         highConfidenceWeeklyTrend = 0,
-        uniqueBreedsLearned = 0,
-        breedsTaughtTrend = 0,
         memoryCount = 0,
         avgConfidence = 0,
         confidenceTrend = 0,
@@ -491,15 +406,11 @@ export default function Dashboard() {
         breedMemoryWall = [],
     } = usePage<PageProps>().props;
 
-    const fmt = (t: number) => `${t >= 0 ? '+' : ''}${t.toFixed(1)}%`;
+    const fmt  = (t: number) => `${t >= 0 ? '+' : ''}${t.toFixed(1)}%`;
     const tIcon = (t: number) =>
-        t > 0 ? (
-            <ArrowUp className="h-3 w-3" />
-        ) : t < 0 ? (
-            <ArrowDown className="h-3 w-3" />
-        ) : (
-            <Minus className="h-3 w-3" />
-        );
+        t > 0 ? <ArrowUp className="h-3 w-3" /> :
+        t < 0 ? <ArrowDown className="h-3 w-3" /> :
+                <Minus className="h-3 w-3" />;
     const tClr = (t: number, inv = false) => {
         if (inv)
             return t < 0
@@ -514,10 +425,10 @@ export default function Dashboard() {
               : 'text-neutral-400';
     };
 
-    const expertChips = breedMemoryWall.filter((c) => c.level === 'expert');
-    const trainedChips = breedMemoryWall.filter((c) => c.level === 'trained');
+    const expertChips   = breedMemoryWall.filter((c) => c.level === 'expert');
+    const trainedChips  = breedMemoryWall.filter((c) => c.level === 'trained');
     const learningChips = breedMemoryWall.filter((c) => c.level === 'learning');
-    const newChips = breedMemoryWall.filter((c) => c.level === 'new');
+    const newChips      = breedMemoryWall.filter((c) => c.level === 'new');
 
     useEffect(() => {
         const iv = setInterval(
@@ -528,7 +439,7 @@ export default function Dashboard() {
                         'learningHeatmap',
                         'heatmapSummary',
                         'correctedBreedCount',
-                        'uniqueBreedsLearned',
+                        'highConfidenceRate',
                     ],
                 }),
             30000,
@@ -536,72 +447,78 @@ export default function Dashboard() {
         return () => clearInterval(iv);
     }, []);
 
-    /* ── 4 top metric cards ─────────────────────────────────────────────── */
-    // Replaced duplicate "Avg Confidence" with "Breeds Taught" (unique breeds)
+    /* ────────────────────────────────────────────────────────────────────────
+       TOP ROW — 4 cards
+       1. Total Scans
+       2. Corrections Made
+       3. Avg Confidence
+       4. Pending Review   ← restored (was replaced before, now back)
+    ──────────────────────────────────────────────────────────────────────── */
     const metricCards = [
         {
-            label: 'Total Scans',
-            value: resultCount,
+            label:   'Total Scans',
             display: String(resultCount),
-            trend: totalScansWeeklyTrend,
-            Icon: BarChart3,
-            accent: '#3b82f6',
-            inv: false,
+            trend:   totalScansWeeklyTrend,
+            Icon:    BarChart3,
+            accent:  '#3b82f6',
+            inv:     false,
         },
         {
-            label: 'Corrections Made',
-            value: correctedBreedCount,
+            label:   'Corrections Made',
             display: String(correctedBreedCount),
-            trend: correctedWeeklyTrend,
-            Icon: GraduationCap,
-            accent: '#8b5cf6',
-            inv: false,
+            trend:   correctedWeeklyTrend,
+            Icon:    GraduationCap,
+            accent:  '#8b5cf6',
+            inv:     false,
         },
         {
-            label: 'Avg Confidence',
-            value: avgConfidence,
+            label:   'Avg Confidence',
             display: `${avgConfidence.toFixed(1)}%`,
-            trend: confidenceTrend,
-            Icon: Brain,
-            accent: '#10b981',
-            inv: false,
+            trend:   confidenceTrend,
+            Icon:    Brain,
+            accent:  '#10b981',
+            inv:     false,
         },
         {
-            // ← REPLACED DUPLICATE: now shows unique breed count, not avg confidence again
-            label: 'Breeds Taught',
-            value: uniqueBreedsLearned,
-            display: String(uniqueBreedsLearned),
-            trend: breedsTaughtTrend,
-            Icon: PawPrint,
-            accent: '#f59e0b',
-            inv: false,
+            label:   'Pending Review',
+            display: String(pendingReviewCount),
+            // Pending going DOWN is good (inv: true)
+            trend:   -(correctedWeeklyTrend),
+            Icon:    ClipboardList,
+            accent:  '#f59e0b',
+            inv:     true,
         },
     ];
 
-    /* ── 3 mini stat cards ──────────────────────────────────────────────── */
-    // Bottom row: Learning Progress / Memory Usage Rate / Avg Confidence trend
-    // (Avg Confidence appears only here now, not duplicated above)
+    /* ────────────────────────────────────────────────────────────────────────
+       MINI ROW — 3 cards
+       1. Learning Progress
+       2. Memory Usage Rate
+       3. High Confidence Rate  ← replaces "Confidence Trend" (never negative)
+          = % of ALL scans that scored ≥80 confidence
+          Always 0–100%. As AI learns, this number can only grow.
+    ──────────────────────────────────────────────────────────────────────── */
     const miniCards = [
         {
             label: 'Learning Progress',
-            val: `${accuracyImprovement.toFixed(0)}/100`,
-            sub: 'Composite score',
-            Icon: Target,
-            a: '#10b981',
+            val:   `${accuracyImprovement.toFixed(0)}/100`,
+            sub:   'Composite score',
+            Icon:  Target,
+            a:     '#10b981',
         },
         {
             label: 'Memory Usage Rate',
-            val: `${memoryHitRate.toFixed(1)}%`,
-            sub: `${memoryCount} patterns stored`,
-            Icon: Database,
-            a: '#8b5cf6',
+            val:   `${memoryHitRate.toFixed(1)}%`,
+            sub:   `${memoryCount} patterns stored`,
+            Icon:  Database,
+            a:     '#8b5cf6',
         },
         {
-            label: 'Confidence Trend',
-            val: `${confidenceTrend >= 0 ? '+' : ''}${confidenceTrend.toFixed(1)}%`,
-            sub: 'This week vs last week',
-            Icon: LineChart,
-            a: confidenceTrend >= 0 ? '#10b981' : '#f59e0b',
+            label: 'High Confidence Rate',
+            val:   `${highConfidenceRate.toFixed(1)}%`,
+            sub:   'Scans scoring ≥80% confidence',
+            Icon:  ShieldCheck,
+            a:     '#10b981',
         },
     ] as const;
 
@@ -610,47 +527,43 @@ export default function Dashboard() {
             <Head title="AI Learning Dashboard" />
 
             <div className="flex h-full flex-col gap-5 p-4 md:p-6">
+
                 {/* ── 4 metric cards ────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {metricCards.map(
-                        ({ label, display, trend, Icon, accent, inv }) => (
-                            <StatCard key={label} accent={accent}>
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
-                                            {label}
+                    {metricCards.map(({ label, display, trend, Icon, accent, inv }) => (
+                        <StatCard key={label} accent={accent}>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                        {label}
+                                    </p>
+                                    <div className="mt-2 flex items-baseline gap-2">
+                                        <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                            {display}
                                         </p>
-                                        <div className="mt-2 flex items-baseline gap-2">
-                                            <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
-                                                {display}
-                                            </p>
-                                            <div
-                                                className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(trend, inv)}`}
-                                            >
-                                                {tIcon(trend)}
-                                                <span>{fmt(trend)}</span>
-                                            </div>
+                                        <div
+                                            className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(trend, inv)}`}
+                                        >
+                                            {tIcon(trend)}
+                                            <span>{fmt(trend)}</span>
                                         </div>
-                                        <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
-                                            vs last week
-                                        </p>
                                     </div>
-                                    <div
-                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                                        style={{
-                                            background: `${accent}18`,
-                                            border: `1px solid ${accent}30`,
-                                        }}
-                                    >
-                                        <Icon
-                                            className="h-5 w-5"
-                                            style={{ color: accent }}
-                                        />
-                                    </div>
+                                    <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                        vs last week
+                                    </p>
                                 </div>
-                            </StatCard>
-                        ),
-                    )}
+                                <div
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                    style={{
+                                        background: `${accent}18`,
+                                        border: `1px solid ${accent}30`,
+                                    }}
+                                >
+                                    <Icon className="h-5 w-5" style={{ color: accent }} />
+                                </div>
+                            </div>
+                        </StatCard>
+                    ))}
                 </div>
 
                 {/* ── 3 mini stats ──────────────────────────────────────── */}
@@ -676,10 +589,7 @@ export default function Dashboard() {
                                         border: `1px solid ${a}28`,
                                     }}
                                 >
-                                    <Icon
-                                        className="h-5 w-5"
-                                        style={{ color: a }}
-                                    />
+                                    <Icon className="h-5 w-5" style={{ color: a }} />
                                 </div>
                             </div>
                         </StatCard>
@@ -699,8 +609,7 @@ export default function Dashboard() {
                                     AI Training Activity
                                 </h2>
                                 <p className="text-xs text-neutral-400 dark:text-white/35">
-                                    12-week correction history &amp; breed
-                                    memory
+                                    12-week correction history &amp; breed memory
                                 </p>
                             </div>
                         </div>
@@ -712,9 +621,7 @@ export default function Dashboard() {
                                     </span>{' '}
                                     corrections
                                 </span>
-                                <span className="text-neutral-300 dark:text-white/15">
-                                    ·
-                                </span>
+                                <span className="text-neutral-300 dark:text-white/15">·</span>
                                 <span className="text-neutral-500 dark:text-white/30">
                                     <span className="font-bold text-neutral-900 dark:text-white">
                                         {heatmapSummary.active_days}
@@ -723,12 +630,9 @@ export default function Dashboard() {
                                 </span>
                                 {heatmapSummary.current_streak > 0 && (
                                     <>
-                                        <span className="text-neutral-300 dark:text-white/15">
-                                            ·
-                                        </span>
+                                        <span className="text-neutral-300 dark:text-white/15">·</span>
                                         <span className="font-semibold text-orange-500 dark:text-orange-400">
-                                            🔥 {heatmapSummary.current_streak}
-                                            -day streak
+                                            🔥 {heatmapSummary.current_streak}-day streak
                                         </span>
                                     </>
                                 )}
@@ -736,19 +640,18 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    {/* 50/50 split: heatmap | memory wall */}
+                    {/* 50/50 body */}
                     <div className="flex flex-col lg:flex-row">
                         {/* Heatmap */}
                         <div className="w-full p-5 lg:w-1/2">
-                            <p className="mb-3 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
+                            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-white/30">
                                 Correction Heatmap
                             </p>
                             {learningHeatmap.length > 0 ? (
                                 <CompactHeatmap days={learningHeatmap} />
                             ) : (
                                 <p className="text-xs text-neutral-400 dark:text-white/20">
-                                    No data yet — submit corrections to see
-                                    activity
+                                    No data yet — submit corrections to see activity
                                 </p>
                             )}
                         </div>
@@ -760,7 +663,7 @@ export default function Dashboard() {
                         {/* Memory Wall */}
                         <div className="w-full p-5 lg:w-1/2">
                             <div className="mb-3 flex flex-wrap items-center gap-2">
-                                <p className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-white/30">
                                     Breed Memory Wall
                                 </p>
                                 <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-600 dark:border-violet-500/25 dark:bg-violet-500/10 dark:text-violet-300">
@@ -775,15 +678,10 @@ export default function Dashboard() {
                                     )
                                         .reverse()
                                         .map(([k, c]) => (
-                                            <div
-                                                key={k}
-                                                className="flex items-center gap-1"
-                                            >
+                                            <div key={k} className="flex items-center gap-1">
                                                 <span
                                                     className="h-1.5 w-1.5 rounded-full"
-                                                    style={{
-                                                        backgroundColor: c.dot,
-                                                    }}
+                                                    style={{ backgroundColor: c.dot }}
                                                 />
                                                 <span className="text-[9px] text-neutral-400 dark:text-white/25">
                                                     {c.label}
@@ -795,48 +693,35 @@ export default function Dashboard() {
 
                             {breedMemoryWall.length === 0 ? (
                                 <p className="text-xs text-neutral-400 dark:text-white/20">
-                                    No breeds yet — submit a correction to
-                                    populate memory
+                                    No breeds yet — submit a correction to populate memory
                                 </p>
                             ) : (
                                 <div className="flex flex-col gap-2">
                                     {expertChips.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
                                             {expertChips.map((c) => (
-                                                <MemoryChipCard
-                                                    key={c.breed}
-                                                    chip={c}
-                                                />
+                                                <MemoryChipCard key={c.breed} chip={c} />
                                             ))}
                                         </div>
                                     )}
                                     {trainedChips.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
                                             {trainedChips.map((c) => (
-                                                <MemoryChipCard
-                                                    key={c.breed}
-                                                    chip={c}
-                                                />
+                                                <MemoryChipCard key={c.breed} chip={c} />
                                             ))}
                                         </div>
                                     )}
                                     {learningChips.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
                                             {learningChips.map((c) => (
-                                                <MemoryChipCard
-                                                    key={c.breed}
-                                                    chip={c}
-                                                />
+                                                <MemoryChipCard key={c.breed} chip={c} />
                                             ))}
                                         </div>
                                     )}
                                     {newChips.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
                                             {newChips.map((c) => (
-                                                <MemoryChipCard
-                                                    key={c.breed}
-                                                    chip={c}
-                                                />
+                                                <MemoryChipCard key={c.breed} chip={c} />
                                             ))}
                                         </div>
                                     )}
@@ -870,12 +755,7 @@ export default function Dashboard() {
                         <Table>
                             <TableHeader>
                                 <TableRow className="border-neutral-100 dark:border-white/5">
-                                    {[
-                                        'Scan ID',
-                                        'Breed',
-                                        'Confidence',
-                                        'Status',
-                                    ].map((h) => (
+                                    {['Scan ID', 'Breed', 'Confidence', 'Status'].map((h) => (
                                         <TableHead
                                             key={h}
                                             className="text-neutral-400 dark:text-white/30"
@@ -905,14 +785,11 @@ export default function Dashboard() {
                                                         style={{
                                                             width: `${r.confidence}%`,
                                                             background:
-                                                                r.confidence >=
-                                                                80
+                                                                r.confidence >= 80
                                                                     ? '#10b981'
-                                                                    : r.confidence >=
-                                                                        60
+                                                                    : r.confidence >= 60
                                                                       ? '#3b82f6'
-                                                                      : r.confidence >=
-                                                                          40
+                                                                      : r.confidence >= 40
                                                                         ? '#f59e0b'
                                                                         : '#ef4444',
                                                         }}
@@ -926,26 +803,10 @@ export default function Dashboard() {
                                         <TableCell>
                                             {(
                                                 [
-                                                    [
-                                                        80,
-                                                        'High',
-                                                        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/12 dark:text-emerald-400 dark:border-emerald-500/20',
-                                                    ],
-                                                    [
-                                                        60,
-                                                        'Medium',
-                                                        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/12 dark:text-blue-400 dark:border-blue-500/20',
-                                                    ],
-                                                    [
-                                                        40,
-                                                        'Low',
-                                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/12 dark:text-amber-400 dark:border-amber-500/20',
-                                                    ],
-                                                    [
-                                                        0,
-                                                        'Very Low',
-                                                        'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/12 dark:text-red-400 dark:border-red-500/20',
-                                                    ],
+                                                    [80, 'High',     'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/12 dark:text-emerald-400 dark:border-emerald-500/20'],
+                                                    [60, 'Medium',   'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/12 dark:text-blue-400 dark:border-blue-500/20'],
+                                                    [40, 'Low',      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/12 dark:text-amber-400 dark:border-amber-500/20'],
+                                                    [0,  'Very Low', 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/12 dark:text-red-400 dark:border-red-500/20'],
                                                 ] as [number, string, string][]
                                             )
                                                 .map(([thresh, label, cls]) =>
@@ -966,6 +827,7 @@ export default function Dashboard() {
                         </Table>
                     </div>
                 </div>
+
             </div>
         </AppLayout>
     );
