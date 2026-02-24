@@ -159,7 +159,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
     const emptyBg = palette[0];
     const numCols = (days[days.length - 1]?.week ?? 0) + 1;
 
-    /* Build (numCols × 7) grid */
     const grid: (HeatmapDay | null)[][] = Array.from({ length: numCols }, () =>
         Array(7).fill(null),
     );
@@ -169,7 +168,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
         }
     });
 
-    /* Month labels — shown on the first column of each new month */
     const monthLabels: string[] = Array(numCols).fill('');
     let lastMonth = '';
     for (let col = 0; col < numCols; col++) {
@@ -196,7 +194,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
 
     return (
         <div className="relative w-full select-none">
-            {/* Tooltip */}
             {hovered && (
                 <div
                     className="pointer-events-none fixed z-50 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-xs shadow-xl dark:border-white/10 dark:bg-neutral-900"
@@ -228,7 +225,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
             )}
 
             <div className="flex w-full items-start" style={{ gap: 3 }}>
-                {/* Day-of-week labels */}
                 <div
                     className="flex shrink-0 flex-col"
                     style={{ gap: 2, marginTop: 18, width: 26 }}
@@ -244,12 +240,10 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                     ))}
                 </div>
 
-                {/* Grid */}
                 <div
                     className="flex min-w-0 flex-1 flex-col"
                     style={{ gap: 2 }}
                 >
-                    {/* Month row */}
                     <div className="flex w-full" style={{ gap: 3 }}>
                         {monthLabels.map((m, i) => (
                             <div
@@ -262,7 +256,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                         ))}
                     </div>
 
-                    {/* Columns */}
                     <div className="flex w-full" style={{ gap: 3 }}>
                         {Array.from({ length: numCols }, (_, col) => (
                             <div
@@ -334,7 +327,6 @@ function CompactHeatmap({ days }: { days: HeatmapDay[] }) {
                 </div>
             </div>
 
-            {/* Legend */}
             <div className="mt-3 flex items-center gap-1.5">
                 <span className="text-[9px] text-neutral-400 dark:text-white/25">
                     Less
@@ -459,11 +451,8 @@ export default function Dashboard() {
         pendingReviewCount = 0,
         highConfidenceRate = 0,
         totalScansWeeklyTrend = 0,
-        correctedWeeklyTrend = 0,
-        highConfidenceWeeklyTrend = 0,
         memoryCount = 0,
         avgConfidence = 0,
-        confidenceTrend = 0,
         memoryHitRate = 0,
         accuracyImprovement = 0,
         learningHeatmap = [],
@@ -480,19 +469,12 @@ export default function Dashboard() {
         ) : (
             <Minus className="h-3 w-3" />
         );
-    const tClr = (t: number, inv = false) => {
-        if (inv)
-            return t < 0
-                ? 'text-emerald-500 dark:text-emerald-400'
-                : t > 0
-                  ? 'text-red-500 dark:text-red-400'
-                  : 'text-neutral-400';
-        return t > 0
+    const tClr = (t: number) =>
+        t > 0
             ? 'text-emerald-500 dark:text-emerald-400'
             : t < 0
               ? 'text-red-500 dark:text-red-400'
               : 'text-neutral-400';
-    };
 
     const expertChips = breedMemoryWall.filter((c) => c.level === 'expert');
     const trainedChips = breedMemoryWall.filter((c) => c.level === 'trained');
@@ -516,81 +498,6 @@ export default function Dashboard() {
         return () => clearInterval(iv);
     }, []);
 
-    /* ────────────────────────────────────────────────────────────────────────
-       TOP ROW — 4 cards
-       1. Total Scans
-       2. Corrections Made
-       3. Avg Confidence
-       4. Pending Review   ← restored (was replaced before, now back)
-    ──────────────────────────────────────────────────────────────────────── */
-    const metricCards = [
-        {
-            label: 'Total Scans',
-            display: String(resultCount),
-            trend: totalScansWeeklyTrend,
-            Icon: BarChart3,
-            accent: '#3b82f6',
-            inv: false,
-        },
-        {
-            label: 'Corrections Made',
-            display: String(correctedBreedCount),
-            trend: correctedWeeklyTrend,
-            Icon: GraduationCap,
-            accent: '#8b5cf6',
-            inv: false,
-        },
-        {
-            label: 'Avg Confidence',
-            display: `${avgConfidence.toFixed(1)}%`,
-            trend: confidenceTrend,
-            Icon: Brain,
-            accent: '#10b981',
-            inv: false,
-        },
-        {
-            label: 'Pending Review',
-            display: String(pendingReviewCount),
-            // Pending going DOWN is good (inv: true)
-            trend: -correctedWeeklyTrend,
-            Icon: ClipboardList,
-            accent: '#f59e0b',
-            inv: true,
-        },
-    ];
-
-    /* ────────────────────────────────────────────────────────────────────────
-       MINI ROW — 3 cards
-       1. Learning Progress
-       2. Memory Usage Rate
-       3. High Confidence Rate  ← replaces "Confidence Trend" (never negative)
-          = % of ALL scans that scored ≥80 confidence
-          Always 0–100%. As AI learns, this number can only grow.
-    ──────────────────────────────────────────────────────────────────────── */
-    const miniCards = [
-        {
-            label: 'Learning Progress',
-            val: `${accuracyImprovement.toFixed(0)}/100`,
-            sub: 'Composite score',
-            Icon: Target,
-            a: '#10b981',
-        },
-        {
-            label: 'Memory Usage Rate',
-            val: `${memoryHitRate.toFixed(1)}%`,
-            sub: `${memoryCount} patterns stored`,
-            Icon: Database,
-            a: '#8b5cf6',
-        },
-        {
-            label: 'High Confidence Rate',
-            val: `${highConfidenceRate.toFixed(1)}%`,
-            sub: 'Scans scoring ≥80% confidence',
-            Icon: ShieldCheck,
-            a: '#10b981',
-        },
-    ] as const;
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="AI Learning Dashboard" />
@@ -598,44 +505,160 @@ export default function Dashboard() {
             <div className="flex h-full flex-col gap-5 p-4 md:p-6">
                 {/* ── 4 metric cards ────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {metricCards.map(
-                        ({ label, display, trend, Icon, accent, inv }) => (
-                            <StatCard key={label} accent={accent}>
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
-                                            {label}
-                                        </p>
-                                        <div className="mt-2 flex items-baseline gap-2">
-                                            <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
-                                                {display}
-                                            </p>
-                                        </div>
-                                        <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
-                                            vs last week
-                                        </p>
-                                    </div>
+                    {/* Total Scans — only card with trend */}
+                    <StatCard accent="#3b82f6">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                    Total Scans
+                                </p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                        {resultCount}
+                                    </p>
                                     <div
-                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                                        style={{
-                                            background: `${accent}18`,
-                                            border: `1px solid ${accent}30`,
-                                        }}
+                                        className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(totalScansWeeklyTrend)}`}
                                     >
-                                        <Icon
-                                            className="h-5 w-5"
-                                            style={{ color: accent }}
-                                        />
+                                        {tIcon(totalScansWeeklyTrend)}
+                                        <span>
+                                            {fmt(totalScansWeeklyTrend)}
+                                        </span>
                                     </div>
                                 </div>
-                            </StatCard>
-                        ),
-                    )}
+                                <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                    vs last week
+                                </p>
+                            </div>
+                            <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                style={{
+                                    background: '#3b82f618',
+                                    border: '1px solid #3b82f630',
+                                }}
+                            >
+                                <BarChart3
+                                    className="h-5 w-5"
+                                    style={{ color: '#3b82f6' }}
+                                />
+                            </div>
+                        </div>
+                    </StatCard>
+
+                    {/* Corrections Made — no trend */}
+                    <StatCard accent="#8b5cf6">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                    Corrections Made
+                                </p>
+                                <p className="mt-2 text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                    {correctedBreedCount}
+                                </p>
+                                <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                    Total vet corrections
+                                </p>
+                            </div>
+                            <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                style={{
+                                    background: '#8b5cf618',
+                                    border: '1px solid #8b5cf630',
+                                }}
+                            >
+                                <GraduationCap
+                                    className="h-5 w-5"
+                                    style={{ color: '#8b5cf6' }}
+                                />
+                            </div>
+                        </div>
+                    </StatCard>
+
+                    {/* Avg Confidence — no trend */}
+                    <StatCard accent="#10b981">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                    Avg Confidence
+                                </p>
+                                <p className="mt-2 text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                    {avgConfidence.toFixed(1)}%
+                                </p>
+                                <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                    This week's scans
+                                </p>
+                            </div>
+                            <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                style={{
+                                    background: '#10b98118',
+                                    border: '1px solid #10b98130',
+                                }}
+                            >
+                                <Brain
+                                    className="h-5 w-5"
+                                    style={{ color: '#10b981' }}
+                                />
+                            </div>
+                        </div>
+                    </StatCard>
+
+                    {/* Pending Review — no trend */}
+                    <StatCard accent="#f59e0b">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-neutral-500 dark:text-white/40">
+                                    Pending Review
+                                </p>
+                                <p className="mt-2 text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
+                                    {pendingReviewCount}
+                                </p>
+                                <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
+                                    Awaiting correction
+                                </p>
+                            </div>
+                            <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                                style={{
+                                    background: '#f59e0b18',
+                                    border: '1px solid #f59e0b30',
+                                }}
+                            >
+                                <ClipboardList
+                                    className="h-5 w-5"
+                                    style={{ color: '#f59e0b' }}
+                                />
+                            </div>
+                        </div>
+                    </StatCard>
                 </div>
 
                 {/* ── 3 mini stats ──────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {miniCards.map(({ label, val, sub, Icon, a }) => (
+                    {(
+                        [
+                            {
+                                label: 'Learning Progress',
+                                val: `${accuracyImprovement.toFixed(0)}/100`,
+                                sub: 'Composite score',
+                                Icon: Target,
+                                a: '#10b981',
+                            },
+                            {
+                                label: 'Memory Usage Rate',
+                                val: `${memoryHitRate.toFixed(1)}%`,
+                                sub: `${memoryCount} patterns stored`,
+                                Icon: Database,
+                                a: '#8b5cf6',
+                            },
+                            {
+                                label: 'High Confidence Rate',
+                                val: `${highConfidenceRate.toFixed(1)}%`,
+                                sub: 'Scans scoring ≥80% confidence',
+                                Icon: ShieldCheck,
+                                a: '#10b981',
+                            },
+                        ] as const
+                    ).map(({ label, val, sub, Icon, a }) => (
                         <StatCard key={label} accent={a}>
                             <div className="flex items-center justify-between">
                                 <div>
@@ -668,7 +691,6 @@ export default function Dashboard() {
 
                 {/* ── AI Training Activity ───────────────────────────────── */}
                 <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
-                    {/* Header */}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-white/[0.06]">
                         <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 dark:border-violet-500/25 dark:bg-violet-500/15">
@@ -716,9 +738,7 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    {/* 50/50 body */}
                     <div className="flex flex-col lg:flex-row">
-                        {/* Heatmap */}
                         <div className="w-full p-5 lg:w-1/2">
                             <p className="mb-3 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
                                 Correction Heatmap
@@ -733,11 +753,9 @@ export default function Dashboard() {
                             )}
                         </div>
 
-                        {/* Divider */}
                         <div className="hidden w-px bg-neutral-100 lg:block dark:bg-white/[0.06]" />
                         <div className="mx-5 h-px bg-neutral-100 lg:hidden dark:bg-white/[0.06]" />
 
-                        {/* Memory Wall */}
                         <div className="w-full p-5 lg:w-1/2">
                             <div className="mb-3 flex flex-wrap items-center gap-2">
                                 <p className="text-[10px] font-semibold tracking-wider text-neutral-400 uppercase dark:text-white/30">
