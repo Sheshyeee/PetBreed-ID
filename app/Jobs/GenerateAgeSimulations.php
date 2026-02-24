@@ -148,7 +148,7 @@ class GenerateAgeSimulations implements ShouldQueue
   private function createGenerationPromise($client, $prompt, $imageData)
   {
     $apiKey    = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-    $modelName = 'gemini-2.0-flash-preview-image-generation';
+    $modelName = 'gemini-2.0-flash-exp-image-generation';
     $endpoint  = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
     $payload = [
@@ -159,11 +159,11 @@ class GenerateAgeSimulations implements ShouldQueue
         ]
       ]],
       'generationConfig' => [
-        'temperature'     => 0.3,
-        'topK'            => 32,
-        'topP'            => 0.85,
-        'maxOutputTokens' => 8192,
-        'responseModalities' => ['Text', 'Image'],
+        'temperature'        => 0.3,
+        'topK'               => 32,
+        'topP'               => 0.85,
+        'maxOutputTokens'    => 8192,
+        'responseModalities' => ['IMAGE', 'TEXT'],
       ],
       'safetySettings' => [
         ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
