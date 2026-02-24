@@ -38,10 +38,9 @@ class GenerateAgeSimulations implements ShouldQueue
     $startTime = microtime(true);
 
     try {
-      Log::info("🐕 WORLD-CLASS AGE TRANSFORMATION STARTED", [
+      Log::info("🐕 AGE SIMULATION STARTED", [
         'result_id' => $this->resultId,
         'breed' => $this->breed,
-        'model' => 'gemini-3-pro-image-preview (Nano Banana Pro)'
       ]);
 
       $result = Results::find($this->resultId);
@@ -52,60 +51,40 @@ class GenerateAgeSimulations implements ShouldQueue
 
       $this->updateStatus($result, 'generating', []);
 
-      // Prepare high-quality image for AI processing
       $imageData = $this->prepareHighQualityImage($this->imagePath);
       if (!$imageData) {
         throw new \Exception("Failed to prepare image");
       }
 
-      // Get advanced breed-specific aging characteristics
-      $breedProfile = $this->getAdvancedBreedProfile($this->breed);
-      Log::info("📊 Breed Profile Generated", $breedProfile);
+      $breedProfile = $this->getBreedProfile($this->breed);
+      Log::info("📊 Breed Profile", $breedProfile);
 
-      // Generate transformations using Nano Banana Pro
-      $simulations = $this->generateWorldClassTransformations($imageData, $breedProfile);
+      $simulations = $this->generateTransformations($imageData, $breedProfile);
 
-      // Save high-quality results
       $savedPaths = [
         '1_years' => null,
         '3_years' => null
       ];
 
       if (isset($simulations['1_year']) && $simulations['1_year']) {
-        $savedPaths['1_years'] = $this->saveHighQualityImage(
-          $simulations['1_year'],
-          '1_year',
-          $this->resultId
-        );
-        Log::info("✅ 1-year transformation complete: {$savedPaths['1_years']}");
+        $savedPaths['1_years'] = $this->saveImage($simulations['1_year'], '1_year', $this->resultId);
+        Log::info("✅ 1-year saved: {$savedPaths['1_years']}");
       }
 
       if (isset($simulations['3_years']) && $simulations['3_years']) {
-        $savedPaths['3_years'] = $this->saveHighQualityImage(
-          $simulations['3_years'],
-          '3_years',
-          $this->resultId
-        );
-        Log::info("✅ 3-years transformation complete: {$savedPaths['3_years']}");
+        $savedPaths['3_years'] = $this->saveImage($simulations['3_years'], '3_years', $this->resultId);
+        Log::info("✅ 3-years saved: {$savedPaths['3_years']}");
       }
 
       $this->updateStatus($result, 'complete', $savedPaths, $breedProfile);
 
       $elapsed = round(microtime(true) - $startTime, 2);
-      $successRate = ($savedPaths['1_years'] && $savedPaths['3_years']) ? '100%' : '50%';
-
-      Log::info("🎉 TRANSFORMATION COMPLETE", [
-        'time' => "{$elapsed}s",
-        'success_rate' => $successRate,
-        'quality' => 'world-class'
-      ]);
+      Log::info("🎉 SIMULATION COMPLETE in {$elapsed}s");
     } catch (\Exception $e) {
-      Log::error("❌ TRANSFORMATION FAILED", [
+      Log::error("❌ SIMULATION FAILED", [
         'error' => $e->getMessage(),
         'line' => $e->getLine(),
-        'file' => $e->getFile()
       ]);
-
       if (isset($result)) {
         $this->updateStatus($result, 'failed', [], [], $e->getMessage());
       }
@@ -113,27 +92,17 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * Generate world-class transformations using Nano Banana Pro
+   * Generate transformations via Gemini
    */
-  private function generateWorldClassTransformations($imageData, $breedProfile)
+  private function generateTransformations($imageData, $breedProfile)
   {
-    $client = new Client([
-      'timeout' => 120,
-      'connect_timeout' => 10,
-    ]);
+    $client = new Client(['timeout' => 120, 'connect_timeout' => 10]);
 
-    $results = [
-      '1_year' => null,
-      '3_years' => null
-    ];
+    $results = ['1_year' => null, '3_years' => null];
 
-    // Build expert-level prompts
-    $prompt1Year = $this->buildExpertPrompt($breedProfile, 1);
-    $prompt3Years = $this->buildExpertPrompt($breedProfile, 3);
+    $prompt1Year  = $this->buildAgingPrompt($breedProfile, 1);
+    $prompt3Years = $this->buildAgingPrompt($breedProfile, 3);
 
-    Log::info("🎨 Using world-class AI prompting techniques with IDENTITY LOCK");
-
-    // Parallel generation with intelligent retry
     $maxAttempts = 3;
 
     for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
@@ -141,53 +110,32 @@ class GenerateAgeSimulations implements ShouldQueue
         Log::info("🔄 Attempt " . ($attempt + 1) . "/{$maxAttempts}");
 
         $promises = [];
+        if (!$results['1_year'])  $promises['1_year']  = $this->createGenerationPromise($client, $prompt1Year,  $imageData);
+        if (!$results['3_years']) $promises['3_years'] = $this->createGenerationPromise($client, $prompt3Years, $imageData);
 
-        if (!$results['1_year']) {
-          $promises['1_year'] = $this->createGenerationPromise(
-            $client,
-            $prompt1Year,
-            $imageData
-          );
-        }
-
-        if (!$results['3_years']) {
-          $promises['3_years'] = $this->createGenerationPromise(
-            $client,
-            $prompt3Years,
-            $imageData
-          );
-        }
-
-        if (empty($promises)) {
-          break;
-        }
+        if (empty($promises)) break;
 
         $settled = Promise\Utils::settle($promises)->wait();
 
         foreach ($settled as $key => $result) {
           if ($result['state'] === 'fulfilled') {
             $results[$key] = $result['value'];
-            Log::info("✅ {$key} transformation successful");
+            Log::info("✅ {$key} succeeded");
           } else {
             Log::warning("⚠️ {$key} failed: " . $result['reason']->getMessage());
           }
         }
 
-        if ($results['1_year'] && $results['3_years']) {
-          Log::info("🎉 Both transformations complete");
-          break;
-        }
+        if ($results['1_year'] && $results['3_years']) break;
 
         if ($attempt < $maxAttempts - 1) {
           $delay = pow(2, $attempt + 1);
-          Log::info("⏳ Exponential backoff: {$delay}s");
+          Log::info("⏳ Backing off {$delay}s");
           sleep($delay);
         }
       } catch (\Exception $e) {
         Log::error("Attempt {$attempt} error: " . $e->getMessage());
-        if ($attempt < $maxAttempts - 1) {
-          sleep(3 * ($attempt + 1));
-        }
+        if ($attempt < $maxAttempts - 1) sleep(3 * ($attempt + 1));
       }
     }
 
@@ -195,506 +143,395 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   /**
-   * Create generation promise using Nano Banana Pro
+   * Create async promise for Gemini call
    */
   private function createGenerationPromise($client, $prompt, $imageData)
   {
-    $apiKey = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-
-    // Use Nano Banana Pro - the BEST image generation model
-    $modelName = 'gemini-3-pro-image-preview';
-
-    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
+    $apiKey    = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+    $modelName = 'gemini-2.0-flash-preview-image-generation';
+    $endpoint  = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
 
     $payload = [
-      'contents' => [
-        [
-          'parts' => [
-            ['text' => $prompt],
-            [
-              'inlineData' => [
-                'mimeType' => $imageData['mimeType'],
-                'data' => $imageData['base64']
-              ]
-            ]
-          ]
+      'contents' => [[
+        'parts' => [
+          ['text' => $prompt],
+          ['inlineData' => ['mimeType' => $imageData['mimeType'], 'data' => $imageData['base64']]]
         ]
-      ],
+      ]],
       'generationConfig' => [
-        'temperature' => 0.4,        // LOWERED from 0.6 for more consistency
-        'topK' => 40,                // LOWERED from 64 for better consistency
-        'topP' => 0.9,              // LOWERED from 0.95 for better consistency
-        'maxOutputTokens' => 32768   // Maximum for Nano Banana Pro
+        'temperature'     => 0.3,
+        'topK'            => 32,
+        'topP'            => 0.85,
+        'maxOutputTokens' => 8192,
+        'responseModalities' => ['Text', 'Image'],
       ],
       'safetySettings' => [
-        [
-          'category' => 'HARM_CATEGORY_HARASSMENT',
-          'threshold' => 'BLOCK_NONE'
-        ],
-        [
-          'category' => 'HARM_CATEGORY_HATE_SPEECH',
-          'threshold' => 'BLOCK_NONE'
-        ],
-        [
-          'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-          'threshold' => 'BLOCK_NONE'
-        ],
-        [
-          'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
-          'threshold' => 'BLOCK_NONE'
-        ]
+        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
       ]
     ];
 
     return $client->postAsync($endpoint, [
-      'json' => $payload,
+      'json'    => $payload,
       'headers' => ['Content-Type' => 'application/json']
     ])->then(function ($response) {
-      return $this->extractHighQualityImage($response);
+      return $this->extractImage($response);
     });
   }
 
   /**
-   * Extract image from API response
+   * Extract image bytes from API response
    */
-  private function extractHighQualityImage($response)
+  private function extractImage($response)
   {
     $responseData = json_decode($response->getBody()->getContents(), true);
 
     if (!isset($responseData['candidates'][0])) {
-      Log::error("No candidates in response", ['response' => $responseData]);
+      Log::error("No candidates", ['response' => $responseData]);
       throw new \Exception("No image generated");
     }
 
-    $candidate = $responseData['candidates'][0];
+    $parts = $responseData['candidates'][0]['content']['parts'] ?? [];
 
-    // Method 1: Direct inlineData
-    if (isset($candidate['content']['parts'][0]['inlineData']['data'])) {
-      Log::info("✅ Image extracted from inlineData");
-      return base64_decode($candidate['content']['parts'][0]['inlineData']['data']);
-    }
-
-    // Method 2: Text block with base64
-    if (isset($candidate['content']['parts'][0]['text'])) {
-      $text = $candidate['content']['parts'][0]['text'];
-      $base64 = preg_replace('/```[\w]*\n?/', '', $text);
-      $base64 = trim($base64);
-
-      if (!empty($base64)) {
-        Log::info("✅ Image extracted from text");
-        return base64_decode($base64);
+    foreach ($parts as $part) {
+      if (isset($part['inlineData']['data'])) {
+        Log::info("✅ Image from inlineData");
+        return base64_decode($part['inlineData']['data']);
       }
     }
 
-    throw new \Exception("No image data found");
+    foreach ($parts as $part) {
+      if (isset($part['text'])) {
+        $text   = preg_replace('/```[\w]*\n?/', '', $part['text']);
+        $text   = trim($text);
+        $decoded = base64_decode($text, true);
+        if ($decoded && strlen($decoded) > 1000) {
+          Log::info("✅ Image from text block");
+          return $decoded;
+        }
+      }
+    }
+
+    throw new \Exception("No image data found in response");
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  CORE: Breed-aware realistic aging prompt
+  // ─────────────────────────────────────────────────────────────────────────
+
   /**
-   * Build expert-level transformation prompt with IDENTITY LOCK
+   * Build a realistic, healthy, breed-accurate aging prompt.
+   *
+   * Key philosophy:
+   *  • Aging = natural biological maturation, NOT neglect / illness
+   *  • Show physical changes specific to this breed (size, coat, face)
+   *  • Dog must look healthy, well-groomed, and HAPPY at every age
+   *  • Identity (color, markings, pose, background) must be preserved
    */
-  private function buildExpertPrompt($profile, $years)
+  private function buildAgingPrompt($profile, $years)
   {
-    $breed = $profile['breed'];
-    $size = $profile['size_category'];
-    $coat = $profile['coat_type'];
-    $grayPattern = $profile['gray_pattern'];
-    $isBrachy = $profile['brachycephalic'] ?? false;
+    $breed    = $profile['breed'];
+    $size     = $profile['size_category'];     // toy | small | medium | large | giant
+    $coat     = $profile['coat_type'];         // short | medium | long_silky | double_coat | curly/fluffy | wire
+    $isGiant  = $size === 'giant';
+    $isToy    = in_array($size, ['toy', 'small']);
+    $isBrachy = $profile['brachycephalic'];
+    $maturity = $profile['maturity_changes'];  // breed-specific physical maturation notes
 
+    // ── Decide which age-stage description to use ──────────────────────────
     if ($years === 1) {
-      $prompt = "🎯 CRITICAL INSTRUCTION: AGE THIS EXACT DOG
-
-═══════════════════════════════════════════════════════
-🔒 IDENTITY LOCK - ABSOLUTE REQUIREMENT 🔒
-═══════════════════════════════════════════════════════
-
-THIS IS NOT A REQUEST FOR 'A {$breed}' - THIS IS THIS SPECIFIC INDIVIDUAL DOG.
-
-⚠️ MANDATORY PRESERVATION (100% REQUIRED):
-✓ EXACT same coat color(s) - every single color must match
-✓ EXACT same coat pattern - every marking, spot, patch
-✓ EXACT same facial structure and features
-✓ EXACT same ear shape, size, and position
-✓ EXACT same eye color and expression
-✓ EXACT same nose color and shape
-✓ EXACT same body build and proportions
-✓ EXACT same collar or accessories (if present)
-✓ EXACT same background color and elements
-✓ EXACT same pose, angle, and camera position
-✓ EXACT same lighting direction and quality
-
-✅ YOU MAY ONLY CHANGE:
-• Add 3-7 scattered gray hairs on muzzle (subtle)
-• Very slight coat texture change (5-10% less glossy)
-• Minimal eye brightness reduction (10% less sparkle)
-• Nothing else
-
-🚨 FAILURE CONDITIONS:
-❌ If coat color changes = COMPLETE FAILURE
-❌ If markings disappear or move = COMPLETE FAILURE  
-❌ If background changes = COMPLETE FAILURE
-❌ If dog doesn't look identical = COMPLETE FAILURE
-❌ If anyone can't recognize it's the same dog = COMPLETE FAILURE
-
-═══════════════════════════════════════════════════════
-🔬 SUBTLE AGING CHANGES (1 YEAR ONLY):
-═══════════════════════════════════════════════════════
-
-👁️ MINIMAL EYE CHANGES:
-• Brightness: 10% less bright (very subtle)
-• Lens: Barely noticeable start of cloudiness
-
-🎨 MINIMAL COAT CHANGES:";
-
-      switch ($coat) {
-        case 'curly/fluffy':
-          $prompt .= "\n• Texture: 5-10% less bouncy (very slight)
-• Quality: Minimally less fluffy";
-          break;
-
-        case 'double_coat':
-          $prompt .= "\n• Gloss: 10-15% reduction (subtle)
-• Texture: Slightly less plush";
-          break;
-
-        case 'long_silky':
-          $prompt .= "\n• Shine: 10-15% less luster (subtle)
-• Texture: Slightly less flowing";
-          break;
-
-        default:
-          $prompt .= "\n• Shine: 10-15% reduction (very subtle)
-• Texture: Minimally coarser";
-      }
-
-      $prompt .= "\n\n😺 MINIMAL FACIAL CHANGES:";
-
-      if ($isBrachy) {
-        $prompt .= "\n• Wrinkles: 10% deeper (barely visible)";
-      } else {
-        $prompt .= "\n• Muzzle: Very subtle loosening (almost invisible)";
-      }
-
-      $prompt .= "\n\n⚪ MINIMAL GRAYING:";
-
-      switch ($grayPattern) {
-        case 'minimal':
-          $prompt .= "\n• Gray hairs: NONE (breed doesn't gray)
-• Color: Slightly duller (5%)";
-          break;
-
-        case 'prominent':
-          $prompt .= "\n• Muzzle: 3-5 scattered silver hairs ONLY
-• Very sparse and subtle";
-          break;
-
-        default:
-          $prompt .= "\n• Muzzle tip: 2-4 scattered gray hairs ONLY
-• Barely noticeable";
-      }
-
-      $prompt .= "\n\n💪 BODY CHANGES:
-• Almost none - dog looks nearly identical
-• Maybe 5% less muscle definition
-
-═══════════════════════════════════════════════════════
-📸 OUTPUT REQUIREMENTS:
-═══════════════════════════════════════════════════════
-• MUST look like the EXACT SAME DOG, just slightly older
-• ALL unique features PERFECTLY preserved
-• Background IDENTICAL
-• Pose and angle IDENTICAL
-• Only aging effects applied (subtle!)
-
-REMEMBER: If viewers can't instantly recognize this as the same dog, YOU HAVE FAILED.
-
-Generate the image now.";
+      $ageStage   = "1 year older — entering young adulthood / prime";
+      $coatChange = $this->coatChange1Year($coat, $size);
+      $bodyChange = $this->bodyChange1Year($size, $isBrachy, $profile);
+      $faceChange = $this->faceChange1Year($isBrachy, $profile);
+      $grayChange = "No gray hairs at all — this dog is young and healthy.";
+      $healthNote = "The dog looks vibrant, healthy, well-fed, and well-groomed — the picture of a happy dog in its prime.";
     } else {
-      // 3 YEARS
-      $prompt = "🎯 CRITICAL INSTRUCTION: AGE THIS EXACT DOG
-
-═══════════════════════════════════════════════════════
-🔒 IDENTITY LOCK - ABSOLUTE REQUIREMENT 🔒
-═══════════════════════════════════════════════════════
-
-THIS IS NOT A REQUEST FOR 'A SENIOR {$breed}' - THIS IS THIS SPECIFIC DOG AGED 3 YEARS.
-
-⚠️ MANDATORY PRESERVATION (100% REQUIRED):
-✓ EXACT same coat base color(s) - every color preserved
-✓ EXACT same coat pattern and markings - all preserved
-✓ EXACT same facial structure
-✓ EXACT same ear shape and position
-✓ EXACT same eye color (can be cloudier, but same color)
-✓ EXACT same nose color
-✓ EXACT same body proportions
-✓ EXACT same collar/accessories (if any)
-✓ EXACT same background and setting
-✓ EXACT same pose and angle
-✓ EXACT same lighting
-
-✅ YOU MAY CHANGE:
-• Add gray/white hairs (30-50% on muzzle and face)
-• Coat texture (coarser, less shiny)
-• Eye cloudiness (cataract-like)
-• Slight facial sagging
-• Some coat thinning
-
-🚨 NEVER CHANGE:
-❌ Coat base colors or patterns
-❌ Unique markings or spots
-❌ Background or environment
-❌ Dog's fundamental appearance
-❌ Pose or camera angle
-
-═══════════════════════════════════════════════════════
-🔬 SENIOR AGING CHANGES (3 YEARS):
-═══════════════════════════════════════════════════════
-
-👁️ SENIOR EYE CHANGES:
-• Cloudiness: 30-40% (cataract-like but NOT blind-looking)
-• Brightness: 30-40% less sparkle
-• Color: SAME color but with slight milkiness
-
-🎨 SENIOR COAT CHANGES:";
-
-      switch ($coat) {
-        case 'curly/fluffy':
-          $prompt .= "\n• Texture: 30-40% less fluffy, wiry
-• Thinning: Slight, patchy areas
-• BUT: Same curly structure, same colors";
-          break;
-
-        case 'double_coat':
-          $prompt .= "\n• Undercoat: 30-40% thinner
-• Guard hairs: Rougher, less glossy
-• BUT: Same coat colors and patterns";
-          break;
-
-        case 'long_silky':
-          $prompt .= "\n• Shine: Significantly reduced
-• Texture: Coarser, dry appearance
-• BUT: Same hair colors";
-          break;
-
-        default:
-          $prompt .= "\n• Texture: Rougher, duller
-• Quality: 30% loss
-• BUT: SAME base colors";
-      }
-
-      $prompt .= "\n\n😺 SENIOR FACIAL AGING:";
-
-      if ($isBrachy) {
-        $prompt .= "\n• Wrinkles: 30-40% deeper
-• Jowls: Looser, more prominent
-• BUT: Same facial structure";
-      } else {
-        $prompt .= "\n• Sagging: Visible on jowls
-• Skin: Looser around muzzle
-• BUT: Same face shape";
-      }
-
-      $prompt .= "\n\n⚪ SENIOR GRAYING:";
-
-      switch ($grayPattern) {
-        case 'minimal':
-          $prompt .= "\n• Gray: None (breed characteristic)
-• Color: 25-30% darker/duller
-• BUT: Same base color";
-          break;
-
-        case 'prominent':
-          $prompt .= "\n• Muzzle: 40-60% gray coverage
-• Face: Gray around eyes/ears
-• BUT: Underlying coat color same";
-          break;
-
-        default:
-          $prompt .= "\n• Muzzle: 30-50% gray
-• Face: Gray scattered around
-• BUT: Base colors preserved";
-      }
-
-      $prompt .= "\n\n💪 SENIOR BODY:";
-
-      if ($size === 'giant') {
-        $prompt .= "\n• Muscle: 20-30% softer
-• Posture: Slightly hunched
-• BUT: Same body structure";
-      } elseif ($size === 'toy' || $size === 'small') {
-        $prompt .= "\n• Muscle: 10-20% softer
-• BUT: Compact form maintained";
-      } else {
-        $prompt .= "\n• Muscle: 20-30% reduced
-• BUT: Same proportions";
-      }
-
-      $prompt .= "\n\n😌 EXPRESSION:
-• Calmer, wiser look
-• Less alert (not sad!)
-• Healthy senior dignity
-
-═══════════════════════════════════════════════════════
-📸 OUTPUT REQUIREMENTS:
-═══════════════════════════════════════════════════════
-• MUST look like the EXACT SAME DOG, just senior
-• ALL markings and colors PRESERVED
-• Background IDENTICAL
-• Pose IDENTICAL
-• Just aged with gray hair and senior features
-
-CRITICAL: Anyone looking at this should say 'That's the same dog, just older' NOT 'That's a different dog'.
-
-Generate the image now.";
+      $ageStage   = "3 years older — fully mature adult in excellent health";
+      $coatChange = $this->coatChange3Years($coat, $size);
+      $bodyChange = $this->bodyChange3Years($size, $isBrachy, $profile);
+      $faceChange = $this->faceChange3Years($isBrachy, $profile);
+      $grayChange = $this->grayChange3Years($profile);
+      $healthNote = "The dog looks strong, healthy, well-groomed, and calm — a confident, well-cared-for adult dog.";
     }
 
-    // Add breed-specific traits
-    if (!empty($profile['specific_traits'])) {
-      $prompt .= "\n\n🧬 BREED NOTES (for aging only):\n";
-      foreach (array_slice($profile['specific_traits'], 0, 2) as $trait) {
-        $prompt .= "• {$trait}\n";
-      }
-    }
+    $prompt = <<<PROMPT
+TASK: Produce a photorealistic image of THIS EXACT DOG aged {$years} year(s) into the future.
+
+════════════════════════════════════════════════
+BREED CONTEXT: {$breed}
+════════════════════════════════════════════════
+{$maturity}
+
+════════════════════════════════════════════════
+AGE STAGE: {$ageStage}
+════════════════════════════════════════════════
+
+🔒 WHAT MUST STAY IDENTICAL (do not change these):
+• Coat base color and every color pattern / marking — exact match
+• Eye color (same hue, can be slightly more settled/calm)
+• Nose color and shape
+• Ear shape and position
+• Pose, camera angle, and framing
+• Background, floor, and lighting
+• Any collar or accessories visible
+
+✅ PHYSICAL MATURATION TO APPLY (healthy, natural changes only):
+COAT: {$coatChange}
+BODY / SIZE: {$bodyChange}
+FACE / HEAD: {$faceChange}
+GRAYING: {$grayChange}
+
+💚 HEALTH & GROOMING RULE (CRITICAL):
+{$healthNote}
+The coat must look clean, brushed, and well-maintained.
+The dog must NOT look sick, thin, matted, dirty, sad, or neglected.
+This is natural biological aging — the dog is thriving.
+
+════════════════════════════════════════════════
+OUTPUT REQUIREMENTS
+════════════════════════════════════════════════
+• Same photo style and quality as the input image
+• Same background / environment
+• Same pose and angle
+• Photorealistic — not illustrated or cartoon
+• Anyone viewing both photos should say: "That's the same dog, just older"
+  NOT: "That's a different dog" or "That dog looks sick"
+
+Generate the aged image now.
+PROMPT;
 
     return $prompt;
   }
 
-  /**
-   * Get advanced breed-specific aging profile
-   */
-  private function getAdvancedBreedProfile($breed)
+  // ─────────────────────────────────────────────────────────────────────────
+  //  PER-COAT / PER-BODY / PER-FACE / GRAY helpers  (1-year vs 3-year)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private function coatChange1Year($coat, $size)
   {
-    $breedLower = strtolower($breed);
+    return match ($coat) {
+      'curly/fluffy' => "Coat is slightly fuller and more settled — the puppy fluffiness is transitioning into the breed's adult plush coat. Still very fluffy, very clean.",
+      'double_coat'  => "Adult double coat is developing — thicker and more defined undercoat starting to show. Coat looks lush and healthy.",
+      'long_silky'   => "Coat is reaching adult length — silky, flowing, and well-groomed. Perhaps slightly longer than before.",
+      'wire'         => "Wiry texture becoming more defined — characteristic breed texture more prominent but tidy.",
+      'short'        => "Adult short coat fully developed — smooth, glossy, healthy sheen.",
+      default        => "Coat has fully matured into the breed's adult coat — healthy, clean, well-groomed.",
+    };
+  }
+
+  private function coatChange3Years($coat, $size)
+  {
+    return match ($coat) {
+      'curly/fluffy' => "Coat is at its full adult glory — dense, well-formed curls or plush fur at peak condition. Clean and well-groomed.",
+      'double_coat'  => "Dense, full double coat — thick and healthy. Coat is rich in color and texture.",
+      'long_silky'   => "Coat is at its longest adult length — flowing, glossy, well-maintained. Some natural texture compared to puppy coat but still beautiful.",
+      'wire'         => "Wiry coat fully expressed — characteristic scruffy-but-tidy look of the mature breed.",
+      'short'        => "Short coat is glossy and healthy — fits the mature body well.",
+      default        => "Mature adult coat — full, healthy, well-maintained.",
+    };
+  }
+
+  private function bodyChange1Year($size, $isBrachy, $profile)
+  {
+    $grows = $profile['grows_significantly'] ?? false;
+
+    if ($grows) {
+      return match ($size) {
+        'giant' => "Body noticeably larger and taller — the breed is a giant breed and has grown significantly. Legs are longer, chest is deeper, overall frame is much bigger but still lean / filling out.",
+        'large' => "Body larger and more muscular — this large breed has grown substantially. Taller, broader chest, longer legs. Looks like a young adult dog with a bigger frame.",
+        'medium' => "Body slightly larger and more filled out — transitioning from puppy proportions to adult frame. Slightly taller, longer legs.",
+        default => "Body slightly larger and more filled-out than puppy stage.",
+      };
+    }
+
+    return match ($size) {
+      'toy'   => "Body fully adult-sized — compact and proportionate. Slightly more filled-out than puppy. Same small, dainty frame.",
+      'small' => "Body is adult-sized — compact, slightly more muscular than puppy. Well-proportioned.",
+      'medium' => "Body transitioning to full adult size — slightly more filled-out, longer legs, deeper chest.",
+      'large' => "Body mostly adult-sized — strong, muscular, well-proportioned young adult.",
+      'giant' => "Body large and still filling out — noticeably bigger than puppy, approaching full giant-breed size.",
+      default => "Body is adult-sized and well-proportioned.",
+    };
+  }
+
+  private function bodyChange3Years($size, $isBrachy, $profile)
+  {
+    return match ($size) {
+      'toy'    => "Body at full adult size — compact, firm, healthy. Excellent muscle tone for a small dog.",
+      'small'  => "Body fully mature — compact and muscular. Excellent condition.",
+      'medium' => "Body in full adult prime — strong, well-muscled, balanced proportions.",
+      'large'  => "Body at peak adult condition — powerful, well-muscled, deep chest, strong legs.",
+      'giant'  => "Body fully mature at its large size — massive, solid, but healthy and well-proportioned. Carries weight well.",
+      default  => "Body in full adult condition — strong, healthy, well-proportioned.",
+    };
+  }
+
+  private function faceChange1Year($isBrachy, $profile)
+  {
+    if ($isBrachy) {
+      return "Face developing adult proportions — slightly broader head, wrinkles beginning to form naturally. Still expressive and alert.";
+    }
+    $muzzle = $profile['muzzle_change'] ?? "Muzzle slightly longer and more defined than puppy. Face more angular and alert — the 'baby face' is transitioning to young adult features.";
+    return $muzzle;
+  }
+
+  private function faceChange3Years($isBrachy, $profile)
+  {
+    if ($isBrachy) {
+      return "Face fully mature — broader head, natural wrinkles of the breed more defined. Expressive, calm, confident look.";
+    }
+    return "Face fully mature — strong, well-defined muzzle and jawline. Calm, wise, confident expression. The face has lost the rounded puppy look and gained adult character.";
+  }
+
+  private function grayChange3Years($profile)
+  {
+    return match ($profile['gray_pattern']) {
+      'none'      => "No gray hairs — this breed does not gray noticeably even as an adult. Coat color remains vivid.",
+      'minimal'   => "Possibly a few light hairs on the muzzle tip — very subtle and breed-appropriate. Color otherwise unchanged.",
+      'moderate'  => "A light dusting of gray/silver hairs on the muzzle and around the eyes — natural and distinguished. The base coat color is fully preserved.",
+      'prominent' => "Noticeable silver/gray hairs on the muzzle, chin, and around the eyes — a natural and handsome sign of maturity. Underlying coat color preserved.",
+      default     => "Subtle, natural graying only where the breed typically grays first.",
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  BREED PROFILE  (expanded with physical-maturation data)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private function getBreedProfile($breed)
+  {
+    $b = strtolower($breed);
 
     $profile = [
-      'breed' => $breed,
-      'size_category' => 'medium',
-      'coat_type' => 'standard',
-      'gray_pattern' => 'moderate',
-      'aging_speed' => 'normal',
-      'brachycephalic' => false,
-      'specific_traits' => []
+      'breed'               => $breed,
+      'size_category'       => 'medium',
+      'coat_type'           => 'medium',
+      'gray_pattern'        => 'moderate',
+      'aging_speed'         => 'normal',
+      'brachycephalic'      => false,
+      'grows_significantly' => false,   // true = visible size increase expected
+      'muzzle_change'       => null,
+      'maturity_changes'    => '',
     ];
 
-    // SIZE CATEGORIES
-    if ($this->matchBreed($breedLower, ['chihuahua', 'pomeranian', 'yorkshire', 'toy', 'papillon', 'maltese', 'shih tzu'])) {
+    // ── SIZE ────────────────────────────────────────────────────────────────
+    if ($this->mb($b, ['chihuahua', 'pomeranian', 'yorkshire terrier', 'yorkie', 'papillon', 'maltese', 'toy poodle', 'italian greyhound', 'miniature pinscher'])) {
       $profile['size_category'] = 'toy';
-      $profile['aging_speed'] = 'slow';
-      $profile['specific_traits'][] = 'Toy breeds age slower';
-    } elseif ($this->matchBreed($breedLower, ['corgi', 'beagle', 'french bulldog', 'boston terrier', 'cocker spaniel'])) {
+      $profile['grows_significantly'] = false;
+      $profile['maturity_changes'] = "Toy breed — adult size is reached early. Very little size change after 6–8 months. Focus on coat maturation and slight facial refinement.";
+    } elseif ($this->mb($b, ['shih tzu', 'french bulldog', 'boston terrier', 'cocker spaniel', 'beagle', 'corgi', 'dachshund', 'scottish terrier', 'west highland', 'westie', 'cavalier', 'bichon', 'lhasa apso', 'havanese', 'miniature schnauzer', 'miniature poodle'])) {
       $profile['size_category'] = 'small';
-      $profile['aging_speed'] = 'slow';
-      $profile['specific_traits'][] = 'Small breeds age gracefully';
-    } elseif ($this->matchBreed($breedLower, ['great dane', 'mastiff', 'saint bernard', 'newfoundland', 'wolfhound', 'leonberger', 'bernese'])) {
+      $profile['grows_significantly'] = false;
+      $profile['maturity_changes'] = "Small breed — adult size reached by 10–12 months. Aging shows mainly in coat maturation and slight facial definition. Stays compact.";
+    } elseif ($this->mb($b, ['great dane', 'mastiff', 'saint bernard', 'newfoundland', 'irish wolfhound', 'leonberger', 'bernese mountain dog', 'great pyrenees', 'tibetan mastiff'])) {
       $profile['size_category'] = 'giant';
-      $profile['aging_speed'] = 'fast';
-      $profile['specific_traits'][] = 'Giant breeds age faster';
-    } elseif ($this->matchBreed($breedLower, ['german shepherd', 'golden retriever', 'labrador', 'rottweiler', 'doberman', 'boxer', 'husky'])) {
+      $profile['grows_significantly'] = true;
+      $profile['maturity_changes'] = "Giant breed — takes 18–24 months to reach full adult size. At +1 year: noticeably taller and heavier, deeper chest, longer legs but still lean. At +3 years: massive, solid, fully mature giant dog.";
+    } elseif ($this->mb($b, ['german shepherd', 'golden retriever', 'labrador', 'rottweiler', 'doberman', 'boxer', 'husky', 'malamute', 'standard poodle', 'border collie', 'australian shepherd', 'weimaraner', 'vizsla', 'dalmatian', 'samoyed'])) {
       $profile['size_category'] = 'large';
-      $profile['specific_traits'][] = 'Large breeds show moderate aging';
+      $profile['grows_significantly'] = true;
+      $profile['maturity_changes'] = "Large breed — full adult size reached around 12–18 months. Noticeable growth in height and muscle from puppy to 1 year. At 3 years: peak muscular condition.";
+    } else {
+      $profile['size_category'] = 'medium';
+      $profile['grows_significantly'] = false;
+      $profile['maturity_changes'] = "Medium breed — adult size reached around 10–14 months. Some filling-out of the chest and musculature expected.";
     }
 
-    // COAT TYPES
-    if ($this->matchBreed($breedLower, ['poodle', 'bichon', 'maltese', 'shih tzu', 'lhasa apso', 'havanese'])) {
+    // ── COAT ────────────────────────────────────────────────────────────────
+    if ($this->mb($b, ['poodle', 'bichon', 'maltese', 'shih tzu', 'lhasa apso', 'havanese', 'pomeranian', 'chow chow', 'keeshond', 'american eskimo', 'samoyed'])) {
       $profile['coat_type'] = 'curly/fluffy';
-      $profile['specific_traits'][] = 'Curly coat becomes wiry with age';
-    } elseif ($this->matchBreed($breedLower, ['husky', 'malamute', 'samoyed', 'chow', 'akita'])) {
+    } elseif ($this->mb($b, ['husky', 'malamute', 'akita', 'bernese mountain dog', 'great pyrenees', 'german shepherd', 'leonberger', 'newfoundland', 'norwegian elkhound'])) {
       $profile['coat_type'] = 'double_coat';
-      $profile['specific_traits'][] = 'Double coat thins with age';
-    } elseif ($this->matchBreed($breedLower, ['golden retriever', 'cocker spaniel', 'setter', 'cavalier'])) {
+    } elseif ($this->mb($b, ['golden retriever', 'cocker spaniel', 'irish setter', 'cavalier king charles', 'afghan hound', 'yorkshire terrier'])) {
       $profile['coat_type'] = 'long_silky';
-      $profile['specific_traits'][] = 'Silky coat loses shine';
+    } elseif ($this->mb($b, ['wire fox terrier', 'airedale', 'border terrier', 'jack russell', 'dachshund wire', 'scottish terrier', 'westie', 'welsh terrier'])) {
+      $profile['coat_type'] = 'wire';
+    } elseif ($this->mb($b, ['labrador', 'boxer', 'doberman', 'rottweiler', 'vizsla', 'weimaraner', 'dalmatian', 'great dane', 'whippet', 'italian greyhound', 'beagle', 'boston terrier'])) {
+      $profile['coat_type'] = 'short';
     }
 
-    // GRAYING PATTERNS
-    if ($this->matchBreed($breedLower, ['rottweiler', 'doberman', 'black lab', 'pug', 'pit bull', 'scottish'])) {
+    // ── GRAYING ─────────────────────────────────────────────────────────────
+    if ($this->mb($b, ['samoyed', 'bichon', 'maltese', 'white swiss shepherd', 'great pyrenees', 'american eskimo'])) {
+      $profile['gray_pattern'] = 'none'; // already white
+    } elseif ($this->mb($b, ['rottweiler', 'black labrador', 'black lab', 'pug', 'scottish terrier', 'doberman'])) {
       $profile['gray_pattern'] = 'minimal';
-      $profile['specific_traits'][] = 'Dark coat dulls rather than grays';
-    } elseif ($this->matchBreed($breedLower, ['german shepherd', 'schnauzer', 'yorkshire', 'weimaraner'])) {
+    } elseif ($this->mb($b, ['german shepherd', 'schnauzer', 'yorkshire terrier', 'weimaraner', 'border collie', 'australian shepherd'])) {
       $profile['gray_pattern'] = 'prominent';
-      $profile['specific_traits'][] = 'Grays prominently on muzzle';
+    } else {
+      $profile['gray_pattern'] = 'moderate';
     }
 
-    // BRACHYCEPHALIC
-    if ($this->matchBreed($breedLower, ['pug', 'french bulldog', 'boston terrier', 'shih tzu', 'bulldog', 'boxer', 'mastiff'])) {
+    // ── BRACHYCEPHALIC ──────────────────────────────────────────────────────
+    if ($this->mb($b, ['pug', 'french bulldog', 'boston terrier', 'shih tzu', 'bulldog', 'boxer', 'mastiff', 'pekinese', 'pekingese', 'chow chow'])) {
       $profile['brachycephalic'] = true;
-      $profile['specific_traits'][] = 'Facial wrinkles deepen with age';
+    }
+
+    // ── BREED-SPECIFIC MUZZLE NOTES ─────────────────────────────────────────
+    if ($this->mb($b, ['pomeranian'])) {
+      $profile['muzzle_change'] = "Muzzle is slightly more defined than puppy. Head shape more refined. The fox-like adult face is emerging.";
+      $profile['maturity_changes'] .= " Pomeranians lose their puppy 'cloud' fluffiness and develop the adult double coat with a defined ruff around the neck.";
+    } elseif ($this->mb($b, ['golden retriever'])) {
+      $profile['maturity_changes'] .= " Golden retrievers develop a fuller, darker golden coat with age. The face broadens and gains a calm, gentle expression.";
+    } elseif ($this->mb($b, ['german shepherd'])) {
+      $profile['maturity_changes'] .= " German Shepherds develop a broader, more angular head and a deeper, more muscular chest as adults.";
+    } elseif ($this->mb($b, ['labrador'])) {
+      $profile['maturity_changes'] .= " Labradors fill out significantly in the chest and hindquarters. Adult coat is short and dense.";
+    } elseif ($this->mb($b, ['husky'])) {
+      $profile['maturity_changes'] .= " Huskies develop a fuller, denser double coat and a more powerful build as adults.";
+    } elseif ($this->mb($b, ['great dane'])) {
+      $profile['maturity_changes'] .= " Great Danes grow dramatically — one of the tallest breeds. At 1 year they look like a big-boned adolescent; at 3 years they are a massive, regal giant.";
     }
 
     return $profile;
   }
 
   /**
-   * Match breed names flexibly
+   * Flexible breed name matching
    */
-  private function matchBreed($breedLower, $patterns)
+  private function mb($breedLower, $patterns)
   {
     foreach ($patterns as $pattern) {
-      if (stripos($breedLower, $pattern) !== false) {
-        return true;
-      }
+      if (stripos($breedLower, $pattern) !== false) return true;
     }
     return false;
   }
 
-  /**
-   * Prepare high-quality image for AI processing
-   */
+  // ─────────────────────────────────────────────────────────────────────────
+  //  IMAGE HELPERS  (unchanged from original)
+  // ─────────────────────────────────────────────────────────────────────────
+
   private function prepareHighQualityImage($fullPath)
   {
     try {
       $cacheKey = "hq_img_" . md5($fullPath);
-
       return Cache::remember($cacheKey, 600, function () use ($fullPath) {
         $imageContents = Storage::disk('object-storage')->get($fullPath);
-
-        if (empty($imageContents)) {
-          throw new \Exception('Empty image file');
-        }
+        if (empty($imageContents)) throw new \Exception('Empty image file');
 
         $imageInfo = @getimagesizefromstring($imageContents);
-        if ($imageInfo === false) {
-          throw new \Exception('Invalid image');
-        }
+        if ($imageInfo === false) throw new \Exception('Invalid image');
 
-        $width = $imageInfo[0];
+        $width  = $imageInfo[0];
         $height = $imageInfo[1];
-
-        Log::info("📐 Original: {$width}x{$height}");
-
-        // Optimal size for Nano Banana Pro (higher quality)
-        $targetSize = 1536;
+        $targetSize = 1024; // Smaller = faster API response
 
         if ($width > $targetSize || $height > $targetSize) {
-          Log::info("🔄 Resizing to {$targetSize}px for optimal AI processing");
-          $imageContents = $this->highQualityResize($imageContents, $targetSize);
+          $imageContents = $this->resizeImage($imageContents, $targetSize);
         }
 
         $img = imagecreatefromstring($imageContents);
-        if ($img === false) {
-          throw new \Exception('Failed to create image');
-        }
-
-        // Slight sharpening for better AI processing
-        $sharpenMatrix = [
-          [-1, -1, -1],
-          [-1, 16, -1],
-          [-1, -1, -1]
-        ];
-        $divisor = 8;
-        $offset = 0;
-        imageconvolution($img, $sharpenMatrix, $divisor, $offset);
+        if ($img === false) throw new \Exception('Failed to create image');
 
         ob_start();
-        imagejpeg($img, null, 92);
+        imagejpeg($img, null, 90);
         $optimized = ob_get_clean();
         imagedestroy($img);
 
         Log::info("✅ Image prepared: " . round(strlen($optimized) / 1024, 2) . " KB");
-
-        return [
-          'base64' => base64_encode($optimized),
-          'mimeType' => 'image/jpeg'
-        ];
+        return ['base64' => base64_encode($optimized), 'mimeType' => 'image/jpeg'];
       });
     } catch (\Exception $e) {
       Log::error("Image prep failed: " . $e->getMessage());
@@ -702,73 +539,45 @@ Generate the image now.";
     }
   }
 
-  /**
-   * High-quality bicubic resize
-   */
-  private function highQualityResize($imageContents, $maxSize)
+  private function resizeImage($imageContents, $maxSize)
   {
     $source = imagecreatefromstring($imageContents);
-    if ($source === false) {
-      throw new \Exception('Failed to create source');
-    }
+    if ($source === false) throw new \Exception('Failed to create source image');
 
-    $width = imagesx($source);
+    $width  = imagesx($source);
     $height = imagesy($source);
+    $ratio  = min($maxSize / $width, $maxSize / $height);
+    $newW   = (int)($width * $ratio);
+    $newH   = (int)($height * $ratio);
 
-    $ratio = min($maxSize / $width, $maxSize / $height);
-    $newWidth = (int)($width * $ratio);
-    $newHeight = (int)($height * $ratio);
-
-    $resized = imagecreatetruecolor($newWidth, $newHeight);
-    imagealphablending($resized, false);
-    imagesavealpha($resized, true);
-
-    imagecopyresampled(
-      $resized,
-      $source,
-      0,
-      0,
-      0,
-      0,
-      $newWidth,
-      $newHeight,
-      $width,
-      $height
-    );
+    $resized = imagecreatetruecolor($newW, $newH);
+    imagecopyresampled($resized, $source, 0, 0, 0, 0, $newW, $newH, $width, $height);
 
     ob_start();
-    imagejpeg($resized, null, 92);
+    imagejpeg($resized, null, 90);
     $output = ob_get_clean();
 
     imagedestroy($source);
     imagedestroy($resized);
-
     return $output;
   }
 
-  /**
-   * Save high-quality transformation
-   */
-  private function saveHighQualityImage($imageOutput, $type, $resultId)
+  private function saveImage($imageOutput, $type, $resultId)
   {
     try {
       $img = imagecreatefromstring($imageOutput);
-      if ($img === false) {
-        throw new \Exception('Failed to create output image');
-      }
+      if ($img === false) throw new \Exception('Failed to create output image');
 
       ob_start();
-      imagewebp($img, null, 90);
+      imagewebp($img, null, 88);
       $webpData = ob_get_clean();
       imagedestroy($img);
 
       $filename = "transform_{$resultId}_{$type}_" . time() . ".webp";
-      $path = "simulations/{$filename}";
-
+      $path     = "simulations/{$filename}";
       Storage::disk('object-storage')->put($path, $webpData);
 
       Log::info("💾 Saved: {$path} (" . round(strlen($webpData) / 1024, 2) . " KB)");
-
       return $path;
     } catch (\Exception $e) {
       Log::error("Save failed: " . $e->getMessage());
@@ -776,28 +585,19 @@ Generate the image now.";
     }
   }
 
-  /**
-   * Update result status
-   */
   private function updateStatus($result, $status, $paths = [], $profile = [], $error = null)
   {
     $data = [
-      'status' => $status,
-      '1_years' => $paths['1_years'] ?? null,
-      '3_years' => $paths['3_years'] ?? null,
+      'status'     => $status,
+      '1_years'    => $paths['1_years'] ?? null,
+      '3_years'    => $paths['3_years'] ?? null,
       'updated_at' => now()->toIso8601String()
     ];
 
-    if (!empty($profile)) {
-      $data['breed_profile'] = $profile;
-    }
-
-    if ($error) {
-      $data['error'] = $error;
-    }
+    if (!empty($profile))  $data['breed_profile'] = $profile;
+    if ($error)            $data['error']          = $error;
 
     $result->update(['simulation_data' => json_encode($data)]);
-
     Cache::forget("simulation_status_{$result->scan_id}");
     Cache::forget("sim_status_{$result->scan_id}");
   }
