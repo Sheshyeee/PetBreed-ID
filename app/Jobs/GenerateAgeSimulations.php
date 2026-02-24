@@ -233,77 +233,77 @@ class GenerateAgeSimulations implements ShouldQueue
   private function buildAgingPrompt($profile, $years)
   {
     $breed    = $profile['breed'];
-    $size     = $profile['size_category'];     // toy | small | medium | large | giant
-    $coat     = $profile['coat_type'];         // short | medium | long_silky | double_coat | curly/fluffy | wire
-    $isGiant  = $size === 'giant';
-    $isToy    = in_array($size, ['toy', 'small']);
+    $size     = $profile['size_category'];
+    $coat     = $profile['coat_type'];
     $isBrachy = $profile['brachycephalic'];
-    $maturity = $profile['maturity_changes'];  // breed-specific physical maturation notes
+    $maturity = $profile['maturity_changes'];
 
-    // ── Decide which age-stage description to use ──────────────────────────
     if ($years === 1) {
-      $ageStage   = "1 year older — entering young adulthood / prime";
+      $ageStage   = "1 year older — healthy young adult";
       $coatChange = $this->coatChange1Year($coat, $size);
       $bodyChange = $this->bodyChange1Year($size, $isBrachy, $profile);
       $faceChange = $this->faceChange1Year($isBrachy, $profile);
-      $grayChange = "No gray hairs at all — this dog is young and healthy.";
-      $healthNote = "The dog looks vibrant, healthy, well-fed, and well-groomed — the picture of a happy dog in its prime.";
+      $grayChange = "No gray hairs — this dog is in its prime.";
+      $healthNote = "Vibrant, healthy, well-fed, well-groomed. Full of energy.";
     } else {
       $ageStage   = "3 years older — fully mature adult in excellent health";
       $coatChange = $this->coatChange3Years($coat, $size);
       $bodyChange = $this->bodyChange3Years($size, $isBrachy, $profile);
       $faceChange = $this->faceChange3Years($isBrachy, $profile);
       $grayChange = $this->grayChange3Years($profile);
-      $healthNote = "The dog looks strong, healthy, well-groomed, and calm — a confident, well-cared-for adult dog.";
+      $healthNote = "Strong, healthy, calm, well-groomed. A confident well-cared-for adult.";
     }
 
-    $prompt = <<<PROMPT
-TASK: Produce a photorealistic image of THIS EXACT DOG aged {$years} year(s) into the future.
+    // Build prompt as plain string to avoid heredoc PHP interpolation issues
+    $lines = [];
+    $lines[] = "You are a photo editor. Your ONLY job is to age the dog in this photo by {$years} year(s).";
+    $lines[] = "";
+    $lines[] = "=== STEP 1: COPY THE ENTIRE SCENE EXACTLY ===";
+    $lines[] = "Reproduce EVERY detail of the input photo with 100% fidelity:";
+    $lines[] = "- EXACT same background: every color, object, texture, and lighting";
+    $lines[] = "- EXACT same camera angle and zoom level";
+    $lines[] = "- EXACT same pose of the dog";
+    $lines[] = "- If the dog is being held by a person, those hands/arms are still there in the same position";
+    $lines[] = "- If there are people in the photo, they remain in exactly the same position";
+    $lines[] = "- EXACT same floor, walls, furniture, and environment";
+    $lines[] = "- EXACT same coat color and markings on the dog";
+    $lines[] = "";
+    $lines[] = "FORBIDDEN CHANGES (any of these = failure):";
+    $lines[] = "- Replacing background with white, gray, or studio backdrop";
+    $lines[] = "- Changing camera angle to portrait/headshot";
+    $lines[] = "- Removing people, hands, or objects from the scene";
+    $lines[] = "- Changing the dog pose or position";
+    $lines[] = "- Changing coat base colors or markings";
+    $lines[] = "";
+    $lines[] = "=== STEP 2: APPLY ONLY THESE AGING CHANGES TO THE DOG ===";
+    $lines[] = "Breed: {$breed}";
+    $lines[] = "Age stage: {$ageStage}";
+    $lines[] = "";
+    $lines[] = "BODY SIZE: {$bodyChange}";
+    $lines[] = "FACE: {$faceChange}";
+    $lines[] = "COAT TEXTURE: {$coatChange}";
+    $lines[] = "GRAYING: {$grayChange}";
+    $lines[] = "";
+    $lines[] = "Breed notes: {$maturity}";
+    $lines[] = "";
+    $lines[] = "=== HEALTH RULE (CRITICAL) ===";
+    $lines[] = "{$healthNote}";
+    $lines[] = "The dog must look clean, healthy, and well cared for.";
+    $lines[] = "Do NOT make the dog look sick, mangy, matted, or neglected.";
+    $lines[] = "This is natural biological aging — the dog is thriving.";
+    $lines[] = "";
+    $lines[] = "=== FINAL CHECKLIST (verify before output) ===";
+    $lines[] = "- Background matches the input photo exactly";
+    $lines[] = "- Camera angle and framing match exactly";
+    $lines[] = "- All people/hands/objects from original are still present";
+    $lines[] = "- Dog coat colors and markings are preserved";
+    $lines[] = "- Dog looks healthy, happy, and well-groomed";
+    $lines[] = "- Only the dog age has changed — nothing else";
+    $lines[] = "";
+    $lines[] = "Output the photo-edited image now.";
 
-════════════════════════════════════════════════
-BREED CONTEXT: {$breed}
-════════════════════════════════════════════════
-{$maturity}
-
-════════════════════════════════════════════════
-AGE STAGE: {$ageStage}
-════════════════════════════════════════════════
-
-🔒 WHAT MUST STAY IDENTICAL (do not change these):
-• Coat base color and every color pattern / marking — exact match
-• Eye color (same hue, can be slightly more settled/calm)
-• Nose color and shape
-• Ear shape and position
-• Pose, camera angle, and framing
-• Background, floor, and lighting
-• Any collar or accessories visible
-
-✅ PHYSICAL MATURATION TO APPLY (healthy, natural changes only):
-COAT: {$coatChange}
-BODY / SIZE: {$bodyChange}
-FACE / HEAD: {$faceChange}
-GRAYING: {$grayChange}
-
-💚 HEALTH & GROOMING RULE (CRITICAL):
-{$healthNote}
-The coat must look clean, brushed, and well-maintained.
-The dog must NOT look sick, thin, matted, dirty, sad, or neglected.
-This is natural biological aging — the dog is thriving.
-
-════════════════════════════════════════════════
-OUTPUT REQUIREMENTS
-════════════════════════════════════════════════
-• Same photo style and quality as the input image
-• Same background / environment
-• Same pose and angle
-• Photorealistic — not illustrated or cartoon
-• Anyone viewing both photos should say: "That's the same dog, just older"
-  NOT: "That's a different dog" or "That dog looks sick"
-
-Generate the aged image now.
-PROMPT;
-
-    return $prompt;
+    return implode("
+", $lines);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
