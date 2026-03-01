@@ -239,7 +239,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                 </button>
 
                 {/* PAGE BODY */}
-                <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20">
+                <div className="relative z-10 mx-auto mt-[-10px] max-w-[1280px] p-3 px-4 pb-20">
                     {/* HERO */}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 py-5 dark:border-white/[.05]">
                         <div className="flex items-center gap-3">

@@ -562,7 +562,7 @@ export default function Scan() {
                 </button>
 
                 {/* ── MAIN CONTENT ── */}
-                <div className="relative z-10 min-h-0 flex-1 overflow-hidden p-3">
+                <div className="relative z-10 mt-[-10px] min-h-0 flex-1 overflow-hidden p-3">
                     {/* 
                         LAYOUT:
                         - Mobile/Tablet: single column, scrollable, NO navigation panel
@@ -625,7 +625,7 @@ export default function Scan() {
                                                 }}
                                             />
                                             <span className="sc-mono text-[10px] font-semibold tracking-[.12em] text-emerald-600 uppercase dark:text-emerald-400">
-                                                AI Breed Detection
+                                                Breed Detection
                                             </span>
                                         </div>
                                         <h1 className="text-2xl leading-none font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -736,7 +736,7 @@ export default function Scan() {
                                         {!preview && !showCamera && (
                                             <div className="flex flex-col gap-3">
                                                 <div
-                                                    className={`sc-dz flex min-h-[250px] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-8 transition-all lg:min-h-[320px] ${isDragging ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'}`}
+                                                    className={`sc-dz flex min-h-[250px] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-8 transition-all lg:min-h-[302px] ${isDragging ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'}`}
                                                     onClick={() =>
                                                         fileInputRef.current?.click()
                                                     }

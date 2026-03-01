@@ -1242,8 +1242,8 @@ class ScanResultController extends Controller
       $flashUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey;
        $proUrl   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=' . $apiKey;
         $client = new \GuzzleHttp\Client([
-            'timeout'         => 180,
-            'connect_timeout' => 15,
+            'timeout'         => 45,
+            'connect_timeout' => 10,
             'http_errors'     => false,
         ]);
 
@@ -1277,11 +1277,14 @@ class ScanResultController extends Controller
         $pass1Prompt = <<<'PASS1'
 You are a veterinary anatomist performing a blind morphometric examination. You are ABSOLUTELY FORBIDDEN from naming, implying, or suggesting any dog breed anywhere in your response. You may only fill in the measurement fields below.
 
+FIRST: Add a top-level field "is_dog" with value "YES" if the image contains a dog (any breed, puppy, partial view, any setting), or "NO" if it does not. This is the only field where you make a non-measurement judgment.
+
 Measure every field with maximum precision. This is objective anatomy — no subjective breed impressions.
 
 Complete all 40 fields using the allowed values. Output ONLY the JSON object.
 
 {
+  "is_dog": "YES | NO",
   "SYSTEM_1_SKULL": {
     "skull_profile": "domed | flat | wedge | blocky-square | chiseled-fine | rounded-moderate | very-broad-flat | narrow-elongated",
     "skull_width_to_length_ratio": "very-wide(>70%) | wide(55-70%) | medium(45-55%) | narrow(35-45%) | very-narrow(<35%)",
@@ -1344,9 +1347,10 @@ Complete all 40 fields using the allowed values. Output ONLY the JSON object.
 
 RULES:
 1. Output ONLY the JSON. No text before or after. No breed names anywhere.
-2. muzzle_to_skull_length_ratio MUST be a decimal number (e.g. 0.43), not a string category.
-3. Every field must have a value. Only secondary_color and visible_cross_type_conflict may be null.
-4. Measure what you SEE, not what you infer. If a feature is obscured, note the closest visible approximation.
+2. "is_dog" must be the very first field and must be "YES" or "NO" only.
+3. muzzle_to_skull_length_ratio MUST be a decimal number (e.g. 0.43), not a string category.
+4. Every field must have a value. Only secondary_color and visible_cross_type_conflict may be null.
+5. Measure what you SEE, not what you infer. If a feature is obscured, note the closest visible approximation.
 PASS1;
 
         try {
@@ -1360,7 +1364,7 @@ PASS1;
         ]],
         'generationConfig' => [
             'temperature'     => 0.0,
-            'maxOutputTokens' => 1400,
+            'maxOutputTokens' => 1000,
             // ← responseMimeType REMOVED — causes parse failure with thinking models
         ],
         'safetySettings' => $this->sigmaGetSafetySettings(),
@@ -1377,6 +1381,16 @@ PASS1;
                 Log::warning('⚠️ Pass 1 parse failed — proceeding without morphometrics');
                 $morphData = null;
             } else {
+                // ── DOG VALIDATION embedded in Pass 1 ───────────────────────────
+                $isDogFromPass1 = strtoupper(trim($morphData['is_dog'] ?? 'YES'));
+                if ($isDogFromPass1 === 'NO') {
+                    Log::warning('⚠️ Pass 1: not a dog — rejecting early');
+                    return [
+                        'success'    => false,
+                        'not_a_dog'  => true,
+                        'error'      => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                    ];
+                }
                 $body   = $morphData['SYSTEM_5_BODY'] ?? [];
                 $skull  = $morphData['SYSTEM_1_SKULL'] ?? [];
                 $coat   = $morphData['SYSTEM_4_COAT'] ?? [];
@@ -1572,8 +1586,8 @@ PASS2;
                     ]],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 3000,
-                        'thinkingConfig'  => ['thinkingBudget' => 8000],
+                        'maxOutputTokens' => 2000,
+                        'thinkingConfig'  => ['thinkingBudget' => 3000],
                     ],
                     'safetySettings' => $this->sigmaGetSafetySettings(),
                 ],
@@ -1642,9 +1656,12 @@ PASS2;
         // C) Distinguishing feature found but points to DIFFERENT breed → override
         //    (Override only happens when structural evidence is unambiguous)
         // ══════════════════════════════════════════════════════════════════
-        $closeRace = ($topAltConf > 0) && (($p2Confidence - $topAltConf) <= 20);
+        // ── PASS 3 TRIGGER: Only fire when genuinely uncertain ──────────────
+        // Skip Pass 3 entirely when confidence ≥ 95 (already certain)
+        // Close race threshold tightened to 15pts (was 20) to reduce extra API calls
+        $closeRace = ($topAltConf > 0) && (($p2Confidence - $topAltConf) <= 15);
 
-        if ($p2Confidence >= 80 || $closeRace) {
+        if (($p2Confidence >= 80 && $p2Confidence < 95) || $closeRace) {
             Log::info('── SIGMA v3 PASS 3: Structural Verification Challenge ──', [
                 'p2_breed'   => $p2Breed,
                 'p2_conf'    => $p2Confidence,
@@ -1715,7 +1732,7 @@ PASS3;
                         ]],
                         'generationConfig' => [
                             'temperature'    => 0.1,
-                            'maxOutputTokens' => 600,
+                            'maxOutputTokens' => 400,
                         ],
                         'safetySettings' => $this->sigmaGetSafetySettings(),
                     ],
@@ -1935,8 +1952,8 @@ FB;
                     ]],
                     'generationConfig' => [
                         'temperature'    => 0.1,
-                        'maxOutputTokens' => 2500,
-                        'thinkingConfig'  => ['thinkingBudget' => 3000],
+                        'maxOutputTokens' => 2000,
+                        'thinkingConfig'  => ['thinkingBudget' => 2000],
                     ],
                     'safetySettings' => $this->sigmaGetSafetySettings(),
                 ],
@@ -2080,10 +2097,8 @@ FB;
 
             $mlService = new \App\Services\MLApiService();
 
-            if (!$mlService->isHealthy()) {
-                throw new \Exception('ML API is not available or unhealthy');
-            }
-
+            // ── FAST PATH: skip health check entirely, just attempt prediction with short timeout ──
+            // If the ML API is slow or down, we don't block — Gemini is always the primary.
             $startTime     = microtime(true);
             $result        = $mlService->predictBreed($imagePath);
             $executionTime = round(microtime(true) - $startTime, 2);
@@ -2219,7 +2234,7 @@ CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
 
         Log::info("📤 Sending request to Gemini API...");
 
-        $client    = new \GuzzleHttp\Client(['timeout' => 60, 'connect_timeout' => 10]);
+        $client    = new \GuzzleHttp\Client(['timeout' => 25, 'connect_timeout' => 8]);
         $startTime = microtime(true);
 
         $response = $client->post(
@@ -2233,7 +2248,7 @@ CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
                     ]],
                     'generationConfig' => [
                         'temperature'     => 0.3,
-                        'maxOutputTokens' => 3000,
+                        'maxOutputTokens' => 2000,
                         // NO responseMimeType — breaks thinking models
                     ],
                 ],
@@ -2701,42 +2716,11 @@ private function extractPartialAiData(string $content): array
 
             // ==========================================
             // STEP 1: DOG VALIDATION
+            // NOTE: Dog validation is now embedded inside SIGMA Pass 1 (identifyBreedWithAPI).
+            // This saves ~4s by eliminating a separate Gemini Flash round trip.
+            // The SIGMA pipeline will return early with a not_a_dog response if needed.
             // ==========================================
-            Log::info('→ Starting dog validation...');
-
-            // Validate file exists before dog validation
-            if (!file_exists($fullPath)) {
-                throw new \Exception('Image file was lost during processing');
-            }
-
-            $dogValidation = $this->validateDogImage($fullPath);
-
-            if (!$dogValidation['is_dog']) {
-                // Clean up temp file before returning
-                if (file_exists($persistentTempPath)) {
-                    @unlink($persistentTempPath);
-                }
-
-                Log::warning('⚠️ Image rejected - Not a dog', [
-                    'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
-                ]);
-
-                // Return error response for non-dog images
-                if ($request->expectsJson() || $request->is('api/*')) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
-                        'not_a_dog' => true
-                    ], 400);
-                }
-
-                return redirect()->back()->with('error', [
-                    'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
-                    'not_a_dog' => true
-                ]);
-            }
-
-            Log::info('✓ Dog validation passed - proceeding with breed analysis');
+            Log::info('✓ Dog validation merged into SIGMA Pass 1 — skipping separate validation call');
 
             // ==========================================
             // STEP 2: STORE IMAGE (only after dog validation passes)
@@ -2928,6 +2912,29 @@ private function extractPartialAiData(string $content): array
                     $mlBreed,       // null unless ML was 100%
                     $mlConfidence   // null unless ML was 100%
                 );
+
+                // ── Handle embedded dog validation rejection ──────────────────
+                if (!empty($geminiResult['not_a_dog'])) {
+                    // Clean up temp file
+                    if (isset($persistentTempPath) && file_exists($persistentTempPath)) {
+                        @unlink($persistentTempPath);
+                    }
+                    // Clean up object storage
+                    if ($path && Storage::disk('object-storage')->exists($path)) {
+                        Storage::disk('object-storage')->delete($path);
+                    }
+                    if ($request->expectsJson() || $request->is('api/*')) {
+                        return response()->json([
+                            'success'   => false,
+                            'message'   => $geminiResult['error'],
+                            'not_a_dog' => true,
+                        ], 400);
+                    }
+                    return redirect()->back()->with('error', [
+                        'message'   => $geminiResult['error'],
+                        'not_a_dog' => true,
+                    ]);
+                }
 
                 if ($geminiResult['success']) {
                     $detectedBreed    = $geminiResult['breed'];
