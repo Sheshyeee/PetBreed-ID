@@ -284,7 +284,7 @@ const ScanResults = () => {
                 </div>
 
                 {/* ── MAIN CONTENT ── */}
-                <div className="sr-nsb relative z-10 flex-1 overflow-y-auto">
+                <div className="sr-nsb relative z-10 mt-[-10px] flex-1 overflow-y-auto">
                     <div className="mx-auto max-w-[1360px] px-3 py-5 sm:px-5 lg:px-6">
                         {/* ── PAGE HEADER ROW ── */}
                         <div className="sr-fu mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -534,12 +534,7 @@ const ScanResults = () => {
                                                         12,
                                                     ) + '…',
                                             },
-                                            {
-                                                label: 'Method',
-                                                value:
-                                                    results?.prediction_method ??
-                                                    'AI Model',
-                                            },
+
                                             {
                                                 label: 'Confidence',
                                                 value: `${conf}%`,
