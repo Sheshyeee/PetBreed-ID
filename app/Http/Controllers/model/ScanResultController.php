@@ -3209,8 +3209,8 @@ private function extractPartialAiData(string $content): array
                 ], 200);
             }
 
-            // For web requests, redirect to scan-results page
-            return redirect('/scan-results');
+            // For web requests, redirect to the specific scan result
+            return redirect('/scan-results/' . $dbResult->scan_id);
         } catch (\Exception $e) {
             Log::error('Analyze Error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
