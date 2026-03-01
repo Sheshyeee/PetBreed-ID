@@ -12,9 +12,7 @@ import {
     QrCode,
     ShieldCheck,
     Smartphone,
-    Sparkles,
     X,
-    Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -401,42 +399,6 @@ function LandingPage() {
                                         Licensed vet reviews predictions
                                     </p>
                                 </div>
-                            </div>
-
-                            {/* Stats row */}
-                            <div className="mb-4 grid grid-cols-3 gap-2">
-                                {[
-                                    {
-                                        label: 'Accuracy',
-                                        value: '95%',
-                                        icon: <Sparkles size={11} />,
-                                    },
-                                    {
-                                        label: 'Breeds',
-                                        value: '120+',
-                                        icon: <PawPrintIcon size={11} />,
-                                    },
-                                    {
-                                        label: 'Speed',
-                                        value: '~1.2s',
-                                        icon: <Zap size={11} />,
-                                    },
-                                ].map((s, i) => (
-                                    <div
-                                        key={i}
-                                        className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[.05] px-2 py-2.5"
-                                    >
-                                        <span className="text-emerald-400/70">
-                                            {s.icon}
-                                        </span>
-                                        <span className="lp-mono text-[13px] font-bold text-white">
-                                            {s.value}
-                                        </span>
-                                        <span className="lp-mono text-[8px] tracking-[.1em] text-white/45 uppercase">
-                                            {s.label}
-                                        </span>
-                                    </div>
-                                ))}
                             </div>
 
                             <div className="border-t border-white/15 pt-4">
