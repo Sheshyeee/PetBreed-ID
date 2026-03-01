@@ -30,9 +30,7 @@ interface AnalysisLoadingDialogProps {
     isOpen: boolean;
 }
 
-const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
-    isOpen,
-}) => {
+const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({ isOpen }) => {
     const [currentStageIndex, setCurrentStageIndex] = useState(0);
     const [progress, setProgress] = useState(0);
 
@@ -101,10 +99,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
 
         const interval = setInterval(() => {
             cumulativeTime += 50;
-            const newProgress = Math.min(
-                (cumulativeTime / totalDuration) * 100,
-                100,
-            );
+            const newProgress = Math.min((cumulativeTime / totalDuration) * 100, 100);
             setProgress(newProgress);
 
             let timeSum = 0;
@@ -170,8 +165,9 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
             <AlertDialog open={isOpen}>
                 <AlertDialogContent className="ald-root max-w-sm border-0 bg-transparent p-0 shadow-none sm:mx-0">
                     <div className="relative overflow-hidden rounded-2xl border border-white/[.08] bg-[#0D1117] shadow-2xl shadow-black/60">
+
                         {/* Top accent line */}
-                        <div className="absolute top-0 right-0 left-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-60" />
+                        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-60" />
 
                         {/* Ambient glow blobs */}
                         <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-emerald-500/[.06] blur-3xl" />
@@ -185,41 +181,26 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                     <div className="relative flex-shrink-0">
                                         <div className="relative flex h-14 w-14 items-center justify-center">
                                             {/* Rings */}
-                                            <div
-                                                className="absolute inset-[-8px] rounded-full border border-emerald-500/15"
-                                                style={{
-                                                    animation:
-                                                        'ald-ring 2.6s ease-out infinite',
-                                                }}
-                                            />
-                                            <div
-                                                className="border-emerald-500/06 absolute inset-[-18px] rounded-full border"
-                                                style={{
-                                                    animation:
-                                                        'ald-ring 2.6s ease-out infinite .8s',
-                                                }}
-                                            />
+                                            <div className="absolute inset-[-8px] rounded-full border border-emerald-500/15" style={{ animation: 'ald-ring 2.6s ease-out infinite' }} />
+                                            <div className="absolute inset-[-18px] rounded-full border border-emerald-500/06" style={{ animation: 'ald-ring 2.6s ease-out infinite .8s' }} />
                                             {/* Orbs */}
                                             <div className="ald-orb" />
                                             <div className="ald-orb ald-orb2" />
                                             {/* Center */}
                                             <div className="ald-card-glow relative flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/25 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10">
-                                                <PawPrint className="ald-paw h-6 w-6 text-emerald-400" />
+                                                <PawPrint className="h-6 w-6 text-emerald-400" />
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="min-w-0 flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <h2 className="text-lg font-extrabold tracking-tight text-white">
                                             Analyzing Your Pet
                                         </h2>
                                         <div className="mt-1 flex items-center gap-2">
                                             <span
                                                 className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'ald-pulse 2s ease-in-out infinite',
-                                                }}
+                                                style={{ animation: 'ald-pulse 2s ease-in-out infinite' }}
                                             />
                                             <span className="ald-mono text-[10px] font-semibold tracking-[.1em] text-emerald-400/80 uppercase">
                                                 Breed Identification
@@ -233,41 +214,24 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                         {/* ── CONTENT ── */}
                         <div className="px-6 pb-6">
                             <AlertDialogDescription className="space-y-4">
+
                                 {/* Current stage spotlight */}
                                 <div className="ald-fadein relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[.07] to-cyan-500/[.04] p-4">
                                     {/* Sweep animation */}
                                     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-                                        <div
-                                            className="absolute right-0 left-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent"
-                                            style={{
-                                                animation:
-                                                    'ald-sweep 2.2s linear infinite',
-                                            }}
-                                        />
+                                        <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" style={{ animation: 'ald-sweep 2.2s linear infinite' }} />
                                     </div>
 
                                     <div className="relative flex items-center gap-3">
-                                        <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15">
-                                            <Loader2
-                                                className="h-5 w-5 text-emerald-400"
-                                                style={{
-                                                    animation:
-                                                        'ald-spin 1s linear infinite',
-                                                }}
-                                            />
+                                        <div className="relative flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15">
+                                            <Loader2 className="h-5 w-5 text-emerald-400" style={{ animation: 'ald-spin 1s linear infinite' }} />
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold text-white">
-                                                {currentStage?.label}…
-                                            </p>
-                                            <p className="mt-0.5 text-xs text-slate-400">
-                                                {currentStage?.sublabel}
-                                            </p>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-white">{currentStage?.label}…</p>
+                                            <p className="mt-0.5 text-xs text-slate-400">{currentStage?.sublabel}</p>
                                         </div>
                                         <div className="ald-mono flex-shrink-0 text-right">
-                                            <span className="text-[11px] font-bold text-emerald-400">
-                                                {Math.round(progress)}%
-                                            </span>
+                                            <span className="text-[11px] font-bold text-emerald-400">{Math.round(progress)}%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -282,8 +246,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="ald-mono text-[9px] tracking-[.1em] text-slate-600 uppercase">
-                                            Step {currentStageIndex + 1} /{' '}
-                                            {stages.length}
+                                            Step {currentStageIndex + 1} / {stages.length}
                                         </span>
                                         <span className="ald-mono text-[9px] text-slate-600">
                                             {Math.round(progress)}% complete
@@ -300,12 +263,9 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                     </div>
                                     <div className="flex flex-col divide-y divide-white/[.04]">
                                         {stages.map((stage, index) => {
-                                            const isCompleted =
-                                                index < currentStageIndex;
-                                            const isCurrent =
-                                                index === currentStageIndex;
-                                            const isPending =
-                                                index > currentStageIndex;
+                                            const isCompleted = index < currentStageIndex;
+                                            const isCurrent = index === currentStageIndex;
+                                            const isPending = index > currentStageIndex;
 
                                             return (
                                                 <div
@@ -314,66 +274,47 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                                         isCurrent
                                                             ? 'bg-emerald-500/[.06]'
                                                             : isPending
-                                                              ? 'opacity-35'
-                                                              : ''
+                                                            ? 'opacity-35'
+                                                            : ''
                                                     }`}
                                                 >
                                                     {/* Status icon */}
                                                     {isCompleted ? (
                                                         <div className="ald-pop flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,.4)]">
-                                                            <CheckCircle2
-                                                                size={12}
-                                                                className="text-black"
-                                                            />
+                                                            <CheckCircle2 size={12} className="text-black" />
                                                         </div>
                                                     ) : isCurrent ? (
                                                         <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/20">
-                                                            <Loader2
-                                                                size={10}
-                                                                className="text-emerald-400"
-                                                                style={{
-                                                                    animation:
-                                                                        'ald-spin 1s linear infinite',
-                                                                }}
-                                                            />
+                                                            <Loader2 size={10} className="text-emerald-400" style={{ animation: 'ald-spin 1s linear infinite' }} />
                                                         </div>
                                                     ) : (
                                                         <div className="h-5 w-5 flex-shrink-0 rounded-full border border-white/[.1]" />
                                                     )}
 
                                                     {/* Stage icon */}
-                                                    <div
-                                                        className={`flex-shrink-0 ${isCompleted ? 'text-emerald-500/60' : isCurrent ? 'text-emerald-400' : 'text-slate-600'}`}
-                                                    >
+                                                    <div className={`flex-shrink-0 ${isCompleted ? 'text-emerald-500/60' : isCurrent ? 'text-emerald-400' : 'text-slate-600'}`}>
                                                         {stage.icon}
                                                     </div>
 
                                                     {/* Label */}
-                                                    <span
-                                                        className={`flex-1 text-[12px] font-medium ${
-                                                            isCompleted
-                                                                ? 'text-emerald-400/70 line-through decoration-emerald-500/40'
-                                                                : isCurrent
-                                                                  ? 'font-bold text-white'
-                                                                  : 'text-slate-600'
-                                                        }`}
-                                                    >
+                                                    <span className={`flex-1 text-[12px] font-medium ${
+                                                        isCompleted
+                                                            ? 'text-emerald-400/70 line-through decoration-emerald-500/40'
+                                                            : isCurrent
+                                                            ? 'font-bold text-white'
+                                                            : 'text-slate-600'
+                                                    }`}>
                                                         {stage.label}
                                                     </span>
 
                                                     {/* Completed badge */}
                                                     {isCompleted && (
-                                                        <span className="ald-mono flex-shrink-0 text-[8px] font-semibold tracking-[.1em] text-emerald-500/60 uppercase">
-                                                            Done
-                                                        </span>
+                                                        <span className="ald-mono flex-shrink-0 text-[8px] font-semibold tracking-[.1em] text-emerald-500/60 uppercase">Done</span>
                                                     )}
                                                     {isCurrent && (
                                                         <span
                                                             className="ald-mono flex-shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[.08] px-1.5 py-0.5 text-[8px] font-semibold tracking-[.1em] text-emerald-400 uppercase"
-                                                            style={{
-                                                                animation:
-                                                                    'ald-pulse 2s ease-in-out infinite',
-                                                            }}
+                                                            style={{ animation: 'ald-pulse 2s ease-in-out infinite' }}
                                                         >
                                                             Active
                                                         </span>
@@ -392,7 +333,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                         </div>
 
                         {/* Bottom accent line */}
-                        <div className="absolute right-0 bottom-0 left-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
                     </div>
                 </AlertDialogContent>
             </AlertDialog>
