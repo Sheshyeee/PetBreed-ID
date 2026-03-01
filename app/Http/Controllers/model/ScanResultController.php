@@ -3650,7 +3650,7 @@ private function extractPartialAiData(string $content): array
             Log::error('Get recent results error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch scan histry '
+                'message' => 'Failed to fetch scan history '
             ], 500);
         }
     }
