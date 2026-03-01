@@ -1115,15 +1115,83 @@ class ScanResultController extends Controller
     //   ASPIN:            ~98%  (v2 was ~70%, SIGMA v1 ~97%)
     // =========================================================================
 
+    // =========================================================================
+    // ███████╗██╗ ██████╗ ███╗   ███╗ █████╗     ██╗   ██╗██████╗
+    // ██╔════╝██║██╔════╝ ████╗ ████║██╔══██╗    ██║   ██║╚════██╗
+    // ███████╗██║██║  ███╗██╔████╔██║███████║    ██║   ██║ █████╔╝
+    // ╚════██║██║██║   ██║██║╚██╔╝██║██╔══██║    ╚██╗ ██╔╝██╔═══╝
+    // ███████║██║╚██████╔╝██║ ╚═╝ ██║██║  ██║     ╚████╔╝ ███████╗
+    // ╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝      ╚═══╝  ╚══════╝
+    //
+    // SIGMA v3 — UNIVERSAL MORPHOMETRIC IDENTIFICATION ENGINE
+    //
+    // PHILOSOPHY: NO HARDCODED BREED RULES.
+    // ─────────────────────────────────────────────────────
+    // Previous versions encoded specific breed fingerprints (Samoyed rules,
+    // Vallhund rules, Goberian rules, etc.). This creates a whack-a-mole
+    // problem: fix one breed, create a blind spot for a similar breed.
+    // The model memorizes rules instead of understanding anatomy.
+    //
+    // v3 takes the opposite approach: teach the model HOW to think about
+    // breed identification universally, not WHAT to think about specific breeds.
+    //
+    // THE THREE UNIVERSAL PRINCIPLES:
+    //
+    // PRINCIPLE 1 — STRUCTURE OVER APPEARANCE
+    //   Coat color and pattern are the LEAST reliable identifiers.
+    //   Bone structure, body proportions, and skull shape cannot be faked
+    //   by lighting, grooming, or individual variation. Always measure
+    //   structure first, use color/pattern only to break ties.
+    //
+    // PRINCIPLE 2 — PROPORTION IS THE PRIMARY SPLITTER
+    //   Body length-to-height ratio and leg length relative to body depth
+    //   are the single most powerful discriminators between visually similar
+    //   breeds. Two dogs can have identical coats, ears, and tails yet be
+    //   completely different breeds (Swedish Vallhund vs Norwegian Elkhound).
+    //   The model must always measure proportion before naming any breed.
+    //
+    // PRINCIPLE 3 — ELIMINATION NOT SELECTION
+    //   Do not ask "what does this look like?" — ask "what can this NOT be?"
+    //   Every breed has hard physical constraints from its standard.
+    //   Find what is IMPOSSIBLE for each candidate, not what fits best.
+    //   The last survivor of elimination is the answer.
+    //
+    // ARCHITECTURE: 3-PASS UNIVERSAL PIPELINE
+    //
+    // PASS 1 — UNIVERSAL MORPHOMETRIC SURVEY (Flash, temp=0.0)
+    //   Measures 40 physical parameters. No breed names allowed.
+    //   Organized into 6 anatomical systems: Skull, Muzzle/Dentition,
+    //   Ears/Eyes, Coat/Skin, Body Structure, Extremities.
+    //   Each system captures measurements that are breed-standard constraints.
+    //
+    // PASS 2 — UNIVERSAL ELIMINATION REASONING (Pro thinking, budget=8000)
+    //   Receives: (a) image + (b) full morphometric survey from Pass 1.
+    //   Protocol: Form candidates from anatomy only → test each against its
+    //   own breed standard using the measured data → eliminate by contradiction
+    //   → verify survivor → classify type.
+    //   No rules are pre-loaded. The model reasons from its complete training
+    //   knowledge of breed standards applied to the measured data.
+    //   Higher thinking budget (8000) for deeper cross-breed comparison.
+    //
+    // PASS 3 — STRUCTURAL VERIFICATION CHALLENGE (Flash, temp=0.1)
+    //   Fires when confidence ≥ 80 OR when top-2 candidates are within 20pts.
+    //   Asks: "What structural feature definitively separates your answer from
+    //   its closest competitor? Locate and measure that feature right now."
+    //   Forces the model to commit to a specific anatomical measurement that
+    //   distinguishes the winner — prevents pattern-match rationalization.
+    //   If it cannot find the distinguishing feature: confidence drops.
+    //   If it finds it clearly: confidence rises and answer is locked.
+    // =========================================================================
+
     /**
-     * SIGMA v2 — identifyBreedWithAPI
-     * Drop-in replacement. Identical signature and return structure.
+     * SIGMA v3 — identifyBreedWithAPI
+     * Universal morphometric identification. No hardcoded breed rules.
      */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false, $mlBreed = null, $mlConfidence = null): array
     {
-        Log::info('╔══════════════════════════════════════════════════════╗');
-        Log::info('║  SIGMA v2 — 4-Pass Adversarial Breed Identification ║');
-        Log::info('╚══════════════════════════════════════════════════════╝');
+        Log::info('╔══════════════════════════════════════════════════════════╗');
+        Log::info('║  SIGMA v3 — Universal Morphometric Identification Engine ║');
+        Log::info('╚══════════════════════════════════════════════════════════╝');
         Log::info('Image: ' . $imagePath . ' | ObjectStorage: ' . ($isObjectStorage ? 'YES' : 'NO'));
 
         $apiKey = env('GEMINI_API_KEY') ?: config('services.gemini.api_key');
@@ -1145,12 +1213,12 @@ class ScanResultController extends Controller
                 }
                 $imageContents = file_get_contents($imagePath);
             }
+
             if (empty($imageContents)) throw new \Exception('Failed to load image data');
 
             $imageInfo = @getimagesizefromstring($imageContents);
             if ($imageInfo === false) throw new \Exception('Invalid image file');
 
-            // Auto-resize oversized images to prevent API timeouts
             if (($imageInfo[0] ?? 0) > 4096 || ($imageInfo[1] ?? 0) > 4096) {
                 $imageContents = $this->sigmaResizeImage($imageContents, $imageInfo, 2048);
                 $imageInfo     = @getimagesizefromstring($imageContents) ?: $imageInfo;
@@ -1164,16 +1232,15 @@ class ScanResultController extends Controller
             }
 
             $imageData = base64_encode($imageContents);
-            Log::info('✓ Image ready — ' . strlen($imageContents) . ' bytes, mime: ' . $mimeType);
+            Log::info('✓ Image ready — ' . strlen($imageContents) . ' bytes, ' . $mimeType);
         } catch (\Exception $e) {
             Log::error('✗ Image load failed: ' . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
 
-        // ── HTTP CLIENTS & ENDPOINTS ───────────────────────────────────────
-        $flashUrl = base64_decode('aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMi4wLWZsYXNoLTAwMTpnZW5lcmF0ZUNvbnRlbnQ/a2V5PQ==') . $apiKey;
-        $proUrl   = base64_decode('aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy1mbGFzaC1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9') . $apiKey;
-
+        // ── ENDPOINTS ─────────────────────────────────────────────────────
+      $flashUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey;
+       $proUrl   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=' . $apiKey;
         $client = new \GuzzleHttp\Client([
             'timeout'         => 180,
             'connect_timeout' => 15,
@@ -1182,87 +1249,104 @@ class ScanResultController extends Controller
 
         $overallStart = microtime(true);
 
-        // ── ML CONTEXT ────────────────────────────────────────────────────
-        $mlContextNote = '';
-        if (!empty($mlBreed) && !empty($mlConfidence)) {
-            $mlPct = round((float)$mlConfidence, 1);
-            if ($mlPct >= 98) {
-                $mlContextNote = "STRONG PRIOR SIGNAL: CV model predicted \"{$mlBreed}\" at {$mlPct}%. Test this hypothesis first in your candidate list — confirm or refute with hard morphometric evidence.\n\n";
-            } elseif ($mlPct >= 75) {
-                $mlContextNote = "WEAK PRIOR SIGNAL: CV model suggested \"{$mlBreed}\" at {$mlPct}%. Include in candidates but do NOT anchor to it — morphometrics override.\n\n";
-            }
-            Log::info('ML hint injected: ' . $mlBreed . ' @ ' . $mlPct . '%');
+        // ── ML CORROBORATION (100% only) ───────────────────────────────────
+        $mlNote = '';
+        if (!empty($mlBreed) && (float)$mlConfidence >= 100.0) {
+            $mlNote = "BACKGROUND NOTE: A secondary vision model independently predicted \"{$mlBreed}\" at 100% certainty. This is weak corroboration only — your anatomical analysis has full priority.\n\n";
+            Log::info('ML corroboration note added (100% only): ' . $mlBreed);
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // PASS 1 — BLIND MORPHOMETRIC EXTRACTION
+        // PASS 1 — UNIVERSAL MORPHOMETRIC SURVEY
         //
-        // 35-point structured measurement grid.
-        // FORBIDDEN: naming any breed, inferring breed, any subjective
-        //            description that implies a breed type.
-        // ALLOWED: only objective physical measurements.
+        // 40-parameter anatomical survey organized into 6 systems.
+        // Model forbidden from naming any breed.
+        // Temperature = 0.0 for maximum measurement reproducibility.
         //
-        // Temperature = 0.0 for maximum reproducibility.
-        // Why this works: Forces separation of OBSERVATION from
-        // IDENTIFICATION. Eliminates anchoring bias at the root.
+        // WHY 6 SYSTEMS:
+        // Each anatomical system captures different breed-standard constraints:
+        // - Skull system: separates molosser/spitz/dolichocephalic types
+        // - Body system: proportion is the #1 splitter for similar-looking breeds
+        // - Coat system: texture and structure (not color) reveal lineage
+        // - Extremity system: leg ratio catches long-low vs square confusion
         // ══════════════════════════════════════════════════════════════════
-        Log::info('── SIGMA v2 PASS 1: 35-Point Blind Morphometric Extraction ──');
+        Log::info('── SIGMA v3 PASS 1: Universal 40-Point Morphometric Survey ──');
         $p1Start   = microtime(true);
         $morphData = null;
 
         $pass1Prompt = <<<'PASS1'
-You are an objective veterinary morphometrist performing a blind physical examination. You are FORBIDDEN from naming, implying, or suggesting any dog breed anywhere in your response. Your ONLY task is to fill in the measurement fields below with precise, objective observations.
+You are a veterinary anatomist performing a blind morphometric examination. You are ABSOLUTELY FORBIDDEN from naming, implying, or suggesting any dog breed anywhere in your response. You may only fill in the measurement fields below.
 
-Complete ALL 35 fields. Use ONLY the allowed values for each field.
+Measure every field with maximum precision. This is objective anatomy — no subjective breed impressions.
+
+Complete all 40 fields using the allowed values. Output ONLY the JSON object.
 
 {
-  "skull_shape": "domed | flat-broad | wedge-narrow | blocky-square | chiseled-refined | brachycephalic | dolichocephalic | rounded-moderate",
-  "skull_width_category": "very-wide(>65%_of_skull_length) | wide(55-65%) | medium(45-55%) | narrow(35-45%) | very-narrow(<35%)",
-  "occiput_prominence": "very-prominent | prominent | moderate | slight | absent",
-  "stop_depth": "very-pronounced(90°) | pronounced(60-90°) | moderate(30-60°) | slight(10-30°) | absent(0°)",
-  "muzzle_ratio": "numeric: fraction of total head length occupied by muzzle. 0.35=very_short, 0.40=short, 0.47=moderate_short, 0.50=equal, 0.55=moderate_long, 0.60=long",
-  "muzzle_shape": "blunt-square | tapered-wedge | broad-rectangular | snipey-narrow | rounded-tip",
-  "muzzle_depth": "deep(height_near_equal_to_length) | moderate | shallow(height_much_less_than_length)",
-  "lip_type": "very-tight | tight | moderate | pendulous | very-pendulous-jowly",
-  "cheek_muscles": "very-prominent-bulging | prominent | moderate | flat | sunken",
-  "ear_set": "very-high(above_eye_line) | high(at_eye_line) | medium(below_eye_line) | low(level_with_jaw)",
-  "ear_shape": "fully-erect-triangular | semi-erect-tipped | rose-folded-back | button-folded-forward | folded-pendant-medium | long-pendant-lobular | bat-large-erect | cropped",
-  "ear_leather": "thick-heavy | moderate | thin-fine",
-  "eye_shape": "almond-sharp | soft-oval | round-full | triangular-deep-set | oblique-slanted",
-  "eye_set": "deep-set | moderate | prominent",
-  "eye_spacing": "wide-apart | moderate | close-set",
-  "eye_color": "blue | brown-dark | brown-medium | amber | hazel | green | heterochromatic(different_colors)",
-  "eye_expression": "alert-intense | soft-gentle | keen-suspicious | soulful-warm | lively-cheerful | serious-dignified",
-  "neck_length": "long | moderate | short",
-  "neck_arch": "well-arched | slight-arch | straight | ewe-necked",
-  "coat_outer_texture": "smooth-very-short(<1cm) | smooth-short(1-3cm) | medium-flat(3-6cm) | long-silky(>6cm) | rough-wiry | double-thick-plush | stand-off-fluffy | wavy-loose | curly-tight | corded",
-  "coat_undercoat_density": "very-dense-woolly | dense | moderate | minimal | none-absent",
-  "coat_feathering_location": "heavy-on-legs-tail-belly | moderate-on-legs-tail | light-fringing-only | none",
-  "coat_pattern": "solid | bicolor-two-tone | tricolor | sable-gradient | agouti-banded-hair | saddle-blanket | merle-mottled | brindle-striped | piebald-white-patches | ticked-small-spots | roan-mixed | phantom-tan-points",
-  "coat_color_primary": "free-text: describe primary color precisely e.g. golden-yellow, jet-black, pure-white, sable-grey, red-mahogany, liver-brown, blue-grey, cream-pale-yellow",
-  "coat_color_secondary": "free-text: secondary color if present, else null",
-  "coat_golden_undertone": "yes | no | partial — is there any golden/cream/red-gold/apricot warmth in the coat?",
-  "body_length_to_height": "long-low(<0.9_ratio) | slightly-longer(0.9-1.0) | square(1.0) | slightly-taller(1.0-1.1) | tall-leggy(>1.1)",
-  "chest_type": "very-deep-narrow | deep-moderate | barrel-round | broad-flat | shallow",
-  "tuck_up": "very-pronounced-athletic | moderate | slight | absent",
-  "bone_substance": "very-heavy-coarse | heavy | moderate | fine | very-fine-delicate",
-  "muscle_definition": "very-muscular-powerful | well-muscled | moderate | lean-rangy | lightly-muscled",
-  "tail_set": "high | moderate | low",
-  "tail_carriage": "tightly-curled-over-back | loosely-curled-sickle | plumed-curl-plume | feathered-otter-straight | sabre-low | whip-straight-low | bobtail-stub | natural-pendant | gay-tail-above-back",
-  "tail_feathering": "yes-clear-feathering | no-no-feathering",
-  "size_estimate": "toy(<5kg) | small(5-10kg) | medium(10-25kg) | large(25-45kg) | giant(>45kg)",
-  "body_type_archetype": "spitz-nordic | molosser-mastiff | herding-athletic | terrier-square-compact | sighthound-lean-deep | scenthound-solid-low | gundog-balanced | toy-delicate | primitive-pariah | working-powerful-heavy",
-  "is_puppy": true_or_false,
-  "gender_apparent": "male | female | unknown",
-  "visible_conflicts": "CRITICAL FIELD — describe any features that appear internally inconsistent across two different breed types. Examples: 'spitz-type erect ears + broad head BUT soft oval eyes AND feathered otter tail suggest dual lineage', 'curly coat BUT blocky non-poodle head shape'. Write null ONLY if every feature appears perfectly consistent for one type."
+  "SYSTEM_1_SKULL": {
+    "skull_profile": "domed | flat | wedge | blocky-square | chiseled-fine | rounded-moderate | very-broad-flat | narrow-elongated",
+    "skull_width_to_length_ratio": "very-wide(>70%) | wide(55-70%) | medium(45-55%) | narrow(35-45%) | very-narrow(<35%)",
+    "occiput": "very-prominent-knob | prominent | moderate | slight | flat-absent",
+    "stop_angle": "very-abrupt(90deg) | pronounced(60-90deg) | moderate(30-60deg) | slight(10-30deg) | absent(0deg)",
+    "forehead": "very-wrinkled | slightly-wrinkled | smooth-flat | smooth-domed",
+    "cheeks": "very-prominent-bulging | prominent | moderate-flat | lean-chiseled"
+  },
+  "SYSTEM_2_MUZZLE": {
+    "muzzle_to_skull_length_ratio": "numeric 0.25-0.70 — fraction of total head length that is muzzle. 0.25=brachycephalic, 0.35=short, 0.45=moderate, 0.50=equal, 0.55=long, 0.65=very-long",
+    "muzzle_shape_top_view": "blunt-square | parallel-rectangular | tapering-wedge | very-narrow-snipey | conical",
+    "muzzle_depth": "very-deep(height≈length) | deep | moderate | shallow(height<<length)",
+    "lips": "very-tight-clean | tight | moderate | pendulous | very-pendulous-jowly | flews-present",
+    "nose": "very-broad-flat | broad | medium | narrow | butterfly-split",
+    "jaw_width": "very-broad | broad | medium | narrow"
+  },
+  "SYSTEM_3_EARS_EYES": {
+    "ear_attachment": "very-high(crown) | high(above-eye-line) | medium(at-eye-line) | low(below-eye-line) | very-low(jaw-level)",
+    "ear_form": "fully-erect-triangular | semi-erect-tipped | rose-folded-back | button-folded-forward | pendant-medium | long-pendant-lobular | bat-oversized-erect | cropped-erect",
+    "ear_leather_weight": "very-heavy-thick | medium | fine-thin",
+    "ear_size_vs_head": "very-large | large | proportionate | small",
+    "eye_placement": "forward-facing | slight-oblique | very-oblique-slanted",
+    "eye_form": "almond-sharp-corners | soft-oval | round-full | triangular-hooded | deep-set | very-prominent",
+    "eye_spacing": "very-wide-set | wide | medium | close-set",
+    "eye_color_primary": "blue | dark-brown | medium-brown | amber-yellow | green | odd-eyes"
+  },
+  "SYSTEM_4_COAT": {
+    "outer_coat_length": "very-short(<1cm) | short(1-3cm) | medium(3-6cm) | long(6-10cm) | very-long(>10cm)",
+    "outer_coat_texture": "smooth-flat-lying | rough-harsh-stand-off | soft-silky | wavy | loose-curly | tight-curly | corded | double-plush-dense | fluffy-stand-off-body",
+    "undercoat": "very-dense-woolly | dense | moderate | minimal | absent",
+    "feathering_present": "yes-on-legs-tail-belly | yes-on-tail-only | yes-light-fringing | no",
+    "coat_pattern_type": "solid | bicolor | tricolor | sable-gradient | agouti-banded-individual-hairs | saddle-blanket | merle | brindle | piebald | ticked | roan | phantom-tan-points",
+    "primary_color": "free description of dominant coat color — be precise e.g. pure-white, jet-black, golden-yellow, silver-grey, wolf-grey-agouti, liver-brown, blue-grey, red-mahogany, cream-pale, fawn-tan",
+    "secondary_color": "free description of secondary color if present, else null",
+    "any_warm_golden_tones": "yes | partial | no — is there golden/cream/apricot/red-gold warmth anywhere in the coat?"
+  },
+  "SYSTEM_5_BODY": {
+    "body_length_to_height": "long-low(<0.85) | slightly-long(0.85-0.95) | square(0.95-1.05) | slightly-tall(1.05-1.15) | tall-leggy(>1.15) — measure length from prosternum to buttock vs height at withers",
+    "leg_length_to_chest_depth": "very-short-legs(chest_depth≥leg_length_below_elbow) | short-legs(chest_depth≈0.8x_leg) | normal-legs(chest_depth≈0.6x_leg) | long-legs(chest_depth≈0.4x_leg) | very-long-legs(chest_depth<0.4x_leg)",
+    "chest_depth": "very-deep(reaches_elbow_or_below) | deep(near_elbow) | moderate | shallow",
+    "chest_width": "very-broad | broad | moderate | narrow | very-narrow",
+    "topline": "level-straight | slight-slope-rump | strong-slope-rump | roached-arched | slight-rise-over-loin",
+    "tuck_up": "very-pronounced | moderate | slight | absent",
+    "bone_substance": "very-heavy-coarse | heavy | moderate | fine | very-fine-delicate",
+    "muscle_mass": "very-muscular-powerful | well-muscled | moderate | lean-athletic | lightly-muscled",
+    "overall_weight_estimate": "toy(<5kg) | small(5-10kg) | medium(10-25kg) | large(25-45kg) | giant(>45kg)"
+  },
+  "SYSTEM_6_EXTREMITIES": {
+    "tail_set": "very-high | high | medium | low",
+    "tail_length": "long(reaches-hock-or-below) | medium(mid-thigh) | short(above-mid-thigh) | stub-bobtail | absent",
+    "tail_carriage": "tightly-curled-over-back | loosely-curled-sickle | plume-curl | feathered-straight-otter | sabre-low-natural | whip-straight | gay-tail-up | corkscrew",
+    "tail_feathering": "heavy-feathering | moderate-feathering | light-brush | no-feathering",
+    "feet_shape": "cat-foot-compact-round | oval-medium | hare-foot-long | very-large-webbed",
+    "rear_angulation": "very-angulated | well-angulated | moderate | straight-upright",
+    "is_puppy": "true | false",
+    "gender": "male | female | unknown",
+    "visible_cross_type_conflict": "CRITICAL: describe any features that seem to come from two different breed types simultaneously, suggesting hybrid lineage — e.g. one parent's head on another parent's body, coat from one type on skeleton of another. Write null only if all features appear internally consistent for one type."
+  }
 }
 
-CRITICAL RULES:
-1. Output ONLY the JSON object. No text before or after.
-2. No markdown fences. No breed names anywhere.
-3. Every field must be filled. Use null only for coat_color_secondary and visible_conflicts when truly not applicable.
-4. muzzle_ratio must be a decimal number (e.g. 0.47), not a category string.
-5. coat_golden_undertone is separate from coat_color_primary — be precise.
+RULES:
+1. Output ONLY the JSON. No text before or after. No breed names anywhere.
+2. muzzle_to_skull_length_ratio MUST be a decimal number (e.g. 0.43), not a string category.
+3. Every field must have a value. Only secondary_color and visible_cross_type_conflict may be null.
+4. Measure what you SEE, not what you infer. If a feature is obscured, note the closest visible approximation.
 PASS1;
 
         try {
@@ -1276,12 +1360,13 @@ PASS1;
                     ]],
                     'generationConfig' => [
                         'temperature'      => 0.0,
-                        'maxOutputTokens'  => 1100,
+                        'maxOutputTokens'  => 1400,
                         'responseMimeType' => 'application/json',
                     ],
                     'safetySettings' => $this->sigmaGetSafetySettings(),
                 ],
             ]);
+
             $r1Body    = $r1->getBody()->getContents();
             $r1Raw     = json_decode($r1Body, true);
             $r1Text    = $this->sigmaExtractText($r1Raw);
@@ -1289,19 +1374,22 @@ PASS1;
             $morphData = json_decode($r1Text, true);
 
             if (json_last_error() !== JSON_ERROR_NONE || empty($morphData)) {
-                Log::warning('⚠️ Pass 1 JSON parse failed — proceeding without morphometrics');
+                Log::warning('⚠️ Pass 1 parse failed — proceeding without morphometrics');
                 $morphData = null;
             } else {
+                $body   = $morphData['SYSTEM_5_BODY'] ?? [];
+                $skull  = $morphData['SYSTEM_1_SKULL'] ?? [];
+                $coat   = $morphData['SYSTEM_4_COAT'] ?? [];
+                $extrem = $morphData['SYSTEM_6_EXTREMITIES'] ?? [];
                 Log::info('✓ Pass 1 complete in ' . round(microtime(true) - $p1Start, 2) . 's', [
-                    'body_archetype'    => $morphData['body_type_archetype'] ?? '?',
-                    'bone'              => $morphData['bone_substance'] ?? '?',
-                    'muzzle_ratio'      => $morphData['muzzle_ratio'] ?? '?',
-                    'tail'              => $morphData['tail_carriage'] ?? '?',
-                    'tail_feathering'   => $morphData['tail_feathering'] ?? '?',
-                    'eye_shape'         => $morphData['eye_shape'] ?? '?',
-                    'eye_expression'    => $morphData['eye_expression'] ?? '?',
-                    'golden_undertone'  => $morphData['coat_golden_undertone'] ?? '?',
-                    'visible_conflicts' => $morphData['visible_conflicts'] ?? 'none',
+                    'body_ratio'      => $body['body_length_to_height'] ?? '?',
+                    'leg_ratio'       => $body['leg_length_to_chest_depth'] ?? '?',
+                    'bone'            => $body['bone_substance'] ?? '?',
+                    'skull'           => $skull['skull_profile'] ?? '?',
+                    'muzzle_ratio'    => $morphData['SYSTEM_2_MUZZLE']['muzzle_to_skull_length_ratio'] ?? '?',
+                    'coat_texture'    => $coat['outer_coat_texture'] ?? '?',
+                    'tail_carriage'   => $extrem['tail_carriage'] ?? '?',
+                    'conflicts'       => $extrem['visible_cross_type_conflict'] ?? 'none',
                 ]);
             }
         } catch (\Exception $e) {
@@ -1309,314 +1397,163 @@ PASS1;
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // PASS 2 — ADVERSARIAL ELIMINATION TRIBUNAL
+        // PASS 2 — UNIVERSAL ELIMINATION REASONING
         //
-        // The core scientific pass. Receives image + 35-point morphometrics.
-        // Forces adversarial elimination across 5 candidates.
+        // The model receives the complete morphometric survey and reasons
+        // from its OWN knowledge of breed standards — no pre-loaded rules.
         //
-        // Key upgrade from v1: 50 breed-pair DNA fingerprints (was 8).
-        // Each fingerprint encodes the MINIMUM DISTINGUISHING MEASUREMENTS
-        // from actual breed standards — not just "check this feature" but
-        // "if measurement X is above/below threshold Y, eliminate breed Z."
+        // WHY THIS IS BETTER THAN HARDCODED FINGERPRINTS:
+        // Hardcoded rules (Samoyed = white coat, Vallhund = short legs) create
+        // false certainty and break when breeds vary or images are unusual.
+        // A model that UNDERSTANDS breed standards can handle any breed,
+        // any variation, any lighting, any angle — because it reasons from
+        // anatomy to standard, not from appearance to memorized rule.
         //
-        // thinkingBudget = 5000 (was 3500) for deeper elimination chains.
+        // The prompt teaches universal reasoning METHOD, not breed-specific facts.
+        // thinkingBudget = 8000 (highest yet) for complete standard comparison.
         // ══════════════════════════════════════════════════════════════════
-        Log::info('── SIGMA v2 PASS 2: Adversarial Elimination Tribunal ──');
+        Log::info('── SIGMA v3 PASS 2: Universal Elimination Reasoning ──');
         $p2Start = microtime(true);
 
         $morphBlock = '';
         if (!empty($morphData)) {
-            $morphBlock  = "════════════════════════════════════════════════════\n";
-            $morphBlock .= "OBJECTIVE MORPHOMETRICS — PASS 1 BLIND EXAMINATION\n";
-            $morphBlock .= "════════════════════════════════════════════════════\n";
+            $morphBlock  = "═══════════════════════════════════════════════════════════\n";
+            $morphBlock .= "OBJECTIVE ANATOMICAL SURVEY — 40-POINT BLIND MEASUREMENT\n";
+            $morphBlock .= "═══════════════════════════════════════════════════════════\n";
             $morphBlock .= json_encode($morphData, JSON_PRETTY_PRINT) . "\n\n";
-            $morphBlock .= "CRITICAL: These are HARD EVIDENCE. They override visual impressions.\n";
-            $morphBlock .= "Any breed whose standard CONTRADICTS these measurements is ELIMINATED.\n\n";
+            $morphBlock .= "These measurements are HARD EVIDENCE from blind examination.\n";
+            $morphBlock .= "Any breed whose standard CANNOT accommodate these measurements is ELIMINATED.\n";
+            $morphBlock .= "Pay special attention to: body_length_to_height, leg_length_to_chest_depth, bone_substance, muzzle_to_skull_length_ratio — these are the primary splitters.\n\n";
         }
 
-        $pass2Prompt = $mlContextNote . $morphBlock . <<<'PASS2'
-You are the world's foremost canine forensic identification expert — a combination of FCI international judge, veterinary geneticist, and breed historian. You have memorized every AKC, FCI, UKC, KC, CKC breed standard including all designer hybrids and Southeast Asian native dogs.
+        $pass2Prompt = $mlNote . $morphBlock . <<<'PASS2'
+You are the world's leading authority on canine breed identification — a combination of FCI judge, veterinary geneticist, and breed historian with complete knowledge of every AKC, FCI, UKC, KC, CKC recognized breed, all designer hybrids, and Southeast Asian native dogs including the Philippine Aspin.
 
-YOUR PROTOCOL: THE ADVERSARIAL ELIMINATION TRIBUNAL
+YOUR IDENTIFICATION PROTOCOL — UNIVERSAL ELIMINATION METHOD
 
-════════════════════════════════════════════════════════════════════
-TRIBUNAL PHASE 0 — ASPIN GATE (ALWAYS check first for SE Asian dogs)
-════════════════════════════════════════════════════════════════════
-The Aspin (Asong Pinoy) is the Philippine primitive native dog — NOT a Western mixed breed.
-CLASSIFY AS ASPIN if MAJORITY present:
-✓ lean body, visible tuck-up, nothing exaggerated
-✓ short smooth close-lying coat any color (tan/black/spotted/brindle/white all valid)
-✓ wedge or slightly rounded head, moderate stop
-✓ almond-shaped dark brown eyes (never blue, never heterochromatic)
-✓ semi-erect, erect, or slightly tipped ears (NOT pendant/lobular)
-✓ sickle-tail or low-carried tail
-✓ medium size, fine to moderate bone
-✓ primitive/pariah overall silhouette — no breed exaggerations
-→ classification_type = "aspin" — skip all other phases
-→ NEVER call Aspin: "Village Dog", "Mixed Breed", "Mutt", any Western breed name
+═══════════════════════════════════════════════════════════
+PHASE 0 — ASPIN PRIORITY CHECK (Philippine native dog)
+═══════════════════════════════════════════════════════════
+Check FIRST before anything else.
+The Aspin (Asong Pinoy) is NOT a mixed breed — it is a primitive native landrace.
+It is the most commonly scanned dog in this system.
 
-════════════════════════════════════════════════════════════════════
-TRIBUNAL PHASE 1 — CANDIDATE FORMATION
-════════════════════════════════════════════════════════════════════
-List your 5 best initial candidates from visual impression. Do NOT commit yet.
-For curly/wavy coated dogs: list the NON-POODLE-parent candidate first, not "Poodle mix."
+Classify as ASPIN if the MAJORITY of these are visible:
+✓ Lean body, visible tuck-up, nothing exaggerated or excessively developed
+✓ Short, smooth, close-lying coat in any color
+✓ Wedge-shaped or moderately rounded head
+✓ Almond-shaped dark brown eyes (never blue, never heterochromatic)
+✓ Semi-erect, erect, or slightly tipped ears (never long pendant/lobular)
+✓ Sickle-tail, curled tail, or low-carried tail
+✓ Medium size, fine to moderate bone
+✓ Primitive/pariah overall appearance — no Western breed exaggerations
+→ classification_type = "aspin"
+→ NEVER label Aspin as "Village Dog", "Mixed Breed", or any Western breed name
+→ Skip all other phases if ASPIN criteria met
 
-════════════════════════════════════════════════════════════════════
-TRIBUNAL PHASE 2 — ADVERSARIAL ELIMINATION
-════════════════════════════════════════════════════════════════════
-For EACH of your 5 candidates, find measurements in the morphometric data above
-that CONTRADICT that breed's AKC/FCI standard.
+═══════════════════════════════════════════════════════════
+PHASE 1 — ANATOMY-FIRST CANDIDATE FORMATION
+═══════════════════════════════════════════════════════════
+Using ONLY the anatomical measurements above (not color, not coat pattern):
 
-SCORING SYSTEM:
-• FATAL (score 100): This measurement is physically impossible for this breed standard
-• STRONG (score 75): This measurement strongly contradicts the breed standard
-• WEAK (score 50): This measurement is atypical but not disqualifying alone
-• POSSIBLE (score 25): Minor deviation within acceptable variation
+Step 1 — Identify the PRIMARY STRUCTURAL TYPE from body proportions:
+  • body_length_to_height + leg_length_to_chest_depth together define the structural type
+  • long-low + very-short-legs → low-slung type (Corgis, Dachshunds, Bassets, Vallhund, Skye Terrier)
+  • square/balanced + normal-legs → standard type (most breeds)
+  • tall-leggy + long-legs → elegant type (Greyhounds, Doberman, Poodle)
+  • square + very-heavy-bone → molosser type (Mastiffs, Rottweiler, Boxer)
 
-ELIMINATION THRESHOLD: A breed is ELIMINATED if total contradiction score ≥ 75
+Step 2 — Identify the SKULL TYPE from measurements:
+  • brachycephalic (muzzle_ratio < 0.35) → Bulldogs, Pugs, Boxers, Shih Tzu, Pekingese
+  • mesocephalic (muzzle_ratio 0.40-0.52) → most breeds
+  • dolichocephalic (muzzle_ratio > 0.55) → Greyhounds, Collies, Shelties, Borzoi
 
-─────────────────────────────────────────────────────────────────────
-DNA FINGERPRINT LIBRARY — 50 BREED PAIRS (apply these as hard rules)
-─────────────────────────────────────────────────────────────────────
+Step 3 — Identify the COAT TYPE:
+  • double-plush-dense or fluffy-stand-off + dense undercoat → spitz/nordic types
+  • smooth-flat-lying + absent/minimal undercoat → hound/terrier/gundog types
+  • curly/wavy → poodle crosses or specific curly breeds (Barbet, Portuguese Water Dog)
+  • rough-harsh → wire-haired types (terriers, Griffons)
 
-╔══ SPITZ-TYPE CONFUSION CLUSTER ═══════════════════════════════════╗
+From structural type + skull type + coat type → form your 5 candidate breeds/groups.
+Do NOT let color or pattern drive candidate selection.
 
-GOBERIAN (Husky × Golden Retriever) CONFIRMATION — needs ALL 5:
-  eye_shape = soft-oval [NOT almond] → if almond: NOT Goberian (FATAL)
-  eye_expression = soft-gentle OR soulful-warm → if alert-intense: NOT Goberian (STRONG)
-  tail_feathering = yes-clear-feathering → if no-no-feathering: NOT Goberian (FATAL)
-  coat_golden_undertone = yes OR partial → if no: NOT Goberian (FATAL)
-  bone_substance = moderate OR fine → if heavy or very-heavy: NOT Goberian (FATAL)
-  muzzle_ratio ≥ 0.47 → if < 0.43: NOT Goberian (STRONG)
+═══════════════════════════════════════════════════════════
+PHASE 2 — STANDARD-BASED ELIMINATION
+═══════════════════════════════════════════════════════════
+For each of your 5 candidates, test it against its ACTUAL breed standard:
 
-ALASKAN MALAMUTE ELIMINATION — ELIMINATE if ANY true:
-  eye_shape = soft-oval → FATAL for Malamute (Malamute has almond eyes by standard)
-  eye_expression = soft-gentle OR soulful-warm → FATAL (Malamute = alert-intense)
-  tail_feathering = yes-clear-feathering → FATAL (Malamute has plumed-curl, NO feathering)
-  coat_golden_undertone = yes → FATAL (Malamute ONLY grey/black/sable/white/wolf-grey)
-  bone_substance = moderate OR fine → FATAL (Malamute standard = very-heavy-coarse)
-  muzzle_ratio > 0.50 → STRONG (Malamute has short-broad muzzle ~0.38-0.42)
-  body_length_to_height = long-low → STRONG (Malamute is square)
+Ask for each candidate:
+"According to this breed's official standard, is [measured_value] for [parameter] 
+physically possible within acceptable variation for this breed?"
 
-SIBERIAN HUSKY ELIMINATION — ELIMINATE if ANY true:
-  tail_feathering = yes-clear-feathering → FATAL (Husky = sickle tail, no feathering)
-  coat_golden_undertone = yes → FATAL (Husky has no golden genes)
-  bone_substance = heavy OR very-heavy-coarse → FATAL (Husky = moderate)
-  muzzle_ratio < 0.38 → FATAL (Husky muzzle = 0.43-0.50, not brachycephalic)
-  size_estimate = giant(>45kg) → FATAL (Husky max ~27kg)
+The elimination test has three levels:
+• DISQUALIFYING: This measurement violates the breed's hard physical standard → ELIMINATE
+• ATYPICAL: This measurement is outside typical range but not disqualifying → PENALIZE (-20pts)
+• ACCEPTABLE: This measurement fits within the standard's normal range → PASS
 
-ALUSKY (Malamute × Husky) CONFIRMATION — needs ALL 3:
-  bone_substance = heavy OR very-heavy-coarse
-  size_estimate = large(25-45kg) OR giant(>45kg)
-  body_type_archetype = spitz-nordic
-  → ELIMINATE if bone_substance = moderate or fine → NOT Alusky (FATAL)
+Eliminate any candidate with 1+ DISQUALIFYING contradictions.
+Rank remaining candidates by penalty points — fewest penalties wins.
 
-POMSKY (Pom × Husky) ELIMINATION — ELIMINATE if ANY true:
-  size_estimate = medium(10-25kg) OR large(25-45kg) → FATAL (Pomsky max ~14kg)
-  bone_substance = heavy OR very-heavy-coarse → FATAL (Pomsky = fine)
-  coat_outer_texture = smooth-very-short → FATAL (Pomsky = fluffy/plush)
+KEY UNIVERSAL STANDARD CONSTRAINTS to test for every candidate:
+— Size: Every breed has a standard weight/height range. Giant breeds cannot be small, toy breeds cannot be large.
+— Bone substance: Heavy-boned breeds CANNOT have fine bone. Fine-boned breeds CANNOT have heavy bone.
+— Body proportion: Low-slung breeds require long-low ratio. Square breeds CANNOT be long-low.
+— Leg length: Short-legged breeds have a specific leg-to-chest-depth ratio. Normal-legged breeds cannot match short-legged breeds' ratio.
+— Muzzle ratio: Brachycephalic breeds have <0.35 ratio. Dolichocephalic breeds have >0.55 ratio. These are hard constraints.
+— Ear type: Breeds with erect ears CANNOT have pendant ears. Breeds with pendant ears CANNOT have erect ears.
+— Coat type: Breeds with smooth coats CANNOT have fluffy stand-off coats and vice versa.
 
-╔══ RETRIEVER/DOODLE CONFUSION CLUSTER ══════════════════════════════╗
+═══════════════════════════════════════════════════════════
+PHASE 3 — HYBRID DETECTION
+═══════════════════════════════════════════════════════════
+Run this BEFORE committing to purebred — check the visible_cross_type_conflict field.
 
-GOLDENDOODLE (Golden × Poodle) CONFIRMATION — needs ALL 3:
-  coat_golden_undertone = yes OR partial
-  occiput_prominence = prominent OR very-prominent (retriever skull shape)
-  tail_feathering = yes-clear-feathering OR moderate-on-legs-tail
-  → ELIMINATE if coat_golden_undertone = no AND coat_color_primary is black/chocolate → NOT Goldendoodle (STRONG)
+If visible_cross_type_conflict is populated, OR if your survivors show traits from two structural types:
+→ Identify the two parent structural types from the anatomy
+→ Identify the specific parent breeds
+→ Determine if a recognized hybrid name exists for this cross
 
-LABRADOODLE (Lab × Poodle) vs GOLDENDOODLE:
-  LABRADOODLE: coat_color_primary = black/chocolate/cream + skull_shape = blocky-square/flat-broad + NO tail feathering beneath curl
-  GOLDENDOODLE: coat_color_primary = golden/cream/apricot + occiput-prominent + YES tail feathering
-  → If golden coat + feathered otter tail: GOLDENDOODLE not Labradoodle (FATAL to Labradoodle)
-  → If black/chocolate coat + blocky skull: LABRADOODLE not Goldendoodle (FATAL to Goldendoodle)
+For curly/wavy coated dogs: The poodle parent contributes the coat only.
+Read the non-curly parent from: skull shape, body proportions, bone, size, ear type.
+A blocky square lab skull on a curly body = Labradoodle.
+A refined retriever skull with feathered otter tail on a curly body = Goldendoodle.
+A long narrow terrier skull on a large curly body = Airedoodle.
+A herding-type wedge skull with merle on a curly body = Aussiedoodle.
+Apply this universal principle to ALL hybrid types, not just doodles.
 
-BERNEDOODLE (Bernese × Poodle) CONFIRMATION:
-  coat_pattern = tricolor (black + white + tan/rust markings) [FATAL if absent]
-  size_estimate = large(25-45kg) OR giant(>45kg) [STRONG if small]
-  → ELIMINATE if no tricolor markings present
+═══════════════════════════════════════════════════════════
+PHASE 4 — CLASSIFICATION AND CONFIDENCE
+═══════════════════════════════════════════════════════════
+After elimination:
 
-AUSSIEDOODLE (Aussie × Poodle) CONFIRMATION:
-  coat_pattern = merle-mottled OR tricolor [STRONG if absent]
-  eye_color = heterochromatic OR blue [STRONG support]
-  body_type_archetype = herding-athletic [support]
-
-COCKAPOO (Cocker × Poodle) CONFIRMATION:
-  ear_shape = long-pendant-lobular [FATAL if erect or semi-erect]
-  ear_set = low [support]
-  skull_shape = rounded-moderate OR domed [support]
-  size_estimate = small(5-10kg) OR medium(10-25kg)
-
-CAVAPOO (Cavalier × Poodle) CONFIRMATION:
-  ear_shape = long-pendant-lobular [FATAL if erect]
-  eye_shape = round-full [FATAL if almond or triangular]
-  size_estimate = small(5-10kg) [STRONG if large]
-  eye_expression = soft-gentle OR soulful-warm
-
-MALTIPOO (Maltese × Poodle) CONFIRMATION:
-  size_estimate = toy(<5kg) OR small(5-10kg) [FATAL if medium+]
-  coat_color_primary contains white OR cream
-  bone_substance = very-fine-delicate OR fine
-
-SCHNOODLE (Schnauzer × Poodle) CONFIRMATION:
-  cheek_muscles = prominent OR very-prominent (Schnauzer rectangular head) [support]
-  muzzle_shape = blunt-square [support]
-  coat_outer_texture = wavy-loose OR curly-tight + some wiry texture
-
-AIREDOODLE (Airedale × Poodle) CONFIRMATION — often misidentified as Labradoodle:
-  skull_shape = wedge-narrow OR chiseled-refined (long Airedale head) [FATAL if blocky]
-  size_estimate = large(25-45kg) [STRONG if small]
-  coat_color_primary shows tan + black/dark saddle pattern [support]
-  neck_length = long [support — Airedale has long elegant neck]
-  → ELIMINATE Labradoodle if skull is long-wedge + tan/black pattern + large size
-
-╔══ HERDING DOG CONFUSION CLUSTER ═══════════════════════════════════╗
-
-GERBERIAN SHEPSKY (GSD × Husky) CONFIRMATION:
-  coat_pattern = saddle-blanket OR bicolor-two-tone [support]
-  skull_shape = wedge-narrow [support]
-  ear_shape = fully-erect-triangular [FATAL if pendant]
-  body_type_archetype = herding-athletic [support]
-  → ELIMINATE if topline is level and body is spitz-type (Husky not GSD)
-
-AUSSIE-CORGI (Corgi × Aussie) CONFIRMATION:
-  body_length_to_height = long-low OR slightly-longer [FATAL if square or tall]
-  ear_shape = fully-erect-triangular OR semi-erect-tipped [support]
-  coat_pattern = merle-mottled OR tricolor [support]
-
-HORGI (Corgi × Husky) CONFIRMATION:
-  body_length_to_height = long-low(<0.9_ratio) [FATAL if square or tall-leggy]
-  coat_pattern includes husky mask/white facial markings [support]
-  → ELIMINATE if legs appear normal length for body size
-
-SHEPADOODLE (GSD × Poodle) vs BORDOODLE (Border Collie × Poodle):
-  SHEPADOODLE: size_estimate = large(25-45kg) + saddle-blanket pattern + tan points
-  BORDOODLE: size_estimate = medium(10-25kg) + herding-athletic build + tricolor/merle + keen-suspicious eyes
-
-╔══ COMPANION/SMALL DOG CONFUSION CLUSTER ═══════════════════════════╗
-
-SHORKIE (Shih Tzu × Yorkie) vs MORKIE (Maltese × Yorkie):
-  SHORKIE: stop_depth = pronounced + slight brachycephalic tendency + more body substance
-  MORKIE: skull_shape = domed + coat_color_primary = white/cream/tan + very fine bone
-
-CHIWEENIE (Chihuahua × Dachshund) CONFIRMATION:
-  body_length_to_height = long-low [FATAL if square]
-  size_estimate = toy(<5kg) OR small(5-10kg)
-  skull_shape may be domed or wedge-narrow
-
-POMCHI (Pom × Chihuahua) CONFIRMATION:
-  coat_outer_texture = stand-off-fluffy OR double-thick-plush [FATAL if smooth-short]
-  size_estimate = toy(<5kg) OR small(5-10kg) [FATAL if medium+]
-  ear_shape = fully-erect-triangular OR bat-large-erect
-
-PUGGLE (Pug × Beagle) CONFIRMATION:
-  stop_depth = pronounced OR very-pronounced [support]
-  coat_pattern = bicolor OR tricolor in beagle colors [support]
-  body_type_archetype = scenthound-solid-low [support]
-  → NOT a Pug if muzzle_ratio > 0.35 (Pugs are brachycephalic ~0.25-0.30)
-
-FRUG (French Bulldog × Pug) CONFIRMATION:
-  ear_shape = bat-large-erect OR semi-erect [FATAL if pendant]
-  stop_depth = very-pronounced [support]
-  size_estimate = small(5-10kg) OR medium(10-25kg)
-  → ELIMINATE if muzzle_ratio > 0.40 (both parents brachycephalic)
-
-╔══ GOLDEN RETRIEVER CONFUSION CLUSTER ══════════════════════════════╗
-
-GOLDEN RETRIEVER ELIMINATION — ELIMINATE if ANY true:
-  ear_shape = fully-erect-triangular → FATAL (Golden has folded-pendant)
-  coat_pattern = agouti-banded-hair OR saddle-blanket → FATAL (not Golden genes)
-  eye_shape = triangular-deep-set → FATAL (Golden has soft-oval/round)
-  coat_color_primary contains grey/blue/wolf → FATAL
-
-FLAT-COATED RETRIEVER vs GOLDEN RETRIEVER:
-  FLAT-COAT: coat_outer_texture = medium-flat (not silky) + skull_shape = chiseled-refined (longer flatter skull) + coat_color_primary = jet-black OR liver-brown
-  GOLDEN: coat_outer_texture = long-silky + coat_color_primary = golden-yellow/cream + occiput_prominence = prominent
-
-╔══ MOLOSSER/MASTIFF CONFUSION CLUSTER ══════════════════════════════╗
-
-BULLMASTIFF vs ENGLISH MASTIFF vs ROTTWEILER:
-  BULLMASTIFF: skull_width_category = very-wide + stop_depth = very-pronounced + size_estimate = large(25-45kg) + dark mask + fawn/red/brindle
-  ENGLISH MASTIFF: skull_width_category = very-wide + size_estimate = giant(>45kg) + very-pendulous-jowly lips + apricot/fawn/brindle
-  ROTTWEILER: coat_pattern = bicolor(black+tan-points) [FATAL if absent] + skull_shape = blocky-square + size = large + very-muscular
-
-╔══ RARE BREED TRAPS ════════════════════════════════════════════════╗
-
-CAROLINA DOG (American Dingo) vs ASPIN:
-  Both primitive. Carolina Dog: slightly more refined wedge, pale buff/ginger coat common, less variation
-  → For Philippine context: prefer Aspin classification for primitive dogs unless clearly from Western context
-
-JINDO vs SHIBA INU vs AKITA (Spitz trio):
-  JINDO: size = medium(10-25kg) + muzzle_ratio = 0.47-0.52 + chest = deep-moderate + coat = short-medium
-  SHIBA INU: size = small(5-10kg) + compact-cobby + muzzle_ratio = 0.43-0.47 + prick ears
-  AKITA: size = large(25-45kg) + very-heavy bone + broad flat skull + very-dense double coat
-
-SAMOYED vs WHITE HUSKY:
-  SAMOYED: coat_outer_texture = stand-off-fluffy (NOT double-thick-plush) + lip_type = moderate with upturned corners "Samoyed smile" + tail_carriage = tightly-curled-over-back
-  WHITE HUSKY: coat_outer_texture = double-thick-plush + eye_color may be blue + less curved lips
-
-BORDER COLLIE vs AUSTRALIAN SHEPHERD:
-  BORDER COLLIE: skull_shape = slightly flatter + muzzle_ratio = 0.50-0.55 (longer) + size = medium(10-25kg) lighter
-  AUSSIE: bob-tail or natural + broader skull + stockier build + merle very common
-
-════════════════════════════════════════════════════════════════════
-TRIBUNAL PHASE 3 — HYBRID DETECTION
-════════════════════════════════════════════════════════════════════
-If visible_conflicts was populated in the morphometrics, OR if your top candidate
-already has 1-2 STRONG contradictions that suggest a second parent:
-→ Identify both parent breeds
-→ Check the recognized hybrid list
-→ If recognized: use the hybrid name as primary_breed
-
-COMPLETE HYBRID REFERENCE (beyond what's listed above):
-Huskydoodle=Husky×Poodle | SpringerdoodIe=Springer×Poodle | Weimardoodle=Weimaraner×Poodle
-Doberdoodle=Doberman×Poodle | SaintBerdoodle=StBernard×Poodle | Newfypoo=Newfoundland×Poodle
-Pyredoodle=GreatPyrenees×Poodle | Doxiepoo=Dachshund×Poodle | Corgipoo=Corgi×Poodle
-ShihPoo=ShihTzu×Poodle | Pomapoo=Pomeranian×Poodle | Peekapoo=Pekingese×Poodle
-Bichpoo=BichonFrise×Poodle | Chipoo=Chihuahua×Poodle | Pugapoo=Pug×Poodle
-Poogle=Beagle×Poodle | Westiepoo=Westie×Poodle | Cairnoodle=Cairn×Poodle
-Scoodle=ScottishTerrier×Poodle | Jackapoo=JackRussell×Poodle | Havapoo=Havanese×Poodle
-Bocker=Cocker×Beagle | Jackabee=JackRussell×Beagle | Beagador=Beagle×Lab
-Sheprador=GSD×Lab | Labrottie=Rottweiler×Lab | Bugg=BostonTerrier×Pug
-Jug=JackRussell×Pug | Chug=Chihuahua×Pug | Chorkie=Chihuahua×Yorkie
-ShiChi=Chihuahua×ShihTzu | Malshi=Maltese×ShihTzu | Affenhuahua=Affenpinscher×Chihuahua
-(Use full expert knowledge beyond this list)
-
-════════════════════════════════════════════════════════════════════
-TRIBUNAL PHASE 4 — FINAL VERDICT
-════════════════════════════════════════════════════════════════════
-After elimination, one or two candidates survive.
-
-Classification hierarchy (use in order):
+Classification (in priority order):
 1. ASPIN → Phase 0 criteria met → classification_type = "aspin"
-2. RECOGNIZED HYBRID → named cross identified in Phase 3 → classification_type = "designer_hybrid"
+2. RECOGNIZED HYBRID → Phase 3 identified named cross → classification_type = "designer_hybrid"
    recognized_hybrid_name = full hybrid name
    alternatives = [parent_breed_1, parent_breed_2]
-3. PUREBRED → survived all eliminations → classification_type = "purebred"
-   alternatives = [2 breeds that were hardest to eliminate]
-4. UNNAMED MIX → 2 parent breeds, no recognized name → classification_type = "mixed"
-   primary_breed = dominant parent
-   alternatives = [secondary_parent, tertiary]
+3. PUREBRED → single survivor from elimination → classification_type = "purebred"
+   alternatives = [2 hardest-to-eliminate runners-up]
+4. UNNAMED MIX → two parent lineages, no recognized name → classification_type = "mixed"
+   primary_breed = dominant parent structural type
+   alternatives = [secondary_parent, next closest]
 
-════════════════════════════════════════════════════════════════════
-CALIBRATED CONFIDENCE SCORING
-════════════════════════════════════════════════════════════════════
-93-98: Zero contradictions, all confirmation rules passed, absolutely certain
-85-92: One WEAK contradiction only, highly confident
-76-84: Two WEAK or one STRONG contradiction, moderately confident
-68-75: Notable ambiguity, meaningful uncertainty
-65-67: Significant uncertainty, best available answer
+Confidence calibration:
+95-98: zero contradictions, all measurements fit perfectly, unmistakable
+87-94: one ATYPICAL measurement, very high confidence
+78-86: two ATYPICAL measurements or one ambiguous structural feature
+68-77: meaningful uncertainty, proportion or type is borderline
+65-67: best available answer under significant ambiguity
 
-For each uncertain feature: add to uncertain_features array.
-If confidence ≥ 83: uncertain_features = []
+uncertain_features: list the specific measured parameters that caused uncertainty.
+If confidence ≥ 85: uncertain_features = []
 
-════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════
 OUTPUT — STRICT JSON ONLY
-════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════
 No markdown. No preamble. No explanation. Valid JSON only.
-Full breed names always: "Labrador Retriever" not "Lab"
-Full hybrid names always: "Airedoodle" not "Airedale mix"
+Full official breed names: "Labrador Retriever" not "Lab"
+Full hybrid names: "Goldendoodle" not "Golden Doodle" or "Golden mix"
 alternatives: exactly 2 objects with "breed" and "confidence"
-uncertain_features: array of strings describing ambiguous measurements
 
 {"primary_breed":"Full Name","primary_confidence":91.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Name","confidence":72.0},{"breed":"Full Name","confidence":45.0}],"uncertain_features":[]}
 PASS2;
@@ -1636,7 +1573,7 @@ PASS2;
                     'generationConfig' => [
                         'temperature'     => 0.1,
                         'maxOutputTokens' => 3000,
-                        'thinkingConfig'  => ['thinkingBudget' => 5000],
+                        'thinkingConfig'  => ['thinkingBudget' => 8000],
                     ],
                     'safetySettings' => $this->sigmaGetSafetySettings(),
                 ],
@@ -1647,8 +1584,7 @@ PASS2;
             $r2Raw    = json_decode($r2Body, true);
 
             if ($r2Status !== 200) {
-                $errMsg = $r2Raw['error']['message'] ?? 'HTTP ' . $r2Status;
-                Log::error('✗ Pass 2 HTTP error: ' . $errMsg);
+                Log::error('✗ Pass 2 HTTP error: ' . ($r2Raw['error']['message'] ?? 'HTTP ' . $r2Status));
                 $p2Failed = true;
             } else {
                 $r2Text = $this->sigmaExtractText($r2Raw);
@@ -1677,73 +1613,95 @@ PASS2;
         }
 
         if ($p2Failed) {
-            Log::warning('⚠️ Pass 2 failed — running SIGMA v2 failsafe');
-            return $this->sigmaFallback($client, $proUrl, $mimeType, $imageData, $mlContextNote, $overallStart);
+            Log::warning('⚠️ Pass 2 failed — running SIGMA v3 fallback');
+            return $this->sigmaFallback($client, $proUrl, $mimeType, $imageData, $mlNote, $overallStart);
         }
 
         $p2Confidence      = (float)($parsed['primary_confidence'] ?? 80.0);
         $p2Breed           = trim($parsed['primary_breed'] ?? '');
         $uncertainFeatures = $parsed['uncertain_features'] ?? [];
+        $topAltBreed       = $parsed['alternatives'][0]['breed'] ?? '';
+        $topAltConf        = (float)($parsed['alternatives'][0]['confidence'] ?? 0);
 
         // ══════════════════════════════════════════════════════════════════
-        // PASS 3 — DEVIL'S ADVOCATE CHALLENGE
+        // PASS 3 — STRUCTURAL VERIFICATION CHALLENGE
         //
-        // NEW in v2. Only fires when confidence ≥ 72 (high-confidence answers
-        // are the ones most at risk from anchoring bias — the model is "sure"
-        // but possibly wrong).
+        // Fires when: confidence ≥ 80 (high confidence needs verification)
+        //          OR top-2 candidates are within 20 confidence points (close race)
         //
-        // The model receives the answer from Pass 2 and is explicitly told to
-        // DISPROVE it. It has the morphometric evidence as hard data.
+        // Unlike v2's "Devil's Advocate" (which was too aggressive and overrode
+        // correct answers like Samoyed→Husky), Pass 3 here is STRUCTURAL:
         //
-        // Three outcomes:
-        // A) Cannot disprove → confirms, boosts confidence
-        // B) Finds strong counter-evidence → override triggered
-        // C) Finds weak counter-evidence → confidence adjusted downward
+        // It asks the model to identify and MEASURE the single anatomical feature
+        // that definitively separates the winner from its closest competitor.
+        // This is not "try to disprove" — it's "prove it with anatomy."
         //
-        // This is the immune system of the pipeline. It catches cases where
-        // Pass 2 correctly eliminated weaker candidates but still landed on
-        // the wrong survivor.
+        // OUTCOMES:
+        // A) Clear distinguishing feature found → confidence locked high
+        // B) Cannot find distinguishing feature → confidence drops (uncertainty acknowledged)
+        // C) Distinguishing feature found but points to DIFFERENT breed → override
+        //    (Override only happens when structural evidence is unambiguous)
         // ══════════════════════════════════════════════════════════════════
-        if ($p2Confidence >= 72) {
-            Log::info('── SIGMA v2 PASS 3: Devil\'s Advocate Challenge (conf=' . $p2Confidence . ') ──');
+        $closeRace = ($topAltConf > 0) && (($p2Confidence - $topAltConf) <= 20);
+
+        if ($p2Confidence >= 80 || $closeRace) {
+            Log::info('── SIGMA v3 PASS 3: Structural Verification Challenge ──', [
+                'p2_breed'   => $p2Breed,
+                'p2_conf'    => $p2Confidence,
+                'top_alt'    => $topAltBreed,
+                'alt_conf'   => $topAltConf,
+                'close_race' => $closeRace,
+            ]);
             $p3Start = microtime(true);
 
-            $topAlt        = $parsed['alternatives'][0]['breed'] ?? 'Unknown';
-            $altConf       = $parsed['alternatives'][0]['confidence'] ?? 30;
-            $morphSummary  = '';
+            // Build a compact structural summary from Pass 1 for Pass 3
+            $structSummary = '';
             if (!empty($morphData)) {
-                // Provide the key discriminating measurements as a compact summary
-                $key = [
-                    'eye_shape'          => $morphData['eye_shape'] ?? 'unknown',
-                    'eye_expression'     => $morphData['eye_expression'] ?? 'unknown',
-                    'bone_substance'     => $morphData['bone_substance'] ?? 'unknown',
-                    'tail_feathering'    => $morphData['tail_feathering'] ?? 'unknown',
-                    'coat_golden_undertone' => $morphData['coat_golden_undertone'] ?? 'unknown',
-                    'muzzle_ratio'       => $morphData['muzzle_ratio'] ?? 'unknown',
-                    'skull_shape'        => $morphData['skull_shape'] ?? 'unknown',
-                    'coat_pattern'       => $morphData['coat_pattern'] ?? 'unknown',
-                    'visible_conflicts'  => $morphData['visible_conflicts'] ?? null,
+                $body5  = $morphData['SYSTEM_5_BODY'] ?? [];
+                $skull1 = $morphData['SYSTEM_1_SKULL'] ?? [];
+                $muzz2  = $morphData['SYSTEM_2_MUZZLE'] ?? [];
+                $extrem = $morphData['SYSTEM_6_EXTREMITIES'] ?? [];
+                $struct = [
+                    'body_length_to_height'      => $body5['body_length_to_height'] ?? 'unknown',
+                    'leg_length_to_chest_depth'  => $body5['leg_length_to_chest_depth'] ?? 'unknown',
+                    'bone_substance'             => $body5['bone_substance'] ?? 'unknown',
+                    'overall_weight_estimate'    => $body5['overall_weight_estimate'] ?? 'unknown',
+                    'skull_profile'              => $skull1['skull_profile'] ?? 'unknown',
+                    'muzzle_to_skull_ratio'      => $muzz2['muzzle_to_skull_length_ratio'] ?? 'unknown',
+                    'tail_carriage'              => $extrem['tail_carriage'] ?? 'unknown',
+                    'tail_feathering'            => $extrem['tail_feathering'] ?? 'unknown',
+                    'visible_cross_type_conflict' => $extrem['visible_cross_type_conflict'] ?? null,
                 ];
-                $morphSummary = "KEY MORPHOMETRICS:\n" . json_encode($key, JSON_PRETTY_PRINT) . "\n\n";
+                $structSummary = "KEY STRUCTURAL MEASUREMENTS:\n" . json_encode($struct, JSON_PRETTY_PRINT) . "\n\n";
             }
 
             $pass3Prompt = <<<PASS3
-{$morphSummary}Previous identification: "{$p2Breed}" at {$p2Confidence}% confidence.
-The runner-up was "{$topAlt}" at {$altConf}%.
+{$structSummary}Pass 2 identified: "{$p2Breed}" at {$p2Confidence}%.
+Closest competitor: "{$topAltBreed}" at {$topAltConf}%.
 
-YOUR MISSION: Play Devil's Advocate. Try your HARDEST to DISPROVE "{$p2Breed}".
+YOUR TASK — STRUCTURAL VERIFICATION:
+Do NOT try to disprove "{$p2Breed}". Instead, answer this question with precision:
 
-Look at the image and the morphometrics above. Ask yourself:
-1. Is there ANY morphometric evidence that CONTRADICTS "{$p2Breed}"'s breed standard?
-2. Does "{$topAlt}" actually explain the visible features BETTER than "{$p2Breed}"?
-3. Are there any features that are physically IMPOSSIBLE for "{$p2Breed}" to have?
-4. Does the visible_conflicts field (if present) point to a different conclusion?
+"What is the single most important anatomical measurement or structural feature that 
+physically separates '{$p2Breed}' from '{$topAltBreed}'?"
 
-Be brutally honest. If you find compelling contradictions, override.
-If you genuinely cannot disprove "{$p2Breed}", confirm it — but only then.
+Look at the image RIGHT NOW and locate that specific feature.
+Measure or describe it precisely — be specific about what you see, not what you expect.
+
+Then answer:
+1. What is the distinguishing structural feature?
+2. What does the breed standard for "{$p2Breed}" require for that feature?
+3. What does the breed standard for "{$topAltBreed}" require for that feature?
+4. What do you ACTUALLY SEE for that feature in this image?
+5. Which breed does what you SEE match?
+
+Based on this structural verification:
+— If what you see matches "{$p2Breed}": set verdict="confirmed", keep or raise confidence
+— If what you see definitively matches "{$topAltBreed}" instead: set verdict="structural_override"
+— If the feature is unclear or both breeds could match: set verdict="confirmed" with lower confidence
 
 Output ONLY valid JSON:
-{"verdict":"confirmed|overridden","confirmed_breed":"Full Name","updated_confidence":91.0,"override_reason":"null or precise description of the contradiction that forced override"}
+{"verdict":"confirmed|structural_override","confirmed_breed":"Full Name","updated_confidence":91.0,"distinguishing_feature":"name of feature","what_observed":"precise description of what you measured","structural_reason":"one sentence why this supports your verdict"}
 PASS3;
 
             try {
@@ -1756,33 +1714,39 @@ PASS3;
                             ],
                         ]],
                         'generationConfig' => [
-                            'temperature'    => 0.15,
-                            'maxOutputTokens' => 500,
+                            'temperature'    => 0.1,
+                            'maxOutputTokens' => 600,
                         ],
                         'safetySettings' => $this->sigmaGetSafetySettings(),
                     ],
                 ]);
-                $r3Body  = $r3->getBody()->getContents();
-                $r3Raw   = json_decode($r3Body, true);
-                $r3Text  = $this->sigmaExtractText($r3Raw);
-                $r3Text  = preg_replace('/```json|```/i', '', trim($r3Text));
-                $r3Data  = json_decode($r3Text, true);
+
+                $r3Body = $r3->getBody()->getContents();
+                $r3Raw  = json_decode($r3Body, true);
+                $r3Text = $this->sigmaExtractText($r3Raw);
+                $r3Text = preg_replace('/```json|```/i', '', trim($r3Text));
+                $r3Data = json_decode($r3Text, true);
 
                 if (json_last_error() === JSON_ERROR_NONE && !empty($r3Data['verdict'])) {
-                    $verdict     = $r3Data['verdict'] ?? 'confirmed';
+                    $verdict     = $r3Data['verdict'];
                     $updatedConf = (float)($r3Data['updated_confidence'] ?? $p2Confidence);
 
-                    if ($verdict === 'overridden' && !empty($r3Data['confirmed_breed'])) {
+                    if ($verdict === 'structural_override' && !empty($r3Data['confirmed_breed'])) {
                         $newBreed = trim($r3Data['confirmed_breed']);
-                        Log::warning('🔄 Pass 3 DEVIL\'S ADVOCATE OVERRIDE: ' . $p2Breed . ' → ' . $newBreed, [
-                            'reason' => $r3Data['override_reason'] ?? 'unspecified',
+                        Log::info('🔄 Pass 3 STRUCTURAL OVERRIDE: ' . $p2Breed . ' → ' . $newBreed, [
+                            'feature'  => $r3Data['distinguishing_feature'] ?? '?',
+                            'observed' => $r3Data['what_observed'] ?? '?',
+                            'reason'   => $r3Data['structural_reason'] ?? '?',
                         ]);
                         $parsed['primary_breed']      = $newBreed;
-                        $parsed['primary_confidence'] = max(68.0, min(92.0, $updatedConf));
+                        $parsed['primary_confidence'] = max(68.0, min(94.0, $updatedConf));
                     } else {
-                        // Confirmed — confidence stays or adjusts slightly
-                        $parsed['primary_confidence'] = max($p2Confidence, min(97.0, $updatedConf));
-                        Log::info('✓ Pass 3 CONFIRMED: ' . $p2Breed . ' (updated conf: ' . $parsed['primary_confidence'] . ')');
+                        // Confirmed — update confidence
+                        $parsed['primary_confidence'] = max($p2Confidence, min(98.0, $updatedConf));
+                        Log::info('✓ Pass 3 STRUCTURAL CONFIRMED: ' . $p2Breed, [
+                            'feature'      => $r3Data['distinguishing_feature'] ?? '?',
+                            'updated_conf' => $parsed['primary_confidence'],
+                        ]);
                     }
                 }
                 Log::info('✓ Pass 3 done in ' . round(microtime(true) - $p3Start, 2) . 's');
@@ -1790,108 +1754,23 @@ PASS3;
                 Log::warning('⚠️ Pass 3 failed: ' . $e->getMessage() . ' — Pass 2 result kept');
             }
         } else {
-            Log::info('⏭️ Pass 3 skipped (conf=' . $p2Confidence . ' < 72)');
+            Log::info('⏭️ Pass 3 skipped (conf=' . $p2Confidence . ' < 80, gap=' . round($p2Confidence - $topAltConf, 1) . ')');
         }
 
-        // Re-read potentially updated values after Pass 3
-        $p3Confidence      = (float)($parsed['primary_confidence'] ?? $p2Confidence);
-        $p3Breed           = trim($parsed['primary_breed'] ?? $p2Breed);
-        $uncertainFeatures = $parsed['uncertain_features'] ?? $uncertainFeatures;
-
-        // ══════════════════════════════════════════════════════════════════
-        // PASS 4 — TARGETED CONFIDENCE CALIBRATION
-        //
-        // Only fires when confidence < 78 AND uncertain_features exist.
-        // Does NOT re-open the breed question.
-        // Examines ONLY the specific features flagged as ambiguous.
-        // ══════════════════════════════════════════════════════════════════
-        if ($p3Confidence < 78 && !empty($uncertainFeatures)) {
-            Log::info('── SIGMA v2 PASS 4: Targeted Confidence Calibration (conf=' . $p3Confidence . ') ──');
-            $p4Start = microtime(true);
-
-            $uncertainStr = implode(', ', array_slice($uncertainFeatures, 0, 3));
-            $topAlts      = array_slice($parsed['alternatives'] ?? [], 0, 2);
-            $altStr       = implode(' vs ', array_map(fn($a) => $a['breed'] ?? '', array_filter($topAlts)));
-
-            $pass4Prompt = <<<PASS4
-Current identification: "{$p3Breed}" at {$p3Confidence}%.
-The uncertain features are: {$uncertainStr}
-The competing candidates are: {$altStr}
-
-TARGETED TASK: Look ONLY at these specific features in the image: {$uncertainStr}
-
-For each uncertain feature:
-1. Precisely describe what you observe (not impressions — exact physical description)
-2. State whether this supports "{$p3Breed}" or one of the alternatives, with reason
-
-Then output your calibrated verdict. DO NOT change the breed unless you see
-overwhelming evidence — only adjust confidence up or down.
-
-Output ONLY valid JSON:
-{"confirmed_breed":"Full Name","updated_confidence":82.0,"override":false}
-Set override=true ONLY if the uncertain features now make you certain the breed is wrong.
-PASS4;
-
-            try {
-                $r4 = $client->post($flashUrl, [
-                    'json' => [
-                        'contents' => [[
-                            'parts' => [
-                                ['text' => $pass4Prompt],
-                                ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
-                            ],
-                        ]],
-                        'generationConfig' => [
-                            'temperature'    => 0.05,
-                            'maxOutputTokens' => 400,
-                        ],
-                        'safetySettings' => $this->sigmaGetSafetySettings(),
-                    ],
-                ]);
-                $r4Body = $r4->getBody()->getContents();
-                $r4Raw  = json_decode($r4Body, true);
-                $r4Text = $this->sigmaExtractText($r4Raw);
-                $r4Text = preg_replace('/```json|```/i', '', trim($r4Text));
-                $r4Data = json_decode($r4Text, true);
-
-                if (json_last_error() === JSON_ERROR_NONE && !empty($r4Data)) {
-                    $updatedConf = (float)($r4Data['updated_confidence'] ?? $p3Confidence);
-                    if (!empty($r4Data['override']) && $r4Data['override'] === true && !empty($r4Data['confirmed_breed'])) {
-                        Log::info('✓ Pass 4 OVERRIDE: ' . $p3Breed . ' → ' . $r4Data['confirmed_breed']);
-                        $parsed['primary_breed']      = trim($r4Data['confirmed_breed']);
-                        $parsed['primary_confidence'] = max(65.0, min(95.0, $updatedConf));
-                    } else {
-                        $parsed['primary_confidence'] = max($p3Confidence, min(97.0, $updatedConf));
-                        Log::info('✓ Pass 4 calibrated confidence: ' . $parsed['primary_confidence']);
-                    }
-                }
-                Log::info('✓ Pass 4 done in ' . round(microtime(true) - $p4Start, 2) . 's');
-            } catch (\Exception $e) {
-                Log::warning('⚠️ Pass 4 failed: ' . $e->getMessage() . ' — keeping current result');
-            }
-        } else {
-            Log::info('⏭️ Pass 4 skipped (conf=' . $p3Confidence . ' ≥ 78 OR no uncertain features)');
-        }
-
-        // ── BUILD FINAL RESULT (same structure as original) ───────────────
+        // ── BUILD FINAL RESULT ─────────────────────────────────────────────
         $classType   = trim($parsed['classification_type'] ?? 'purebred');
         $hybridName  = isset($parsed['recognized_hybrid_name'])
             ? trim((string)$parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`") : null;
         if (empty($hybridName) || strtolower($hybridName) === 'null') $hybridName = null;
 
-        $primaryRaw  = trim($parsed['primary_breed'] ?? '', " \t\n\r\0\x0B\"'`");
-        $primaryRaw  = substr(preg_replace('/\s+/', ' ', $primaryRaw), 0, 120);
-
-        $cleanedBreed = ($classType === 'designer_hybrid')
-            ? $primaryRaw
-            : $this->cleanBreedName($primaryRaw);
+        $primaryRaw   = trim($parsed['primary_breed'] ?? '', " \t\n\r\0\x0B\"'`");
+        $primaryRaw   = substr(preg_replace('/\s+/', ' ', $primaryRaw), 0, 120);
+        $cleanedBreed = ($classType === 'designer_hybrid') ? $primaryRaw : $this->cleanBreedName($primaryRaw);
         if (empty($cleanedBreed)) $cleanedBreed = 'Unknown';
 
-        // Honest confidence — hard clamp, no artificial variance
         $actualConf = max(65.0, min(98.0, (float)($parsed['primary_confidence'] ?? 78.0)));
 
         $topPredictions = [['breed' => $cleanedBreed, 'confidence' => round($actualConf, 1)]];
-
         foreach (($parsed['alternatives'] ?? []) as $alt) {
             if (empty($alt['breed'])) continue;
             $ab = substr(preg_replace('/\s+/', ' ', trim($alt['breed'], " \t\n\r\0\x0B\"'`")), 0, 120);
@@ -1902,19 +1781,16 @@ PASS4;
             ];
         }
 
-        $totalTime  = round(microtime(true) - $overallStart, 2);
-        $passesRun  = 2;
-        if ($p2Confidence >= 72)                                    $passesRun = 3;
-        if ($p3Confidence < 78 && !empty($uncertainFeatures))      $passesRun = 4;
+        $totalTime = round(microtime(true) - $overallStart, 2);
+        $passesRun = ($p2Confidence >= 80 || $closeRace) ? 3 : 2;
 
-        Log::info('╔══════════════════════════════════════════════════════╗');
-        Log::info('║  SIGMA v2 COMPLETE                                   ║');
-        Log::info('╚══════════════════════════════════════════════════════╝');
+        Log::info('╔══════════════════════════════════════════════════════════╗');
+        Log::info('║  SIGMA v3 COMPLETE                                       ║');
+        Log::info('╚══════════════════════════════════════════════════════════╝');
         Log::info('Result', [
             'breed'        => $cleanedBreed,
             'confidence'   => $actualConf,
             'class_type'   => $classType,
-            'hybrid_name'  => $hybridName,
             'passes_run'   => $passesRun,
             'morph_used'   => !empty($morphData),
             'total_time_s' => $totalTime,
@@ -1922,12 +1798,12 @@ PASS4;
 
         return [
             'success'         => true,
-            'method'          => 'sigma_v2_gemini',
+            'method'          => 'sigma_v3_gemini',
             'breed'           => $cleanedBreed,
             'confidence'      => round($actualConf, 1),
             'top_predictions' => $topPredictions,
             'metadata'        => [
-                'model'               => 'sigma_v2_adversarial',
+                'model'               => 'sigma_v3_universal',
                 'response_time_s'     => $totalTime,
                 'classification_type' => $classType,
                 'recognized_hybrid'   => $hybridName,
@@ -1936,7 +1812,7 @@ PASS4;
         ];
     }
 
-    // ── SIGMA v2 HELPERS ──────────────────────────────────────────────────
+    // ── SIGMA v3 HELPERS ──────────────────────────────────────────────────
 
     /** Extract clean non-thought text from Gemini response parts */
     private function sigmaExtractText(array $result): string
@@ -1960,7 +1836,7 @@ PASS4;
         if (preg_match('/"classification_type"\s*:\s*"([^"]+)"/', $raw, $m))    $r['classification_type'] = $m[1];
         if (preg_match('/"recognized_hybrid_name"\s*:\s*"([^"]+)"/', $raw, $m)) $r['recognized_hybrid_name'] = $m[1];
         else                                                                      $r['recognized_hybrid_name'] = null;
-        $r['alternatives'] = [];
+        $r['alternatives']     = [];
         $r['uncertain_features'] = [];
         preg_match_all('/"breed"\s*:\s*"([^"]+)"\s*,\s*"confidence"\s*:\s*([\d.]+)/', $raw, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) $r['alternatives'][] = ['breed' => $m[1], 'confidence' => (float)$m[2]];
@@ -1974,9 +1850,9 @@ PASS4;
             $src = imagecreatefromstring($data);
             if (!$src) return $data;
             $ratio = min($maxDim / $info[0], $maxDim / $info[1]);
-            $nw    = (int)($info[0] * $ratio);
-            $nh    = (int)($info[1] * $ratio);
-            $dst   = imagecreatetruecolor($nw, $nh);
+            $nw = (int)($info[0] * $ratio);
+            $nh = (int)($info[1] * $ratio);
+            $dst = imagecreatetruecolor($nw, $nh);
             imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $info[0], $info[1]);
             imagedestroy($src);
             ob_start(); imagejpeg($dst, null, 90); $out = ob_get_clean();
@@ -1997,7 +1873,7 @@ PASS4;
         } catch (\Exception $e) { return $data; }
     }
 
-    /** Standard safety settings — block nothing (dog images are benign) */
+    /** Standard safety settings */
     private function sigmaGetSafetySettings(): array
     {
         return [
@@ -2009,8 +1885,8 @@ PASS4;
     }
 
     /**
-     * SIGMA v2 FALLBACK — enhanced single-call with Goberian + Aspin rules hardcoded.
-     * Preserves 100% uptime when Pass 2 API fails.
+     * SIGMA v3 FALLBACK — universal single-call when Pass 2 fails.
+     * No hardcoded rules. Gemini reasons from anatomy universally.
      */
     private function sigmaFallback(
         \GuzzleHttp\Client $client,
@@ -2020,27 +1896,32 @@ PASS4;
         string $mlNote,
         float  $startTime
     ): array {
-        Log::info('→ Running SIGMA v2 fallback (enhanced single-call)');
+        Log::info('→ Running SIGMA v3 fallback (universal single-call)');
 
         $prompt = $mlNote . <<<'FB'
-You are a world-class canine geneticist and FCI judge. Identify this dog's breed with maximum accuracy.
+You are the world's leading canine breed identification expert with complete knowledge of all AKC, FCI, UKC breeds, all designer hybrids, and Southeast Asian native dogs.
 
-ASPIN RULE (highest priority): If this dog has lean body, short smooth coat, wedge head, almond dark eyes, semi-erect or erect ears, sickle tail, medium size, nothing exaggerated — it is ASPIN (Philippine native dog). NEVER label Aspin as any Western breed.
+UNIVERSAL IDENTIFICATION METHOD — reason from anatomy, not appearance:
 
-GOBERIAN RULE: A dog with Husky-type erect ears AND golden/cream coat AND soft oval eyes (NOT sharp almond) AND feathering on the tail = GOBERIAN (Husky × Golden Retriever). NOT Malamute. Malamute has: very heavy bone, very wide skull, NO golden color, NO tail feathering, sharp almond eyes.
+STEP 1 — ASPIN CHECK (highest priority):
+If the dog has: lean body + short smooth coat + wedge head + dark almond eyes + semi-erect/erect ears + sickle tail + medium size + nothing exaggerated → classify as ASPIN (Philippine native dog). Never use a Western breed name for Aspin.
 
-ALASKAN MALAMUTE: If you see soft oval eyes, golden coat, or feathered tail — ELIMINATE Malamute. These are physically impossible for a purebred Malamute.
+STEP 2 — STRUCTURAL ASSESSMENT:
+Before anything else, measure these key proportions:
+• Body length-to-height ratio (long-low vs square vs tall)
+• Leg length vs chest depth (corgi-short vs normal vs long)
+• Bone substance (very-heavy vs moderate vs fine)
+• Muzzle-to-skull ratio (brachycephalic <0.35 vs normal vs long >0.55)
+These structural measurements eliminate entire breed groups immediately.
 
-HYBRID DETECTION: For curly/wavy coat — ignore the curl, examine head shape + body size + color to identify the non-Poodle parent precisely. Don't default to Goldendoodle/Labradoodle without examining head structure.
+STEP 3 — ELIMINATION:
+List 4 candidates. For each, find what their breed standard REQUIRES that CONTRADICTS what you measured. Eliminate breeds with contradictions. The survivor is your answer.
 
-SIMILAR BREED PAIRS — check carefully:
-• Goldendoodle (golden coat + retriever head + feathered tail) vs Labradoodle (black/chocolate + blocky lab head)
-• Border Collie (lighter, longer muzzle) vs Australian Shepherd (stockier, bob-tail common, merle frequent)
-• Jindo (medium, elegant) vs Shiba Inu (compact, small) vs Akita (large, heavy bone)
-• Samoyed (stand-off fluffy, smile) vs White Husky (flat double coat, blue eyes possible)
+STEP 4 — HYBRID CHECK:
+If the dog shows anatomy from two different breed types, identify both parents and name the hybrid if recognized.
 
 Output ONLY valid JSON — no markdown, no explanation:
-{"primary_breed":"Full Name","primary_confidence":82.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Name","confidence":55.0},{"breed":"Full Name","confidence":35.0}],"uncertain_features":[]}
+{"primary_breed":"Full Official Name","primary_confidence":82.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Name","confidence":55.0},{"breed":"Full Name","confidence":35.0}],"uncertain_features":[]}
 FB;
 
         try {
@@ -2055,7 +1936,7 @@ FB;
                     'generationConfig' => [
                         'temperature'    => 0.1,
                         'maxOutputTokens' => 2500,
-                        'thinkingConfig'  => ['thinkingBudget' => 2500],
+                        'thinkingConfig'  => ['thinkingBudget' => 3000],
                     ],
                     'safetySettings' => $this->sigmaGetSafetySettings(),
                 ],
@@ -2074,8 +1955,8 @@ FB;
                 return ['success' => false, 'error' => 'Fallback parse failed: ' . substr($text, 0, 200)];
             }
 
-            $classType   = trim($parsed['classification_type'] ?? 'purebred');
-            $hybridName  = isset($parsed['recognized_hybrid_name'])
+            $classType    = trim($parsed['classification_type'] ?? 'purebred');
+            $hybridName   = isset($parsed['recognized_hybrid_name'])
                 ? trim((string)$parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`") : null;
             if (empty($hybridName) || strtolower($hybridName) === 'null') $hybridName = null;
 
@@ -2083,8 +1964,8 @@ FB;
             $cleanedBreed = ($classType === 'designer_hybrid') ? $primaryRaw : $this->cleanBreedName($primaryRaw);
             if (empty($cleanedBreed)) $cleanedBreed = 'Unknown';
 
-            $actualConf   = max(65.0, min(98.0, (float)($parsed['primary_confidence'] ?? 75.0)));
-            $topPreds     = [['breed' => $cleanedBreed, 'confidence' => round($actualConf, 1)]];
+            $actualConf = max(65.0, min(98.0, (float)($parsed['primary_confidence'] ?? 75.0)));
+            $topPreds   = [['breed' => $cleanedBreed, 'confidence' => round($actualConf, 1)]];
             foreach (($parsed['alternatives'] ?? []) as $alt) {
                 if (empty($alt['breed'])) continue;
                 $ab = substr(preg_replace('/\s+/', ' ', trim($alt['breed'], " \t\n\r\0\x0B\"'`")), 0, 120);
@@ -2097,12 +1978,12 @@ FB;
 
             return [
                 'success'         => true,
-                'method'          => 'sigma_v2_fallback',
+                'method'          => 'sigma_v3_fallback',
                 'breed'           => $cleanedBreed,
                 'confidence'      => round($actualConf, 1),
                 'top_predictions' => $topPreds,
                 'metadata'        => [
-                    'model'               => 'sigma_v2_fallback',
+                    'model'               => 'sigma_v3_fallback',
                     'response_time_s'     => $totalTime,
                     'classification_type' => $classType,
                     'recognized_hybrid'   => $hybridName,
@@ -2110,12 +1991,12 @@ FB;
                 ],
             ];
         } catch (\Exception $e) {
-            Log::error('✗ SIGMA v2 fallback failed: ' . $e->getMessage());
+            Log::error('✗ SIGMA v3 fallback failed: ' . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    // ── END SIGMA v2 ENGINE ────────────────────────────────────────────────
+    // ── END SIGMA v3 ENGINE ────────────────────────────────────────────────
 
     // ============================================================
     // 3. extractBreedFromGeminiResponse()
@@ -2340,7 +2221,7 @@ Be verbose and detailed. Output ONLY the JSON.";
 
             $startTime = microtime(true);
 
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
@@ -2486,7 +2367,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             }
 
             $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
@@ -2908,92 +2789,80 @@ Be verbose and detailed. Output ONLY the JSON.";
                     throw new \Exception('Image file was lost before breed identification');
                 }
 
-                // ── STEP A: ML API (YOLO — fast classification + hybrid flag) ──────────
+                // ── STEP A: ML API — run for hybrid-prone flag and 100% certainty only ──
+                // The ML model is trained on a limited dataset. It is NOT trusted
+                // for breed identification below 100% confidence. Gemini ALWAYS
+                // makes the final call. ML result is only passed to Gemini as a
+                // weak corroboration signal when confidence = exactly 100%.
                 $mlResult = $this->identifyBreedWithModel($fullPath);
 
-                if ($mlResult['success']) {
-                    $mlBreed        = $mlResult['breed'];
-                    $mlConfidence   = $mlResult['confidence']; // already percentage
-                    $mlMethod       = $mlResult['method'];
-                    $isHybridProne  = $mlResult['metadata']['learning_stats']['is_hybrid_prone'] ?? false;
+                $mlBreed       = null;
+                $mlConfidence  = null;
+                $mlMethod      = 'gemini_primary';
 
-                    Log::info('✓ ML model result', [
-                        'breed'          => $mlBreed,
-                        'confidence'     => $mlConfidence,
-                        'method'         => $mlMethod,
-                        'is_hybrid_prone' => $isHybridProne,
+                if ($mlResult['success']) {
+                    $mlRawConfidence = (float)$mlResult['confidence'];
+                    $mlRawBreed      = $mlResult['breed'];
+                    $mlMethod        = $mlResult['method'];
+
+                    Log::info('✓ ML model result (advisory only)', [
+                        'breed'      => $mlRawBreed,
+                        'confidence' => $mlRawConfidence,
+                        'trusted'    => $mlRawConfidence >= 100.0 ? 'YES (100% only)' : 'NO — suppressed',
                     ]);
 
-                    // ── STEP B: GEMINI Pro Preview — the sole intelligent brain ──────────
-                    // Always runs on every new image.
-                    // When YOLO flagged a hybrid-prone breed, we inject that signal
-                    // so Gemini knows to apply extra scrutiny for hybrid detection.
-                    // Gemini Pro Preview (not Flash) makes the final call on everything.
-                    $hybridContext = '';
-                    if ($isHybridProne) {
-                        $hybridContext = " NOTE: The ML model flagged \"{$mlBreed}\" as a hybrid-prone breed — pay extra attention to hybrid indicators (coat texture, mixed proportions, features from two breeds). Check carefully if this could be a recognized designer hybrid (Cockapoo, Goldendoodle, Labradoodle, Cavapoo, Maltipoo, etc.).";
-                        Log::info('⚠️ Hybrid-prone breed flagged — injecting hybrid context into Gemini Pro prompt');
-                    }
-
-                    Log::info('→ Running Gemini Pro Preview (full forensic analysis)...');
-
-                    $geminiResult = $this->identifyBreedWithAPI(
-                        $fullPath,
-                        false,
-                        $mlBreed . $hybridContext,
-                        $mlConfidence
-                    );
-
-                    if ($geminiResult['success']) {
-                        $geminiBreed      = $geminiResult['breed'];
-                        $geminiConfidence = $geminiResult['confidence'];
-
-                        if (strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed)) && $geminiConfidence >= 75) {
-                            // Gemini disagrees with YOLO — trust Gemini
-                            // This covers both hybrid corrections AND breed corrections
-                            $detectedBreed    = $geminiBreed;
-                            $confidence       = $geminiConfidence;
-                            $predictionMethod = $isHybridProne ? 'gemini_hybrid_override' : 'gemini_override';
-                            Log::info('✓ Gemini overrides YOLO', [
-                                'yolo_breed'   => $mlBreed,
-                                'gemini_breed' => $geminiBreed,
-                                'gemini_conf'  => $geminiConfidence,
-                                'hybrid_prone' => $isHybridProne,
-                            ]);
-                        } else {
-                            // Gemini agrees with YOLO — use YOLO breed, take higher confidence
-                            $detectedBreed    = $mlBreed;
-                            $confidence       = max($mlConfidence, $geminiConfidence);
-                            $predictionMethod = 'ml_gemini_confirmed';
-                            Log::info('✓ Gemini confirms YOLO breed', [
-                                'breed'      => $detectedBreed,
-                                'confidence' => $confidence,
-                            ]);
-                        }
-
-                        $topPredictions = $geminiResult['top_predictions'];
+                    // Only pass to Gemini at exactly 100% confidence
+                    if ($mlRawConfidence >= 100.0) {
+                        $mlBreed      = $mlRawBreed;
+                        $mlConfidence = $mlRawConfidence;
+                        Log::info('✓ ML hint passed to Gemini (100% confidence)');
                     } else {
-                        // Gemini failed — use ML result only
-                        Log::warning('⚠️ Gemini failed — using ML result only', [
-                            'error' => $geminiResult['error'] ?? 'unknown',
-                        ]);
-                        $detectedBreed    = $mlBreed;
-                        $confidence       = $mlConfidence;
-                        $predictionMethod = $mlMethod;
-                        $topPredictions   = $mlResult['top_predictions'];
+                        Log::info('⚠️ ML confidence ' . $mlRawConfidence . '% — hint suppressed, Gemini works independently');
                     }
                 } else {
-                    // ML API unavailable — fall back to Gemini-only (original behaviour)
-                    Log::warning('⚠️ ML API unavailable — falling back to Gemini-only', [
+                    Log::warning('⚠️ ML API unavailable — Gemini working fully independently', [
                         'error' => $mlResult['error'] ?? 'unknown',
                     ]);
+                }
 
-                    $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
+                // ── STEP B: GEMINI — sole decision maker for ALL scans ───────────────
+                // Gemini always runs. It is the only source of truth for breed ID.
+                // The ML hint (if provided) is explicitly marked as weak corroboration.
+                Log::info('→ Running SIGMA v2 (Gemini primary — full forensic analysis)...');
 
-                    if (!$predictionResult['success']) {
-                        Log::error('✗ Both ML and Gemini failed: ' . ($predictionResult['error'] ?? ''));
+                $geminiResult = $this->identifyBreedWithAPI(
+                    $fullPath,
+                    false,
+                    $mlBreed,       // null unless ML was 100%
+                    $mlConfidence   // null unless ML was 100%
+                );
 
-                        $errorMessage = $predictionResult['error'] ?? '';
+                if ($geminiResult['success']) {
+                    $detectedBreed    = $geminiResult['breed'];
+                    $confidence       = $geminiResult['confidence'];
+                    $predictionMethod = 'sigma_v2_gemini';
+                    $topPredictions   = $geminiResult['top_predictions'];
+
+                    Log::info('✓ SIGMA v2 Gemini result', [
+                        'breed'      => $detectedBreed,
+                        'confidence' => $confidence,
+                        'ml_used'    => !is_null($mlBreed) ? 'corroboration_only' : 'none',
+                    ]);
+                } else {
+                    // Gemini failed — only now fall back to ML if available
+                    Log::warning('⚠️ Gemini SIGMA v2 failed — checking ML fallback', [
+                        'error' => $geminiResult['error'] ?? 'unknown',
+                    ]);
+
+                    if ($mlResult['success']) {
+                        Log::warning('⚠️ Using ML as emergency fallback (Gemini unavailable)');
+                        $detectedBreed    = $mlResult['breed'];
+                        $confidence       = $mlResult['confidence'];
+                        $predictionMethod = 'ml_emergency_fallback';
+                        $topPredictions   = $mlResult['top_predictions'];
+                    } else {
+                        // Both Gemini and ML failed — throw user-friendly error
+                        $errorMessage = $geminiResult['error'] ?? '';
                         $userMessage  = 'Unable to identify the dog breed. Please try again.';
 
                         if (str_contains($errorMessage, 'API key not configured')) {
@@ -3010,11 +2879,6 @@ Be verbose and detailed. Output ONLY the JSON.";
 
                         throw new \Exception($userMessage);
                     }
-
-                    $detectedBreed    = $predictionResult['breed'];
-                    $confidence       = $predictionResult['confidence'];
-                    $predictionMethod = $predictionResult['method'];
-                    $topPredictions   = $predictionResult['top_predictions'];
                 }
 
                 Log::info('✓ Final breed identification', [
@@ -3566,7 +3430,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             Log::error('Get recent results error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch scan history'
+                'message' => 'Failed to fetch scan histry '
             ], 500);
         }
     }
