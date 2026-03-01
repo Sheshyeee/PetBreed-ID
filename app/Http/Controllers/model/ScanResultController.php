@@ -1350,22 +1350,22 @@ RULES:
 PASS1;
 
         try {
-            $r1 = $client->post($flashUrl, [
-                'json' => [
-                    'contents' => [[
-                        'parts' => [
-                            ['text' => $pass1Prompt],
-                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
-                        ],
-                    ]],
-                    'generationConfig' => [
-                        'temperature'      => 0.0,
-                        'maxOutputTokens'  => 1400,
-                        'responseMimeType' => 'application/json',
-                    ],
-                    'safetySettings' => $this->sigmaGetSafetySettings(),
-                ],
-            ]);
+           $r1 = $client->post($flashUrl, [
+    'json' => [
+        'contents' => [[
+            'parts' => [
+                ['text' => $pass1Prompt],
+                ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
+            ],
+        ]],
+        'generationConfig' => [
+            'temperature'     => 0.0,
+            'maxOutputTokens' => 1400,
+            // ← responseMimeType REMOVED — causes parse failure with thinking models
+        ],
+        'safetySettings' => $this->sigmaGetSafetySettings(),
+    ],
+]);
 
             $r1Body    = $r1->getBody()->getContents();
             $r1Raw     = json_decode($r1Body, true);
@@ -2145,23 +2145,23 @@ FB;
      * FIXED: Generate AI descriptions with better error handling
      * ==========================================
      */
-    private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
-    {
-        $aiData = [
-            'description' => "Identified as $detectedBreed.",
-            'origin_history' => [],
-            'health_risks' => [],
-        ];
+   private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
+{
+    $aiData = [
+        'description'    => "Identified as $detectedBreed.",
+        'origin_history' => [],
+        'health_risks'   => [],
+    ];
 
-        if ($detectedBreed === 'Unknown') {
-            Log::info('⏭️ Skipping AI generation for Unknown breed');
-            return $aiData;
-        }
+    if ($detectedBreed === 'Unknown') {
+        Log::info('⏭️ Skipping AI generation for Unknown breed');
+        return $aiData;
+    }
 
-        try {
-            Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
+    try {
+        Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
-            $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
+        $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
 
 1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
@@ -2204,135 +2204,132 @@ Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDU
     ]
 }
 
-Be verbose and detailed. Output ONLY the JSON.";
+Be verbose and detailed. Output ONLY the JSON. Do NOT include any control characters, newlines inside string values, or special characters that would break JSON parsing.";
 
-            $apiKey = config('services.gemini.api_key');
-            if (empty($apiKey)) {
-                Log::error('❌ Gemini API key not configured in services.gemini.api_key');
-                return $aiData;
-            }
-
-            Log::info("📤 Sending request to Gemini API...");
-
-            $client = new \GuzzleHttp\Client([
-                'timeout' => 30,
-                'connect_timeout' => 10
-            ]);
-
-            $startTime = microtime(true);
-
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
-                'json' => [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                [
-                                    'text' => "You are a veterinary historian. Output only valid JSON. Be verbose and detailed.\n\n" . $combinedPrompt
-                                ]
-                            ]
-                        ]
-                    ],
-                    'generationConfig' => [
-                        'temperature' => 0.3,
-                        'maxOutputTokens' => 2000, // Increased for more detailed content
-                        'responseMimeType' => 'application/json'
-                    ]
-                ]
-            ]);
-
-            $duration = round(microtime(true) - $startTime, 2);
-            Log::info("📥 Gemini response received in {$duration}s");
-
-            $responseBody = $response->getBody()->getContents();
-            $result = json_decode($responseBody, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error('❌ Failed to parse Gemini response as JSON: ' . json_last_error_msg());
-                Log::error('Raw response: ' . substr($responseBody, 0, 500));
-                return $aiData;
-            }
-
-            // Check if response has the expected structure
-            if (!isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-                Log::error('❌ Unexpected Gemini response structure');
-                Log::error('Response keys: ' . json_encode(array_keys($result)));
-
-                // Check for safety blocks
-                if (isset($result['candidates'][0]['finishReason'])) {
-                    Log::error('Finish reason: ' . $result['candidates'][0]['finishReason']);
-                }
-
-                return $aiData;
-            }
-
-            $content = $result['candidates'][0]['content']['parts'][0]['text'];
-
-            if (empty($content)) {
-                Log::error('❌ Gemini returned empty content');
-                return $aiData;
-            }
-
-            Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
-
-            // Parse the JSON content
-            $parsed = json_decode($content, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error('❌ Failed to parse Gemini content as JSON: ' . json_last_error_msg());
-                Log::error('Content preview: ' . substr($content, 0, 500));
-                return $aiData;
-            }
-
-            if (!$parsed) {
-                Log::error('❌ Gemini content parsed to null/false');
-                return $aiData;
-            }
-
-            // Extract and validate each field
-            if (isset($parsed['description'])) {
-                $aiData['description'] = $parsed['description'];
-                Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
-            } else {
-                Log::warning('⚠️ No description field in parsed data');
-            }
-
-            if (isset($parsed['health_risks'])) {
-                $aiData['health_risks'] = $parsed['health_risks'];
-                $concernsCount = count($parsed['health_risks']['concerns'] ?? []);
-                Log::info("✓ Health risks extracted: {$concernsCount} concerns");
-            } else {
-                Log::warning('⚠️ No health_risks field in parsed data');
-            }
-
-            if (isset($parsed['origin_data'])) {
-                $aiData['origin_history'] = $parsed['origin_data'];
-                $country = $parsed['origin_data']['country'] ?? 'Unknown';
-                Log::info("✓ Origin data extracted: {$country}");
-            } else {
-                Log::warning('⚠️ No origin_data field in parsed data');
-            }
-
-            Log::info('✅ AI descriptions generated successfully with Gemini', [
-                'breed' => $detectedBreed,
-                'has_description' => !empty($aiData['description']),
-                'has_health_risks' => !empty($aiData['health_risks']),
-                'has_origin' => !empty($aiData['origin_history'])
-            ]);
-
-            return $aiData;
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            Log::error("❌ Gemini API request failed: " . $e->getMessage());
-            if ($e->hasResponse()) {
-                $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::error("API Error Response: " . substr($errorBody, 0, 500));
-            }
-            return $aiData;
-        } catch (\Exception $e) {
-            Log::error("❌ AI generation failed: " . $e->getMessage());
-            Log::error("Stack trace: " . $e->getTraceAsString());
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            Log::error('❌ Gemini API key not configured in services.gemini.api_key');
             return $aiData;
         }
+
+        Log::info("📤 Sending request to Gemini API...");
+
+        $client = new \GuzzleHttp\Client(['timeout' => 60, 'connect_timeout' => 10]);
+
+        $startTime = microtime(true);
+
+        $response = $client->post(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey,
+            [
+                'json' => [
+                    'contents' => [[
+                        'parts' => [[
+                            'text' => "You are a veterinary historian. Output only valid JSON. No markdown. No code blocks. No control characters inside strings.\n\n" . $combinedPrompt
+                        ]]
+                    ]],
+                    'generationConfig' => [
+                        'temperature'     => 0.3,
+                        'maxOutputTokens' => 3000,
+                        // NO responseMimeType — causes issues with thinking models
+                    ],
+                ],
+            ]
+        );
+
+        $duration = round(microtime(true) - $startTime, 2);
+        Log::info("📥 Gemini response received in {$duration}s");
+
+        $responseBody = $response->getBody()->getContents();
+        $result       = json_decode($responseBody, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error('❌ Failed to parse Gemini response envelope: ' . json_last_error_msg());
+            return $aiData;
+        }
+
+        // Handle thinking model — skip thought blocks
+        $content = '';
+        $parts   = $result['candidates'][0]['content']['parts'] ?? [];
+        foreach ($parts as $p) {
+            if (isset($p['text']) && empty($p['thought'])) {
+                $content = trim($p['text']);
+                break;
+            }
+        }
+        if (empty($content)) {
+            foreach ($parts as $p) {
+                if (isset($p['text'])) {
+                    $content = trim($p['text']);
+                    break;
+                }
+            }
+        }
+
+        if (empty($content)) {
+            Log::error('❌ Gemini returned empty content');
+            if (isset($result['candidates'][0]['finishReason'])) {
+                Log::error('Finish reason: ' . $result['candidates'][0]['finishReason']);
+            }
+            return $aiData;
+        }
+
+        Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
+
+        // ── CLEAN BEFORE PARSE ──────────────────────────────────────────────
+        // Strip markdown code fences
+        $content = preg_replace('/^```json\s*/i', '', $content);
+        $content = preg_replace('/^```\s*/i', '', $content);
+        $content = preg_replace('/\s*```$/i', '', $content);
+        $content = trim($content);
+
+        // Remove control characters (0x00–0x1F) EXCEPT valid JSON whitespace
+        // Valid JSON whitespace: 0x09 (tab), 0x0A (newline), 0x0D (CR), 0x20 (space)
+        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+
+        // ── PARSE ────────────────────────────────────────────────────────────
+        $parsed = json_decode($content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error('❌ Failed to parse Gemini content as JSON: ' . json_last_error_msg());
+            Log::error('Content preview: ' . substr($content, 0, 500));
+            return $aiData;
+        }
+
+        if (!$parsed) {
+            Log::error('❌ Gemini content parsed to null/false');
+            return $aiData;
+        }
+
+        if (isset($parsed['description'])) {
+            $aiData['description'] = $parsed['description'];
+            Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
+        }
+
+        if (isset($parsed['health_risks'])) {
+            $aiData['health_risks'] = $parsed['health_risks'];
+            Log::info("✓ Health risks extracted: " . count($parsed['health_risks']['concerns'] ?? []) . " concerns");
+        }
+
+        if (isset($parsed['origin_data'])) {
+            $aiData['origin_history'] = $parsed['origin_data'];
+            Log::info("✓ Origin data extracted: " . ($parsed['origin_data']['country'] ?? 'Unknown'));
+        }
+
+        Log::info('✅ AI descriptions generated successfully', ['breed' => $detectedBreed]);
+
+        return $aiData;
+
+    } catch (\GuzzleHttp\Exception\RequestException $e) {
+        Log::error("❌ Gemini API request failed: " . $e->getMessage());
+        if ($e->hasResponse()) {
+            Log::error("API Error: " . substr($e->getResponse()->getBody()->getContents(), 0, 500));
+        }
+        return $aiData;
+    } catch (\Exception $e) {
+        Log::error("❌ AI generation failed: " . $e->getMessage());
+        return $aiData;
     }
+}
     /**
      * ==========================================
      * OPTIMIZED: Faster feature extraction with detailed prompt
@@ -2345,77 +2342,89 @@ Be verbose and detailed. Output ONLY the JSON.";
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
      * ==========================================
      */
-    private function validateDogImage($imagePath): array
-    {
-        try {
-            Log::info('🔍 Starting dog validation with Gemini Vision', [
-                'image_path' => $imagePath
-            ]);
+   private function validateDogImage($imagePath): array
+{
+    try {
+        Log::info('🔍 Starting dog validation with Gemini Vision', [
+            'image_path' => $imagePath
+        ]);
 
-            // Read image and convert to base64
-            $imageData = base64_encode(file_get_contents($imagePath));
-            $mimeType = mime_content_type($imagePath);
+        $imageData = base64_encode(file_get_contents($imagePath));
+        $mimeType  = mime_content_type($imagePath);
 
-            // Use Gemini API instead of OpenAI
-            $apiKey = config('services.gemini.api_key');
-            if (empty($apiKey)) {
-                Log::error('✗ Gemini API key not configured');
-                return [
-                    'is_dog' => true,
-                    'error' => 'Gemini API key not configured'
-                ];
-            }
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            Log::error('✗ Gemini API key not configured');
+            return ['is_dog' => true, 'error' => 'Gemini API key not configured'];
+        }
 
-            $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey, [
+        $client = new \GuzzleHttp\Client(['timeout' => 30]);
+
+        $response = $client->post(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey,
+            [
                 'json' => [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                [
-                                    'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
-                                ],
-                                [
-                                    'inlineData' => [
-                                        'mimeType' => $mimeType,
-                                        'data' => $imageData
-                                    ]
+                    'contents' => [[
+                        'parts' => [
+                            [
+                                'text' => 'Look at this image. Is there a dog (canine) anywhere in it — including in the background, partially visible, or in any setting (outdoors, indoors, park, street, etc.)? Any dog breed counts, including puppies, fluffy dogs, white dogs, dark dogs, mixed breeds, or native dogs. Respond with ONLY the single word YES or NO.'
+                            ],
+                            [
+                                'inlineData' => [
+                                    'mimeType' => $mimeType,
+                                    'data'     => $imageData
                                 ]
                             ]
                         ]
-                    ],
+                    ]],
                     'generationConfig' => [
-                        'maxOutputTokens' => 10
-                    ]
-                ]
-            ]);
+                        'temperature'    => 0.0,
+                        'maxOutputTokens' => 5,
+                    ],
+                    'safetySettings' => [
+                        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+                    ],
+                ],
+            ]
+        );
 
-            $result = json_decode($response->getBody()->getContents(), true);
-            $answer = trim(strtoupper($result['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-            $isDog = str_contains($answer, 'YES');
+        $result = json_decode($response->getBody()->getContents(), true);
 
-            Log::info('✓ Gemini dog validation complete', [
-                'answer' => $answer,
-                'is_dog' => $isDog
-            ]);
-
-            return [
-                'is_dog' => $isDog,
-                'raw_response' => $answer
-            ];
-        } catch (\Exception $e) {
-            Log::error('❌ Dog validation failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            // On error, allow the image through (fail-open approach)
-            return [
-                'is_dog' => true,
-                'error' => $e->getMessage()
-            ];
+        // Handle thinking model — skip thought blocks
+        $answer = '';
+        $parts  = $result['candidates'][0]['content']['parts'] ?? [];
+        foreach ($parts as $p) {
+            if (isset($p['text']) && empty($p['thought'])) {
+                $answer = trim(strtoupper($p['text']));
+                break;
+            }
         }
+        if (empty($answer)) {
+            foreach ($parts as $p) {
+                if (isset($p['text'])) {
+                    $answer = trim(strtoupper($p['text']));
+                    break;
+                }
+            }
+        }
+
+        $isDog = str_contains($answer, 'YES');
+
+        Log::info('✓ Dog validation complete', [
+            'answer' => $answer,
+            'is_dog' => $isDog
+        ]);
+
+        return ['is_dog' => $isDog, 'raw_response' => $answer];
+
+    } catch (\Exception $e) {
+        Log::error('❌ Dog validation failed — failing open', ['error' => $e->getMessage()]);
+        return ['is_dog' => true, 'error' => $e->getMessage()];
     }
+}
 
     /**
      * ==========================================
