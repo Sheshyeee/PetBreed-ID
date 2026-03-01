@@ -1,13 +1,6 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { usePage } from '@inertiajs/react';
-import {
-    CheckCircle2,
-    PawPrint,
-    Shield,
-    Sparkles,
-    XCircle,
-    Zap,
-} from 'lucide-react';
+import { CheckCircle2, PawPrint, Shield, XCircle } from 'lucide-react';
 
 interface LoginProps {
     status?: string;
@@ -30,172 +23,218 @@ export default function Login({ status }: LoginProps) {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
-                @keyframes lc-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.6)} }
-                @keyframes lc-ring  { 0%{transform:scale(.82);opacity:.6} 70%,100%{transform:scale(1.26);opacity:0} }
-                @keyframes lc-paw   { 0%,100%{transform:rotate(0deg)} 30%{transform:rotate(-9deg)} 70%{transform:rotate(9deg)} }
-                @keyframes lc-orb   { from{transform:rotate(0deg) translateX(26px) rotate(0deg)} to{transform:rotate(360deg) translateX(26px) rotate(-360deg)} }
-                @keyframes lc-orb2  { from{transform:rotate(180deg) translateX(18px) rotate(-180deg)} to{transform:rotate(540deg) translateX(18px) rotate(-540deg)} }
-                @keyframes lc-sweep { 0%{left:-80%} 100%{left:160%} }
-                @keyframes lc-fade  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.7)} }
+                @keyframes lv-ring  { 0%{transform:scale(.8);opacity:.65} 70%,100%{transform:scale(1.3);opacity:0} }
+                @keyframes lv-paw   { 0%,100%{transform:rotate(0deg)} 30%{transform:rotate(-10deg)} 70%{transform:rotate(10deg)} }
+                @keyframes lv-orb   { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
+                @keyframes lv-orb2  { from{transform:rotate(180deg) translateX(20px) rotate(-180deg)} to{transform:rotate(540deg) translateX(20px) rotate(-540deg)} }
+                @keyframes lv-sweep { 0%{left:-80%} 100%{left:160%} }
+                @keyframes lv-fade  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes lv-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 
-                .lc-root { font-family:'Plus Jakarta Sans',sans-serif; }
-                .lc-mono { font-family:'JetBrains Mono',monospace !important; }
-                .lc-f1 { animation:lc-fade .35s cubic-bezier(.16,1,.3,1) .05s both; }
-                .lc-f2 { animation:lc-fade .35s cubic-bezier(.16,1,.3,1) .14s both; }
-                .lc-f3 { animation:lc-fade .35s cubic-bezier(.16,1,.3,1) .22s both; }
+                .lv-f1 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .05s both; }
+                .lv-f2 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .14s both; }
+                .lv-f3 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .22s both; }
+                .lv-f4 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .30s both; }
 
-                /* Two-col wrapper */
-                .lc-cols {
+                /* ── CARD WRAPPER ── */
+                .lv-card {
+                    font-family: 'Plus Jakarta Sans', sans-serif;
                     display: flex;
-                    gap: 0;
-                    border-radius: 16px;
+                    border-radius: 20px;
                     overflow: hidden;
-                    border: 1px solid rgba(255,255,255,.08);
+                    box-shadow: 0 20px 60px rgba(0,0,0,.12);
+                    border: 1px solid rgba(0,0,0,.07);
+                    background: #fff;
+                    min-height: 360px;
+                }
+                :is(.dark) .lv-card {
                     background: #0D1117;
+                    border-color: rgba(255,255,255,.07);
+                    box-shadow: 0 20px 60px rgba(0,0,0,.5);
                 }
 
-                /* LEFT */
-                .lc-left {
-                    width: 160px;
+                /* ── LEFT VISUAL PANEL ── */
+                .lv-left {
+                    width: 200px;
                     flex-shrink: 0;
-                    padding: 20px 16px;
+                    position: relative;
+                    overflow: hidden;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    gap: 14px;
-                    position: relative;
-                    overflow: hidden;
-                    border-right: 1px solid rgba(255,255,255,.07);
-                    background: linear-gradient(160deg, rgba(16,185,129,.06) 0%, rgba(6,182,212,.03) 100%);
+                    padding: 28px 20px;
+                    background: linear-gradient(160deg, #0f2b1e 0%, #0a1f2e 100%);
                 }
-                .lc-left-dot-grid {
+
+                /* dot grid */
+                .lv-left::before {
+                    content: '';
                     position: absolute; inset: 0; pointer-events: none;
-                    background-image: radial-gradient(circle, rgba(16,185,129,.1) 1px, transparent 1px);
-                    background-size: 18px 18px;
+                    background-image: radial-gradient(circle, rgba(16,185,129,.12) 1px, transparent 1px);
+                    background-size: 20px 20px;
                     -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
                     mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
                 }
-                .lc-left-beam {
+                /* top beam */
+                .lv-left-beam {
                     position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
                     background: linear-gradient(90deg, transparent, #10b981 50%, transparent);
-                    opacity: .5;
+                    opacity: .6;
                 }
+                /* glow blobs */
+                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:160px; height:160px; border-radius:50%; background:rgba(16,185,129,.08); filter:blur(50px); pointer-events:none; }
+                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:120px; height:120px; border-radius:50%; background:rgba(6,182,212,.06); filter:blur(45px); pointer-events:none; }
 
-                /* Icon */
-                .lc-icon-wrap {
+                /* icon */
+                .lv-icon-wrap {
                     position: relative;
-                    width: 64px; height: 64px;
+                    width: 80px; height: 80px;
                     display: flex; align-items: center; justify-content: center;
+                    margin-bottom: 20px;
+                    animation: lv-float 4s ease-in-out infinite;
                 }
-                .lc-ring1 { position:absolute; inset:-8px; border-radius:50%; border:1px solid rgba(16,185,129,.2); animation:lc-ring 2.8s ease-out infinite; }
-                .lc-ring2 { position:absolute; inset:-16px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:lc-ring 2.8s ease-out infinite .9s; }
-                .lc-orb  { position:absolute; width:5px; height:5px; border-radius:50%; top:50%; left:50%; margin:-2.5px 0 0 -2.5px; background:#10b981; box-shadow:0 0 8px #10b981; animation:lc-orb 3.4s linear infinite; }
-                .lc-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; box-shadow:0 0 6px #06b6d4; animation:lc-orb2 4s linear infinite; }
-                .lc-icon-center {
-                    width: 64px; height: 64px; border-radius: 18px;
+                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.2); animation:lv-ring 2.8s ease-out infinite; }
+                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:lv-ring 2.8s ease-out infinite .9s; }
+                .lv-orb  { position:absolute; width:6px; height:6px; border-radius:50%; top:50%; left:50%; margin:-3px 0 0 -3px; background:#10b981; box-shadow:0 0 10px #10b981; animation:lv-orb 3.4s linear infinite; }
+                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; box-shadow:0 0 8px #06b6d4; animation:lv-orb2 4s linear infinite; }
+                .lv-icon-bg {
+                    width: 80px; height: 80px; border-radius: 24px;
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid rgba(16,185,129,.22);
-                    background: linear-gradient(135deg, rgba(16,185,129,.13), rgba(6,182,212,.06));
-                    box-shadow: 0 0 22px rgba(16,185,129,.15), inset 0 0 14px rgba(16,185,129,.04);
+                    border: 1px solid rgba(16,185,129,.25);
+                    background: linear-gradient(135deg, rgba(16,185,129,.15), rgba(6,182,212,.07));
+                    box-shadow: 0 0 30px rgba(16,185,129,.2), inset 0 0 20px rgba(16,185,129,.05);
                 }
 
-                /* Mini stats */
-                .lc-stats { display: flex; flex-direction: column; gap: 7px; width: 100%; }
-                .lc-stat {
-                    display: flex; align-items: center; gap: 8px;
-                    padding: 7px 9px; border-radius: 9px;
-                    border: 1px solid rgba(255,255,255,.055);
-                    background: rgba(255,255,255,.025);
+                /* left text */
+                .lv-left-title {
+                    font-size: 17px; font-weight: 800; color: #fff;
+                    text-align: center; line-height: 1.25; letter-spacing: -.01em;
+                    margin-bottom: 6px;
                 }
-                .lc-stat-icon {
-                    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
-                    display: flex; align-items: center; justify-content: center;
-                }
-                .lc-stat-val   { font-size: 11px; font-weight: 800; color: #fff; line-height: 1; }
-                .lc-stat-label { font-size: 9px; color: rgba(255,255,255,.38); margin-top: 1px; }
-
-                /* RIGHT */
-                .lc-right {
-                    flex: 1;
-                    padding: 20px 18px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 14px;
-                }
-
-                /* Badge */
-                .lc-badge {
-                    display: inline-flex; align-items: center; gap: 5px;
-                    padding: 4px 10px; border-radius: 99px;
-                    border: 1px solid rgba(16,185,129,.2);
-                    background: rgba(16,185,129,.08);
-                    width: fit-content;
-                }
-                .lc-badge-dot { width:5px; height:5px; border-radius:50%; background:#10b981; box-shadow:0 0 5px #10b981; animation:lc-pulse 2s ease-in-out infinite; }
-                .lc-badge-text { font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; font-family:'JetBrains Mono',monospace; }
-
-                .lc-form-title { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.01em; line-height: 1.2; }
-                .lc-form-title span {
+                .lv-left-title span {
                     background: linear-gradient(135deg, #10b981, #06b6d4);
                     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
                     background-clip: text;
                 }
-                .lc-form-sub { font-size: 11px; color: rgba(255,255,255,.35); line-height: 1.5; margin-top: 3px; }
+                .lv-left-sub {
+                    font-size: 10px; color: rgba(255,255,255,.38);
+                    text-align: center; line-height: 1.55; max-width: 150px;
+                }
+
+                /* dots indicator (decorative) */
+                .lv-dots { display:flex; gap:5px; margin-top:20px; }
+                .lv-dot  { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.2); }
+                .lv-dot.active { background:#10b981; box-shadow:0 0 6px #10b981; width:16px; border-radius:99px; transition:all .3s; }
+
+                /* ── RIGHT FORM ── */
+                .lv-right {
+                    flex: 1;
+                    padding: 28px 26px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    gap: 0;
+                    background: #fff;
+                }
+                :is(.dark) .lv-right { background: #0D1117; }
+
+                /* brand pill */
+                .lv-brand {
+                    display: inline-flex; align-items: center; gap: 5px;
+                    padding: 3px 10px; border-radius: 99px;
+                    border: 1px solid rgba(16,185,129,.2);
+                    background: rgba(16,185,129,.07);
+                    margin-bottom: 14px; width: fit-content;
+                }
+                .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; box-shadow:0 0 5px #10b981; animation:lv-pulse 2s ease-in-out infinite; }
+                .lv-brand-text { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; }
+
+                .lv-form-title {
+                    font-size: 20px; font-weight: 800; letter-spacing: -.015em;
+                    color: #0f172a; line-height: 1.2; margin-bottom: 4px;
+                }
+                :is(.dark) .lv-form-title { color: #f8fafc; }
+
+                .lv-form-sub {
+                    font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 22px;
+                }
 
                 /* Google btn */
-                .lc-google-btn {
+                .lv-google {
                     position: relative; overflow: hidden; width: 100%;
-                    display: flex; align-items: center; justify-content: center; gap: 8px;
-                    padding: 11px 16px; border-radius: 10px;
-                    background: #fff; border: none;
+                    display: flex; align-items: center; justify-content: center; gap: 9px;
+                    padding: 12px 18px; border-radius: 11px;
+                    background: #fff;
+                    border: 1.5px solid #e2e8f0;
                     color: #1e293b; font-size: 13px; font-weight: 700;
                     font-family: 'Plus Jakarta Sans', sans-serif;
                     cursor: pointer;
-                    transition: transform .17s, box-shadow .17s;
-                    box-shadow: 0 2px 10px rgba(0,0,0,.2);
+                    transition: transform .18s, box-shadow .18s, border-color .18s;
+                    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+                    margin-bottom: 16px;
                 }
-                .lc-google-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.28), 0 0 0 1px rgba(16,185,129,.18); }
-                .lc-google-btn:active { transform: translateY(0); }
-                .lc-shine {
-                    position: absolute; top:0; left:-80%; width:40%; height:100%;
-                    background: linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
-                    transform: skewX(-18deg); pointer-events:none;
+                .lv-google:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.1); border-color:#cbd5e1; }
+                .lv-google:active { transform:translateY(0); }
+                :is(.dark) .lv-google { background:#161d27; border-color:rgba(255,255,255,.09); color:#f1f5f9; box-shadow:none; }
+                :is(.dark) .lv-google:hover { border-color:rgba(16,185,129,.3); box-shadow:0 6px 20px rgba(16,185,129,.08); }
+                .lv-shine {
+                    position:absolute; top:0; left:-80%; width:40%; height:100%;
+                    background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+                    transform:skewX(-18deg); pointer-events:none;
                 }
-                .lc-google-btn:hover .lc-shine { animation: lc-sweep .5s ease forwards; }
+                .lv-google:hover .lv-shine { animation:lv-sweep .5s ease forwards; }
 
-                /* Divider */
-                .lc-div { display:flex; align-items:center; gap:8px; }
-                .lc-div-line { flex:1; height:1px; background:rgba(255,255,255,.07); }
-                .lc-div-text { font-size:8px; letter-spacing:.12em; color:rgba(255,255,255,.2); text-transform:uppercase; font-family:'JetBrains Mono',monospace; white-space:nowrap; }
+                /* divider */
+                .lv-divider { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+                .lv-div-line { flex:1; height:1px; background:#f1f5f9; }
+                :is(.dark) .lv-div-line { background:rgba(255,255,255,.07); }
+                .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
+                :is(.dark) .lv-div-text { color:rgba(255,255,255,.2); }
 
-                /* Trust */
-                .lc-trust { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
-                .lc-trust-card {
-                    display:flex; align-items:center; gap:7px;
-                    padding:8px 10px; border-radius:9px;
-                    border:1px solid rgba(255,255,255,.055);
-                    background:rgba(255,255,255,.02);
+                /* trust row */
+                .lv-trust { display:flex; gap:8px; }
+                .lv-trust-item {
+                    flex:1; display:flex; align-items:center; gap:7px;
+                    padding: 9px 10px; border-radius:10px;
+                    border:1px solid #f1f5f9;
+                    background:#fafafa;
                 }
-                .lc-trust-ico {
-                    width:22px; height:22px; border-radius:6px; flex-shrink:0;
+                :is(.dark) .lv-trust-item { border-color:rgba(255,255,255,.06); background:rgba(255,255,255,.025); }
+                .lv-trust-ico {
+                    width:24px; height:24px; border-radius:7px; flex-shrink:0;
                     display:flex; align-items:center; justify-content:center;
-                    border:1px solid rgba(255,255,255,.07);
                 }
-                .lc-trust-name { font-size:10px; font-weight:700; color:rgba(255,255,255,.75); line-height:1; }
-                .lc-trust-sub  { font-size:8px; color:rgba(255,255,255,.28); margin-top:2px; }
+                .lv-trust-name { font-size:11px; font-weight:700; color:#334155; line-height:1; }
+                :is(.dark) .lv-trust-name { color:rgba(255,255,255,.75); }
+                .lv-trust-sub  { font-size:9px; color:#94a3b8; margin-top:2px; }
 
-                /* Alerts */
-                .lc-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:4px; }
-                .lc-ok  { border:1px solid rgba(16,185,129,.25); background:rgba(16,185,129,.08); color:#6ee7b7; }
-                .lc-err { border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.08); color:#fca5a5; }
+                /* alerts */
+                .lv-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:12px; }
+                .lv-ok  { border:1px solid rgba(16,185,129,.25); background:rgba(16,185,129,.07); color:#059669; }
+                :is(.dark) .lv-ok { color:#6ee7b7; }
+                .lv-err { border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.07); color:#dc2626; }
+                :is(.dark) .lv-err { color:#fca5a5; }
+
+                /* responsive: stack on mobile */
+                @media (max-width: 560px) {
+                    .lv-card { flex-direction: column; }
+                    .lv-left { width: 100%; min-height: 180px; padding: 24px 20px; flex-direction: row; gap: 16px; justify-content: flex-start; align-items: center; }
+                    .lv-icon-wrap { margin-bottom: 0; width:60px; height:60px; flex-shrink:0; }
+                    .lv-icon-bg { width:60px; height:60px; border-radius:18px; }
+                    .lv-left-title { text-align:left; font-size:15px; }
+                    .lv-left-sub { text-align:left; }
+                    .lv-dots { margin-top:8px; }
+                    .lv-right { padding: 22px 20px; }
+                }
             `}</style>
 
-            <div className="lc-root lc-f1">
-                {/* Alerts outside the cols */}
+            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {/* Alerts above card */}
                 {status && (
                     <div
-                        className="lc-alert lc-ok"
+                        className="lv-alert lv-ok lv-f1"
                         style={{ marginBottom: 12 }}
                     >
                         <CheckCircle2
@@ -207,7 +246,7 @@ export default function Login({ status }: LoginProps) {
                 )}
                 {flash?.error && (
                     <div
-                        className="lc-alert lc-err"
+                        className="lv-alert lv-err lv-f1"
                         style={{ marginBottom: 12 }}
                     >
                         <XCircle
@@ -218,99 +257,68 @@ export default function Login({ status }: LoginProps) {
                     </div>
                 )}
 
-                <div className="lc-cols">
-                    {/* ── LEFT: Brand ── */}
-                    <div className="lc-left">
-                        <div className="lc-left-dot-grid" />
-                        <div className="lc-left-beam" />
+                <div className="lv-card">
+                    {/* ── LEFT ── */}
+                    <div className="lv-left">
+                        <div className="lv-left-beam" />
+                        <div className="lv-blob1" />
+                        <div className="lv-blob2" />
 
-                        {/* Icon */}
-                        <div className="lc-icon-wrap">
-                            <div className="lc-ring1" />
-                            <div className="lc-ring2" />
-                            <div className="lc-orb" />
-                            <div className="lc-orb2" />
-                            <div className="lc-icon-center">
+                        {/* floating icon */}
+                        <div className="lv-icon-wrap">
+                            <div className="lv-ring1" />
+                            <div className="lv-ring2" />
+                            <div className="lv-orb" />
+                            <div className="lv-orb2" />
+                            <div className="lv-icon-bg">
                                 <PawPrint
-                                    size={28}
+                                    size={32}
                                     style={{
                                         animation:
-                                            'lc-paw 3s ease-in-out infinite',
+                                            'lv-paw 3s ease-in-out infinite',
                                         color: '#10b981',
                                     }}
                                 />
                             </div>
                         </div>
 
-                        {/* Stats */}
-                        <div className="lc-stats">
-                            {[
-                                {
-                                    icon: <Zap size={11} color="#10b981" />,
-                                    bg: 'rgba(16,185,129,.1)',
-                                    val: '~1.2s',
-                                    label: 'Scan speed',
-                                },
-                                {
-                                    icon: (
-                                        <Sparkles size={11} color="#06b6d4" />
-                                    ),
-                                    bg: 'rgba(6,182,212,.1)',
-                                    val: '95%+',
-                                    label: 'Accuracy',
-                                },
-                                {
-                                    icon: <Shield size={11} color="#a78bfa" />,
-                                    bg: 'rgba(167,139,250,.1)',
-                                    val: 'Vet OK',
-                                    label: 'Verified',
-                                },
-                            ].map((s, i) => (
-                                <div className="lc-stat" key={i}>
-                                    <div
-                                        className="lc-stat-icon"
-                                        style={{ background: s.bg }}
-                                    >
-                                        {s.icon}
-                                    </div>
-                                    <div>
-                                        <div className="lc-stat-val">
-                                            {s.val}
-                                        </div>
-                                        <div className="lc-stat-label">
-                                            {s.label}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                        <div>
+                            <p className="lv-left-title">
+                                Identify any
+                                <br />
+                                <span>dog breed</span>
+                            </p>
+                            <p className="lv-left-sub">
+                                Upload a photo, get results instantly with
+                                health insights
+                            </p>
+                            <div className="lv-dots">
+                                <div className="lv-dot active" />
+                                <div className="lv-dot" />
+                                <div className="lv-dot" />
+                            </div>
                         </div>
                     </div>
 
-                    {/* ── RIGHT: Form ── */}
-                    <div className="lc-right lc-f2">
-                        <div>
-                            <div className="lc-badge">
-                                <span className="lc-badge-dot" />
-                                <span className="lc-badge-text">DogLens</span>
-                            </div>
-                            <p
-                                className="lc-form-title"
-                                style={{ marginTop: 10 }}
-                            >
-                                Sign in to <span>DogLens</span>
-                            </p>
-                            <p className="lc-form-sub">
-                                Access breed analysis & health reports
-                            </p>
+                    {/* ── RIGHT ── */}
+                    <div className="lv-right">
+                        <div className="lv-brand lv-f1">
+                            <span className="lv-brand-dot" />
+                            <span className="lv-brand-text">DogLens</span>
                         </div>
+
+                        <p className="lv-form-title lv-f2">Welcome back</p>
+                        <p className="lv-form-sub lv-f2">
+                            Sign in to access your breed analysis
+                        </p>
 
                         <button
                             onClick={() =>
                                 (window.location.href = '/auth/google')
                             }
-                            className="lc-google-btn lc-f3"
+                            className="lv-google lv-f3"
                         >
-                            <span className="lc-shine" />
+                            <span className="lv-shine" />
                             <svg
                                 width="18"
                                 height="18"
@@ -338,16 +346,18 @@ export default function Login({ status }: LoginProps) {
                             Continue with Google
                         </button>
 
-                        <div className="lc-div">
-                            <div className="lc-div-line" />
-                            <span className="lc-div-text">OAuth 2.0</span>
-                            <div className="lc-div-line" />
+                        <div className="lv-divider lv-f3">
+                            <div className="lv-div-line" />
+                            <span className="lv-div-text">
+                                secured · oauth 2.0
+                            </span>
+                            <div className="lv-div-line" />
                         </div>
 
-                        <div className="lc-trust lc-f3">
+                        <div className="lv-trust lv-f4">
                             {[
                                 {
-                                    icon: <Shield size={12} color="#10b981" />,
+                                    icon: <Shield size={13} color="#10b981" />,
                                     bg: 'rgba(16,185,129,.1)',
                                     name: 'Secure Login',
                                     sub: 'OAuth 2.0',
@@ -355,27 +365,27 @@ export default function Login({ status }: LoginProps) {
                                 {
                                     icon: (
                                         <CheckCircle2
-                                            size={12}
+                                            size={13}
                                             color="#06b6d4"
                                         />
                                     ),
                                     bg: 'rgba(6,182,212,.1)',
                                     name: 'Vet Verified',
-                                    sub: 'Licensed',
+                                    sub: 'Licensed review',
                                 },
                             ].map((c, i) => (
-                                <div className="lc-trust-card" key={i}>
+                                <div className="lv-trust-item" key={i}>
                                     <div
-                                        className="lc-trust-ico"
+                                        className="lv-trust-ico"
                                         style={{ background: c.bg }}
                                     >
                                         {c.icon}
                                     </div>
                                     <div>
-                                        <div className="lc-trust-name">
+                                        <div className="lv-trust-name">
                                             {c.name}
                                         </div>
-                                        <div className="lc-trust-sub">
+                                        <div className="lv-trust-sub">
                                             {c.sub}
                                         </div>
                                     </div>
