@@ -137,15 +137,13 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                 @keyframes ald-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes ald-pop    { 0%{transform:scale(.85);opacity:0} 100%{transform:scale(1);opacity:1} }
                 @keyframes ald-bar    { from{width:0} }
-                @keyframes ald-glow   { 0%,100%{box-shadow:0 0 10px rgba(16,185,129,.3)} 50%{box-shadow:0 0 24px rgba(16,185,129,.6),0 0 40px rgba(16,185,129,.2)} }
-                @keyframes ald-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+                                @keyframes ald-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
                 @keyframes ald-orbit  { from{transform:rotate(0deg) translateX(28px) rotate(0deg)} to{transform:rotate(360deg) translateX(28px) rotate(-360deg)} }
                 @keyframes ald-paw    { 0%,100%{transform:scale(1) rotate(0deg)} 25%{transform:scale(1.08) rotate(-5deg)} 75%{transform:scale(1.08) rotate(5deg)} }
 
                 .ald-root { font-family:'Plus Jakarta Sans',sans-serif; }
                 .ald-mono { font-family:'JetBrains Mono',monospace !important; }
 
-                .ald-card-glow { animation:ald-glow 2.5s ease-in-out infinite; }
                 .ald-float { animation:ald-float 3s ease-in-out infinite; }
                 .ald-paw { animation:ald-paw 2s ease-in-out infinite; }
                 .ald-fadein { animation:ald-fadein .4s cubic-bezier(.16,1,.3,1) both; }
@@ -181,31 +179,10 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                         <div className="relative px-6 pt-6 pb-5">
                             <AlertDialogHeader>
                                 <AlertDialogTitle className="flex items-center gap-4">
-                                    {/* Icon + Orbiting dots */}
-                                    <div className="relative flex-shrink-0">
-                                        <div className="relative flex h-14 w-14 items-center justify-center">
-                                            {/* Rings */}
-                                            <div
-                                                className="absolute inset-[-8px] rounded-full border border-emerald-500/15"
-                                                style={{
-                                                    animation:
-                                                        'ald-ring 2.6s ease-out infinite',
-                                                }}
-                                            />
-                                            <div
-                                                className="border-emerald-500/06 absolute inset-[-18px] rounded-full border"
-                                                style={{
-                                                    animation:
-                                                        'ald-ring 2.6s ease-out infinite .8s',
-                                                }}
-                                            />
-                                            {/* Orbs */}
-                                            <div className="ald-orb" />
-                                            <div className="ald-orb ald-orb2" />
-                                            {/* Center */}
-                                            <div className="ald-card-glow relative flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/25 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10">
-                                                <PawPrint className="h-6 w-6 text-emerald-400" />
-                                            </div>
+                                    {/* Icon */}
+                                    <div className="flex-shrink-0">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/25 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10">
+                                            <PawPrint className="h-6 w-6 text-emerald-400" />
                                         </div>
                                     </div>
 
@@ -214,13 +191,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                             Analyzing Your Pet
                                         </h2>
                                         <div className="mt-1 flex items-center gap-2">
-                                            <span
-                                                className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'ald-pulse 2s ease-in-out infinite',
-                                                }}
-                                            />
+                                            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-400" />
                                             <span className="ald-mono text-[10px] font-semibold tracking-[.1em] text-emerald-400/80 uppercase">
                                                 Breed Identification
                                             </span>
@@ -368,13 +339,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                                                         </span>
                                                     )}
                                                     {isCurrent && (
-                                                        <span
-                                                            className="ald-mono flex-shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[.08] px-1.5 py-0.5 text-[8px] font-semibold tracking-[.1em] text-emerald-400 uppercase"
-                                                            style={{
-                                                                animation:
-                                                                    'ald-pulse 2s ease-in-out infinite',
-                                                            }}
-                                                        >
+                                                        <span className="ald-mono flex-shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[.08] px-1.5 py-0.5 text-[8px] font-semibold tracking-[.1em] text-emerald-400 uppercase">
                                                             Active
                                                         </span>
                                                     )}

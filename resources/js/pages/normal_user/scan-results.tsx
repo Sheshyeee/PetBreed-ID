@@ -285,7 +285,7 @@ const ScanResults = () => {
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="sr-nsb relative z-10 mt-[-10px] flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[1360px] px-3 py-5 sm:px-5 lg:px-6">
+                    <div className="mx-auto max-w-[1360px] px-3 py-5 sm:px-5 lg:px-8">
                         {/* ── PAGE HEADER ROW ── */}
                         <div className="sr-fu mb-5 flex flex-wrap items-start justify-between gap-4">
                             <div>
