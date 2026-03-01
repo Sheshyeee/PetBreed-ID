@@ -4,6 +4,7 @@ import {
     CheckCircle2,
     Globe,
     Loader2,
+    PawPrint,
     Sparkles,
     Upload,
 } from 'lucide-react';
@@ -19,8 +20,10 @@ import {
 interface AnalysisStage {
     id: string;
     label: string;
+    sublabel: string;
     icon: React.ReactNode;
     duration: number;
+    color: string;
 }
 
 interface AnalysisLoadingDialogProps {
@@ -37,45 +40,54 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
         {
             id: 'upload',
             label: 'Uploading image',
+            sublabel: 'Preparing your photo for analysis',
             icon: <Upload className="h-4 w-4" />,
             duration: 800,
+            color: 'from-cyan-400 to-blue-500',
         },
         {
             id: 'identify',
             label: 'Identifying breed',
+            sublabel: 'Running neural network inference',
             icon: <Brain className="h-4 w-4" />,
             duration: 7500,
+            color: 'from-emerald-400 to-cyan-500',
         },
         {
             id: 'features',
             label: 'Extracting features',
+            sublabel: 'Analyzing coat, structure & markings',
             icon: <Activity className="h-4 w-4" />,
             duration: 3500,
+            color: 'from-violet-400 to-purple-500',
         },
         {
             id: 'origin',
             label: 'Generating origin data',
+            sublabel: 'Tracing breed history & geography',
             icon: <Globe className="h-4 w-4" />,
             duration: 3500,
+            color: 'from-amber-400 to-orange-500',
         },
         {
             id: 'health',
             label: 'Creating health analysis',
+            sublabel: 'Mapping breed-specific risk factors',
             icon: <Sparkles className="h-4 w-4" />,
             duration: 3500,
+            color: 'from-pink-400 to-rose-500',
         },
         {
             id: 'finalize',
             label: 'Finalizing analysis',
+            sublabel: 'Compiling your full report',
             icon: <Sparkles className="h-4 w-4" />,
             duration: 1500,
+            color: 'from-emerald-400 to-teal-500',
         },
     ];
 
-    const totalDuration = stages.reduce(
-        (sum, stage) => sum + stage.duration,
-        0,
-    );
+    const totalDuration = stages.reduce((sum, s) => sum + s.duration, 0);
 
     useEffect(() => {
         if (!isOpen) {
@@ -89,7 +101,6 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
 
         const interval = setInterval(() => {
             cumulativeTime += 50;
-
             const newProgress = Math.min(
                 (cumulativeTime / totalDuration) * 100,
                 100,
@@ -104,12 +115,9 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
                     break;
                 }
             }
-
             setCurrentStageIndex(currentIndex);
 
-            if (cumulativeTime >= totalDuration) {
-                clearInterval(interval);
-            }
+            if (cumulativeTime >= totalDuration) clearInterval(interval);
         }, 50);
 
         return () => clearInterval(interval);
@@ -118,133 +126,277 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
     const currentStage = stages[currentStageIndex];
 
     return (
-        <div className="mx-6">
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+                @keyframes ald-pulse  { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:.3} }
+                @keyframes ald-ring   { 0%{transform:scale(.82);opacity:.7} 70%,100%{transform:scale(1.22);opacity:0} }
+                @keyframes ald-spin   { to{transform:rotate(360deg)} }
+                @keyframes ald-sweep  { 0%{transform:translateY(-100%)} 100%{transform:translateY(200%)} }
+                @keyframes ald-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes ald-pop    { 0%{transform:scale(.85);opacity:0} 100%{transform:scale(1);opacity:1} }
+                @keyframes ald-bar    { from{width:0} }
+                @keyframes ald-glow   { 0%,100%{box-shadow:0 0 10px rgba(16,185,129,.3)} 50%{box-shadow:0 0 24px rgba(16,185,129,.6),0 0 40px rgba(16,185,129,.2)} }
+                @keyframes ald-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+                @keyframes ald-orbit  { from{transform:rotate(0deg) translateX(28px) rotate(0deg)} to{transform:rotate(360deg) translateX(28px) rotate(-360deg)} }
+                @keyframes ald-paw    { 0%,100%{transform:scale(1) rotate(0deg)} 25%{transform:scale(1.08) rotate(-5deg)} 75%{transform:scale(1.08) rotate(5deg)} }
+
+                .ald-root { font-family:'Plus Jakarta Sans',sans-serif; }
+                .ald-mono { font-family:'JetBrains Mono',monospace !important; }
+
+                .ald-card-glow { animation:ald-glow 2.5s ease-in-out infinite; }
+                .ald-float { animation:ald-float 3s ease-in-out infinite; }
+                .ald-paw { animation:ald-paw 2s ease-in-out infinite; }
+                .ald-fadein { animation:ald-fadein .4s cubic-bezier(.16,1,.3,1) both; }
+                .ald-pop { animation:ald-pop .3s cubic-bezier(.34,1.56,.64,1) both; }
+
+                .ald-progress-track {
+                    position:relative; height:6px; border-radius:9999px;
+                    background:rgba(255,255,255,.08); overflow:hidden;
+                }
+                .ald-progress-track::after {
+                    content:''; position:absolute; top:0; left:-100%; width:40%; height:100%;
+                    background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+                    animation:ald-sweep 2s linear infinite;
+                }
+
+                .ald-stage-item { transition:all .3s cubic-bezier(.16,1,.3,1); }
+
+                .ald-orb { position:absolute; width:5px; height:5px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981; animation:ald-orbit 3s linear infinite; }
+                .ald-orb2 { animation-delay:-1.5s; background:#06b6d4; box-shadow:0 0 8px #06b6d4; }
+            `}</style>
+
             <AlertDialog open={isOpen}>
-                <AlertDialogContent className="max-w-md border-0 bg-white p-0 shadow-xl sm:mx-0 dark:bg-gray-900">
-                    {/* Header Section with Gradient */}
-                    <div className="relative overflow-hidden rounded-t-lg bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 px-6 pt-6 pb-8">
-                        {/* Animated Background Pattern */}
-                        <div className="absolute inset-0 opacity-10">
-                            <div className="absolute -top-4 -left-4 h-24 w-24 animate-pulse rounded-full bg-white blur-2xl"></div>
-                            <div
-                                className="absolute top-1/2 -right-4 h-32 w-32 animate-pulse rounded-full bg-white blur-3xl"
-                                style={{ animationDelay: '0.7s' }}
-                            ></div>
+                <AlertDialogContent className="ald-root max-w-sm border-0 bg-transparent p-0 shadow-none sm:mx-0">
+                    <div className="relative overflow-hidden rounded-2xl border border-white/[.08] bg-[#0D1117] shadow-2xl shadow-black/60">
+                        {/* Top accent line */}
+                        <div className="absolute top-0 right-0 left-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-60" />
+
+                        {/* Ambient glow blobs */}
+                        <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-emerald-500/[.06] blur-3xl" />
+                        <div className="pointer-events-none absolute -top-6 -right-6 h-32 w-32 rounded-full bg-cyan-500/[.04] blur-2xl" />
+
+                        {/* ── HEADER ── */}
+                        <div className="relative px-6 pt-6 pb-5">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-4">
+                                    {/* Icon + Orbiting dots */}
+                                    <div className="relative flex-shrink-0">
+                                        <div className="relative flex h-14 w-14 items-center justify-center">
+                                            {/* Rings */}
+                                            <div
+                                                className="absolute inset-[-8px] rounded-full border border-emerald-500/15"
+                                                style={{
+                                                    animation:
+                                                        'ald-ring 2.6s ease-out infinite',
+                                                }}
+                                            />
+                                            <div
+                                                className="border-emerald-500/06 absolute inset-[-18px] rounded-full border"
+                                                style={{
+                                                    animation:
+                                                        'ald-ring 2.6s ease-out infinite .8s',
+                                                }}
+                                            />
+                                            {/* Orbs */}
+                                            <div className="ald-orb" />
+                                            <div className="ald-orb ald-orb2" />
+                                            {/* Center */}
+                                            <div className="ald-card-glow relative flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/25 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10">
+                                                <PawPrint className="ald-paw h-6 w-6 text-emerald-400" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <h2 className="text-lg font-extrabold tracking-tight text-white">
+                                            Analyzing Your Pet
+                                        </h2>
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <span
+                                                className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"
+                                                style={{
+                                                    animation:
+                                                        'ald-pulse 2s ease-in-out infinite',
+                                                }}
+                                            />
+                                            <span className="ald-mono text-[10px] font-semibold tracking-[.1em] text-emerald-400/80 uppercase">
+                                                Breed Identification
+                                            </span>
+                                        </div>
+                                    </div>
+                                </AlertDialogTitle>
+                            </AlertDialogHeader>
                         </div>
 
-                        <AlertDialogHeader className="relative space-y-0">
-                            <AlertDialogTitle className="flex items-center gap-3 text-white">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 ring-2 ring-white/30 backdrop-blur-sm">
-                                    <Brain className="h-6 w-6 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                    <h2 className="text-xl font-bold">
-                                        Analyzing Your Pet
-                                    </h2>
-                                    <p className="text-sm font-normal text-cyan-100">
-                                        Breed identification
-                                    </p>
-                                </div>
-                            </AlertDialogTitle>
-                        </AlertDialogHeader>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="px-6 pt-4 pb-6">
-                        <AlertDialogDescription className="space-y-5">
-                            {/* Current Stage Display */}
-                            <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-blue-50 p-4 shadow-sm dark:border-cyan-800 dark:from-cyan-950/50 dark:to-blue-950/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
-                                        {/* Animated Ring */}
-                                        <div className="absolute inset-0 animate-ping rounded-full bg-cyan-400 opacity-20"></div>
-                                        <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
-                                            <Loader2 className="h-5 w-5 animate-spin text-white" />
-                                        </div>
+                        {/* ── CONTENT ── */}
+                        <div className="px-6 pb-6">
+                            <AlertDialogDescription className="space-y-4">
+                                {/* Current stage spotlight */}
+                                <div className="ald-fadein relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[.07] to-cyan-500/[.04] p-4">
+                                    {/* Sweep animation */}
+                                    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                                        <div
+                                            className="absolute right-0 left-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent"
+                                            style={{
+                                                animation:
+                                                    'ald-sweep 2.2s linear infinite',
+                                            }}
+                                        />
                                     </div>
-                                    <div className="flex-1">
-                                        <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                            {currentStage?.label}...
-                                        </p>
-                                        <div className="mt-1 flex items-center gap-2">
-                                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                                                Step {currentStageIndex + 1} of{' '}
-                                                {stages.length}
-                                            </span>
-                                            <span className="text-xs text-cyan-600 dark:text-cyan-400">
-                                                •
-                                            </span>
-                                            <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
-                                                {Math.round(progress)}% Complete
+
+                                    <div className="relative flex items-center gap-3">
+                                        <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15">
+                                            <Loader2
+                                                className="h-5 w-5 text-emerald-400"
+                                                style={{
+                                                    animation:
+                                                        'ald-spin 1s linear infinite',
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-white">
+                                                {currentStage?.label}…
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-slate-400">
+                                                {currentStage?.sublabel}
+                                            </p>
+                                        </div>
+                                        <div className="ald-mono flex-shrink-0 text-right">
+                                            <span className="text-[11px] font-bold text-emerald-400">
+                                                {Math.round(progress)}%
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Progress Bar */}
-                            <div className="space-y-2">
-                                <div className="relative h-2.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                                    <div
-                                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 transition-all duration-300 ease-out"
-                                        style={{ width: `${progress}%` }}
-                                    ></div>
+                                {/* Progress bar */}
+                                <div className="space-y-1.5">
+                                    <div className="ald-progress-track">
+                                        <div
+                                            className={`h-full rounded-full bg-gradient-to-r ${currentStage?.color ?? 'from-emerald-500 to-cyan-500'} transition-all duration-300 ease-out`}
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="ald-mono text-[9px] tracking-[.1em] text-slate-600 uppercase">
+                                            Step {currentStageIndex + 1} /{' '}
+                                            {stages.length}
+                                        </span>
+                                        <span className="ald-mono text-[9px] text-slate-600">
+                                            {Math.round(progress)}% complete
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Completed Steps List */}
-                            <div className="max-h-[280px] overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-                                <p className="mb-3 text-xs font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-400">
-                                    Progress Steps
-                                </p>
-                                <div className="space-y-2.5">
-                                    {stages.map((stage, index) => {
-                                        const isCompleted =
-                                            index < currentStageIndex;
-                                        const isCurrent =
-                                            index === currentStageIndex;
+                                {/* Stage list */}
+                                <div className="overflow-hidden rounded-xl border border-white/[.06] bg-white/[.02]">
+                                    <div className="border-b border-white/[.05] px-3.5 py-2">
+                                        <span className="ald-mono text-[9px] font-bold tracking-[.14em] text-slate-500 uppercase">
+                                            Analysis Pipeline
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col divide-y divide-white/[.04]">
+                                        {stages.map((stage, index) => {
+                                            const isCompleted =
+                                                index < currentStageIndex;
+                                            const isCurrent =
+                                                index === currentStageIndex;
+                                            const isPending =
+                                                index > currentStageIndex;
 
-                                        return (
-                                            <div
-                                                key={stage.id}
-                                                className={`flex items-center gap-3 transition-all duration-300 ${
-                                                    isCompleted || isCurrent
-                                                        ? 'opacity-100'
-                                                        : 'opacity-40'
-                                                }`}
-                                            >
-                                                {isCompleted ? (
-                                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-500 shadow-sm">
-                                                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                                                    </div>
-                                                ) : isCurrent ? (
-                                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-500 shadow-sm">
-                                                        <Loader2 className="h-3 w-3 animate-spin text-white" />
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-5 w-5 shrink-0 rounded-full border-2 border-gray-300 dark:border-gray-600"></div>
-                                                )}
-                                                <span
-                                                    className={`text-sm ${
-                                                        isCompleted
-                                                            ? 'font-medium text-green-700 dark:text-green-400'
-                                                            : isCurrent
-                                                              ? 'font-semibold text-cyan-700 dark:text-cyan-300'
-                                                              : 'text-gray-500 dark:text-gray-500'
+                                            return (
+                                                <div
+                                                    key={stage.id}
+                                                    className={`ald-stage-item flex items-center gap-3 px-3.5 py-2.5 ${
+                                                        isCurrent
+                                                            ? 'bg-emerald-500/[.06]'
+                                                            : isPending
+                                                              ? 'opacity-35'
+                                                              : ''
                                                     }`}
                                                 >
-                                                    {stage.label}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                                    {/* Status icon */}
+                                                    {isCompleted ? (
+                                                        <div className="ald-pop flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,.4)]">
+                                                            <CheckCircle2
+                                                                size={12}
+                                                                className="text-black"
+                                                            />
+                                                        </div>
+                                                    ) : isCurrent ? (
+                                                        <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/20">
+                                                            <Loader2
+                                                                size={10}
+                                                                className="text-emerald-400"
+                                                                style={{
+                                                                    animation:
+                                                                        'ald-spin 1s linear infinite',
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="h-5 w-5 flex-shrink-0 rounded-full border border-white/[.1]" />
+                                                    )}
+
+                                                    {/* Stage icon */}
+                                                    <div
+                                                        className={`flex-shrink-0 ${isCompleted ? 'text-emerald-500/60' : isCurrent ? 'text-emerald-400' : 'text-slate-600'}`}
+                                                    >
+                                                        {stage.icon}
+                                                    </div>
+
+                                                    {/* Label */}
+                                                    <span
+                                                        className={`flex-1 text-[12px] font-medium ${
+                                                            isCompleted
+                                                                ? 'text-emerald-400/70 line-through decoration-emerald-500/40'
+                                                                : isCurrent
+                                                                  ? 'font-bold text-white'
+                                                                  : 'text-slate-600'
+                                                        }`}
+                                                    >
+                                                        {stage.label}
+                                                    </span>
+
+                                                    {/* Completed badge */}
+                                                    {isCompleted && (
+                                                        <span className="ald-mono flex-shrink-0 text-[8px] font-semibold tracking-[.1em] text-emerald-500/60 uppercase">
+                                                            Done
+                                                        </span>
+                                                    )}
+                                                    {isCurrent && (
+                                                        <span
+                                                            className="ald-mono flex-shrink-0 rounded border border-emerald-500/20 bg-emerald-500/[.08] px-1.5 py-0.5 text-[8px] font-semibold tracking-[.1em] text-emerald-400 uppercase"
+                                                            style={{
+                                                                animation:
+                                                                    'ald-pulse 2s ease-in-out infinite',
+                                                            }}
+                                                        >
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        </AlertDialogDescription>
+
+                                {/* Bottom hint */}
+                                <p className="ald-mono text-center text-[9px] tracking-[.1em] text-slate-600 uppercase">
+                                    This may take a few seconds · please wait
+                                </p>
+                            </AlertDialogDescription>
+                        </div>
+
+                        {/* Bottom accent line */}
+                        <div className="absolute right-0 bottom-0 left-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
                     </div>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </>
     );
 };
 

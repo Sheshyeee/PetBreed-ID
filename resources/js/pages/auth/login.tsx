@@ -1,6 +1,12 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { usePage } from '@inertiajs/react';
-import { CheckCircle2, Shield } from 'lucide-react';
+import {
+    CheckCircle2,
+    PawPrint,
+    Shield,
+    Sparkles,
+    XCircle,
+} from 'lucide-react';
 
 interface LoginProps {
     status?: string;
@@ -26,51 +32,155 @@ export default function Login({
             title="Dog Breed Identification System"
             description="Sign in to access professional breed analysis"
         >
-            <div className="flex flex-col gap-6">
-                {/* Status Message */}
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+                @keyframes lg-pulse  { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:.3} }
+                @keyframes lg-ring   { 0%{transform:scale(.82);opacity:.7} 70%,100%{transform:scale(1.22);opacity:0} }
+                @keyframes lg-orbit  { from{transform:rotate(0deg) translateX(32px) rotate(0deg)} to{transform:rotate(360deg) translateX(32px) rotate(-360deg)} }
+                @keyframes lg-orbit2 { from{transform:rotate(180deg) translateX(32px) rotate(-180deg)} to{transform:rotate(540deg) translateX(32px) rotate(-540deg)} }
+                @keyframes lg-fadein { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes lg-sweep  { 0%{transform:translateX(-100%)} 100%{transform:translateX(350%)} }
+                @keyframes lg-glow   { 0%,100%{box-shadow:0 0 12px rgba(16,185,129,.25)} 50%{box-shadow:0 0 28px rgba(16,185,129,.5),0 0 50px rgba(16,185,129,.15)} }
+                @keyframes lg-paw    { 0%,100%{transform:scale(1) rotate(0deg)} 25%{transform:scale(1.1) rotate(-6deg)} 75%{transform:scale(1.1) rotate(6deg)} }
+                @keyframes lg-shimmer{ 0%{left:-100%} 100%{left:160%} }
+                @keyframes lg-slide  { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+                .lg-root { font-family:'Plus Jakarta Sans',sans-serif; }
+                .lg-mono { font-family:'JetBrains Mono',monospace !important; }
+
+                .lg-card-glow { animation:lg-glow 2.5s ease-in-out infinite; }
+                .lg-paw  { animation:lg-paw 2.2s ease-in-out infinite; }
+                .lg-fu   { animation:lg-fadein .45s cubic-bezier(.16,1,.3,1) both; }
+                .lg-fu2  { animation:lg-fadein .45s cubic-bezier(.16,1,.3,1) .1s both; }
+                .lg-fu3  { animation:lg-fadein .45s cubic-bezier(.16,1,.3,1) .2s both; }
+                .lg-slide{ animation:lg-slide .3s ease both; }
+
+                .lg-btn {
+                    position:relative; overflow:hidden;
+                    transition:transform .2s, box-shadow .2s, border-color .2s;
+                }
+                .lg-btn::before {
+                    content:''; position:absolute; top:0; left:-100%; width:45%;
+                    height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.09),transparent);
+                    transform:skewX(-18deg); transition:left .55s;
+                }
+                .lg-btn:hover::before { left:160%; }
+                .lg-btn:hover { transform:translateY(-1px); box-shadow:0 8px 28px rgba(16,185,129,.18); }
+                .lg-btn:active { transform:translateY(0); }
+            `}</style>
+
+            <div className="lg-root flex flex-col gap-5">
+                {/* Status */}
                 {status && (
-                    <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 shadow-sm dark:border-green-900/50 dark:from-green-900/20 dark:to-emerald-900/20">
-                        <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
-                        <p className="text-sm text-green-800 dark:text-green-300">
-                            {status}
-                        </p>
+                    <div className="lg-slide flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[.07] p-3.5">
+                        <CheckCircle2
+                            size={15}
+                            className="mt-0.5 flex-shrink-0 text-emerald-400"
+                        />
+                        <p className="text-sm text-emerald-300">{status}</p>
                     </div>
                 )}
 
-                {/* Error Message */}
+                {/* Error */}
                 {flash?.error && (
-                    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50 p-4 shadow-sm dark:border-red-900/50 dark:from-red-900/20 dark:to-rose-900/20">
-                        <svg
-                            className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                        </svg>
-                        <p className="text-sm text-red-800 dark:text-red-300">
-                            {flash.error}
-                        </p>
+                    <div className="lg-slide flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/[.07] p-3.5">
+                        <XCircle
+                            size={15}
+                            className="mt-0.5 flex-shrink-0 text-red-400"
+                        />
+                        <p className="text-sm text-red-300">{flash.error}</p>
                     </div>
                 )}
 
-                {/* Google Sign-In Button */}
-                <div className="mt-2">
+                {/* ── ICON + HEADLINE ── */}
+                <div className="lg-fu flex flex-col items-center gap-4 pt-2 pb-1 text-center">
+                    {/* Orbiting icon */}
+                    <div className="relative flex h-16 w-16 items-center justify-center">
+                        <div
+                            className="absolute inset-[-10px] rounded-full border border-emerald-500/15"
+                            style={{
+                                animation: 'lg-ring 2.6s ease-out infinite',
+                            }}
+                        />
+                        <div
+                            className="border-emerald-500/07 absolute inset-[-20px] rounded-full border"
+                            style={{
+                                animation: 'lg-ring 2.6s ease-out infinite .9s',
+                            }}
+                        />
+                        {/* Orbiting dots */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: '#10b981',
+                                boxShadow: '0 0 8px #10b981',
+                                animation: 'lg-orbit 3.2s linear infinite',
+                                top: '50%',
+                                left: '50%',
+                                marginTop: -3,
+                                marginLeft: -3,
+                            }}
+                        />
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: 5,
+                                height: 5,
+                                borderRadius: '50%',
+                                background: '#06b6d4',
+                                boxShadow: '0 0 7px #06b6d4',
+                                animation: 'lg-orbit2 3.2s linear infinite',
+                                top: '50%',
+                                left: '50%',
+                                marginTop: -2.5,
+                                marginLeft: -2.5,
+                            }}
+                        />
+                        {/* Center */}
+                        <div className="lg-card-glow relative flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/25 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10">
+                            <PawPrint className="lg-paw h-7 w-7 text-emerald-400" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h1 className="text-xl font-extrabold tracking-tight text-white">
+                            Welcome to{' '}
+                            <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                                DogLens
+                            </span>
+                        </h1>
+                        <p className="mt-1 text-xs text-slate-500">
+                            Sign in to start identifying breeds instantly
+                        </p>
+                    </div>
+
+                    {/* Live badge */}
+                    <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.08] px-3 py-1.5">
+                        <span
+                            className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"
+                            style={{
+                                animation: 'lg-pulse 2s ease-in-out infinite',
+                            }}
+                        />
+                        <span className="lg-mono text-[10px] font-semibold tracking-[.12em] text-emerald-400 uppercase">
+                            AI System Online
+                        </span>
+                    </div>
+                </div>
+
+                {/* ── GOOGLE BUTTON ── */}
+                <div className="lg-fu2">
                     <button
                         onClick={() => (window.location.href = '/auth/google')}
-                        className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl border-2 border-gray-200 bg-white px-6 py-4 text-base font-semibold text-gray-900 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-lg focus:ring-4 focus:ring-violet-500/20 focus:outline-none dark:border-gray-700 dark:bg-neutral-900 dark:text-white dark:hover:border-gray-600"
+                        className="lg-btn group flex w-full items-center justify-center gap-3 rounded-xl border border-white/[.1] bg-white/[.05] px-5 py-3.5 text-sm font-bold text-white focus:ring-2 focus:ring-emerald-500/30 focus:outline-none"
                     >
-                        {/* Subtle gradient overlay on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-violet-500/0 via-purple-500/0 to-violet-500/0 opacity-0 transition-opacity duration-300 group-hover:opacity-5" />
-
-                        {/* Google "G" Logo SVG */}
+                        {/* Google G */}
                         <svg
-                            className="h-6 w-6 flex-shrink-0"
+                            className="h-5 w-5 flex-shrink-0"
                             viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg"
                         >
@@ -91,23 +201,70 @@ export default function Login({
                                 fill="#EA4335"
                             />
                         </svg>
-                        <span className="relative">Continue with Google</span>
+                        Continue with Google
                     </button>
+                </div>
 
-                    {/* Trust Indicators */}
-                    <div className="mt-6 space-y-3">
-                        <div className="flex items-center justify-center gap-6 text-xs text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center gap-1.5">
-                                <Shield className="h-4 w-4 text-violet-500" />
-                                <span>Secure Login</span>
+                {/* ── DIVIDER ── */}
+                <div className="lg-fu3 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-white/[.07]" />
+                    <span className="lg-mono text-[9px] tracking-[.14em] text-slate-600 uppercase">
+                        Secured by OAuth 2.0
+                    </span>
+                    <div className="h-px flex-1 bg-white/[.07]" />
+                </div>
+
+                {/* ── TRUST INDICATORS ── */}
+                <div className="lg-fu3 overflow-hidden rounded-xl border border-white/[.06] bg-white/[.02]">
+                    {[
+                        {
+                            icon: (
+                                <Shield
+                                    size={13}
+                                    className="text-emerald-400"
+                                />
+                            ),
+                            label: 'Secure Login',
+                            sub: 'Google OAuth 2.0 protected',
+                        },
+                        {
+                            icon: (
+                                <CheckCircle2
+                                    size={13}
+                                    className="text-cyan-400"
+                                />
+                            ),
+                            label: 'Vet Verified',
+                            sub: 'Licensed veterinary review',
+                        },
+                        {
+                            icon: (
+                                <Sparkles
+                                    size={13}
+                                    className="text-violet-400"
+                                />
+                            ),
+                            label: 'AI Powered',
+                            sub: '95%+ breed accuracy',
+                        },
+                    ].map((item, i) => (
+                        <div
+                            key={i}
+                            className={`flex items-center gap-3 px-4 py-3 ${i < 2 ? 'border-b border-white/[.05]' : ''}`}
+                        >
+                            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-white/[.08] bg-white/[.04]">
+                                {item.icon}
                             </div>
-                            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
-                            <div className="flex items-center gap-1.5">
-                                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                <span>Vet Verified</span>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-semibold text-slate-300">
+                                    {item.label}
+                                </p>
+                                <p className="text-[10px] text-slate-600">
+                                    {item.sub}
+                                </p>
                             </div>
                         </div>
-                    </div>
+                    ))}
                 </div>
             </div>
         </AuthLayout>
