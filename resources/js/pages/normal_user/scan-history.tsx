@@ -241,32 +241,26 @@ export default function ScanHistory({ mockScans, user }: Props) {
                 {/* PAGE BODY */}
                 <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20">
                     {/* HERO */}
-                    <div className="items-flex-end flex flex-wrap justify-between gap-4 border-b border-slate-200 py-8 dark:border-white/[.05]">
-                        <div>
-                            <div className="sh-font-mono mb-3.5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-[5px] text-[10px] font-bold tracking-[.18em] text-emerald-600 uppercase dark:border-emerald-500/18 dark:text-emerald-400">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 py-5 dark:border-white/[.05]">
+                        <div className="flex items-center gap-3">
+                            <div className="sh-font-mono inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-2.5 py-1 text-[9px] font-bold tracking-[.18em] text-emerald-600 uppercase dark:border-emerald-500/18 dark:text-emerald-400">
                                 <span className="sh-blink-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                 Scan Records
                             </div>
-                            <h1 className="sh-font-syne m-0 mb-2.5 text-[clamp(2rem,8vw,4rem)] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
-                                My{' '}
+                            <h1 className="sh-font-syne m-0 text-xl leading-none font-extrabold tracking-tight text-slate-900 sm:text-2xl dark:text-white">
+                                Scan{' '}
                                 <span className="bg-gradient-to-br from-emerald-500 to-cyan-500 bg-clip-text text-transparent">
-                                    Scan
+                                    History
                                 </span>
-                                <br />
-                                History
                             </h1>
-                            <p className="max-w-[360px] text-[13px] leading-relaxed text-slate-400 dark:text-slate-500">
-                                View and manage your pet breed identification
-                                scans.
-                            </p>
                         </div>
                         <Link
                             href="/scan"
-                            className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-[11px] text-[13px] font-extrabold whitespace-nowrap text-black no-underline shadow-lg shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:shadow-emerald-500/40"
+                            className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-[12px] font-bold whitespace-nowrap text-black no-underline shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
                         >
-                            <Zap size={13} />
+                            <Zap size={12} />
                             New Scan
-                            <ChevronRight size={12} className="opacity-60" />
+                            <ChevronRight size={11} className="opacity-60" />
                         </Link>
                     </div>
 
