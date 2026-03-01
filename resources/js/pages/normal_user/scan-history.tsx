@@ -43,7 +43,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'verified' | 'pending'>('all');
     const [deletingId, setDeletingId] = useState<number | null>(null);
-    const [hoveredId, setHoveredId] = useState<number | null>(null);
 
     const handleDelete = (id: number) => {
         setDeletingId(id);
@@ -79,352 +78,122 @@ export default function ScanHistory({ mockScans, user }: Props) {
         <>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
-                *, *::before, *::after { box-sizing: border-box; }
 
-                @keyframes bar-fill    { from{width:0} }
-                @keyframes fade-up     { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes modal-pop   { from{opacity:0;transform:scale(.94) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
-                @keyframes ring-expand { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.5);opacity:0} }
-                @keyframes ticker-blink{ 0%,100%{opacity:1} 50%{opacity:.3} }
-                @keyframes glow-drift  { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-20px) scale(1.06)} 66%{transform:translate(-20px,15px) scale(.96)} }
-                @keyframes counter-up  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes scan-line   { 0%{top:0;opacity:.7} 100%{top:100%;opacity:0} }
+                @keyframes sh-bar-fill   { from { width: 0 } }
+                @keyframes sh-fade-up    { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+                @keyframes sh-modal-pop  { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
+                @keyframes sh-ring       { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.5);opacity:0} }
+                @keyframes sh-blink      { 0%,100%{opacity:1} 50%{opacity:.3} }
+                @keyframes sh-glow       { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-20px) scale(1.06)} 66%{transform:translate(-20px,15px) scale(.96)} }
+                @keyframes sh-scan-line  { 0%{top:0;opacity:.7} 100%{top:100%;opacity:0} }
+                @keyframes sh-fab-ring   { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(1.34);opacity:0} }
 
-                .sh-root { font-family:'DM Sans',sans-serif; min-height:100vh; background:#070A0E; color:#e2e8f0; overflow-x:hidden; }
+                .sh-font-syne  { font-family: 'Syne', sans-serif; }
+                .sh-font-mono  { font-family: 'Space Mono', monospace; }
+                .sh-font-dm    { font-family: 'DM Sans', sans-serif; }
 
-                .bg-canvas {
-                    position:fixed; inset:0; z-index:0; pointer-events:none;
-                    background:
-                        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(16,185,129,.07) 0%, transparent 70%),
-                        radial-gradient(ellipse 50% 35% at 80% 85%, rgba(6,182,212,.05) 0%, transparent 70%);
-                }
-                .bg-grid {
-                    position:fixed; inset:0; z-index:0; pointer-events:none;
-                    background-image: linear-gradient(rgba(16,185,129,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,.04) 1px, transparent 1px);
-                    background-size:48px 48px;
-                    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
-                }
-                .orb { position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0; }
-                .orb-1 { width:500px; height:500px; background:rgba(16,185,129,.04); top:-200px; left:-150px; animation:glow-drift 20s ease-in-out infinite; }
-                .orb-2 { width:350px; height:350px; background:rgba(6,182,212,.035); bottom:-100px; right:-80px; animation:glow-drift 25s ease-in-out infinite reverse; }
-
-                /* ── HERO ── */
-                .hero-section {
-                    position:relative; z-index:10;
-                    padding: 32px 0 32px;
-                    border-bottom:1px solid rgba(255,255,255,.05);
-                    display:flex; align-items:flex-end; justify-content:space-between;
-                    gap:16px; flex-wrap:wrap;
-                }
-                .hero-eyebrow {
-                    display:inline-flex; align-items:center; gap:8px;
-                    font-family:'Space Mono',monospace; font-size:10px; font-weight:700;
-                    letter-spacing:.18em; text-transform:uppercase; color:#10b981;
-                    background:rgba(16,185,129,.07); border:1px solid rgba(16,185,129,.18);
-                    padding:5px 12px; border-radius:100px; margin-bottom:14px;
-                }
-                .hero-eyebrow-dot { width:6px; height:6px; border-radius:50%; background:#10b981; animation:ticker-blink 1.8s ease-in-out infinite; }
-                .hero-title {
-                    font-family:'Syne',sans-serif;
-                    font-size: clamp(2rem, 8vw, 4rem);
-                    font-weight:800; line-height:1; letter-spacing:-.03em; color:#fff; margin:0 0 10px;
-                }
-                .hero-title span { background:linear-gradient(135deg,#10b981 0%,#06b6d4 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-                .hero-sub { font-size:13px; color:rgba(226,232,240,.45); line-height:1.7; max-width:360px; }
-
-                /* ── NEW SCAN BUTTON ── */
-                .btn-newscan {
-                    position:relative; overflow:hidden;
-                    display:inline-flex; align-items:center; gap:8px;
-                    font-family:'Syne',sans-serif; font-size:13px; font-weight:700;
-                    color:#000; background:linear-gradient(135deg,#10b981,#06b6d4);
-                    border:none; border-radius:12px; padding:11px 20px; cursor:pointer;
-                    text-decoration:none;
-                    box-shadow:0 0 30px rgba(16,185,129,.25),0 4px 20px rgba(0,0,0,.3);
-                    transition:transform .2s,box-shadow .2s; white-space:nowrap;
-                }
-                .btn-newscan:hover { transform:translateY(-2px); box-shadow:0 0 45px rgba(16,185,129,.4),0 8px 30px rgba(0,0,0,.4); }
-
-                /* ── STATS STRIP ── */
-                .stats-strip {
-                    position:relative; z-index:10;
-                    display:grid;
-                    grid-template-columns: repeat(2, 1fr); /* 2 cols on mobile */
-                    border:1px solid rgba(255,255,255,.06);
-                    border-radius:16px; overflow:hidden;
-                    margin-bottom:28px;
-                    background:rgba(255,255,255,.02);
-                    backdrop-filter:blur(12px);
-                }
-                @media (min-width: 640px) { .stats-strip { grid-template-columns: repeat(4, 1fr); } }
-
-                .stat-cell {
-                    position:relative; padding:20px 20px 18px;
-                    transition:background .25s; animation:fade-up .5s ease both;
-                    border-right:1px solid rgba(255,255,255,.05);
-                    border-bottom:1px solid rgba(255,255,255,.05);
-                }
-                /* Remove right border on last in each row, remove bottom border on last row */
-                @media (max-width: 639px) {
-                    .stat-cell:nth-child(2n) { border-right:none; }
-                    .stat-cell:nth-child(3), .stat-cell:nth-child(4) { border-bottom:none; }
-                }
-                @media (min-width: 640px) {
-                    .stat-cell { border-bottom:none; }
-                    .stat-cell:last-child { border-right:none; }
+                .sh-grid-bg {
+                    position:fixed; inset:0; pointer-events:none; z-index:0;
+                    background-image: linear-gradient(rgba(16,185,129,.04) 1px, transparent 1px),
+                                      linear-gradient(90deg, rgba(16,185,129,.04) 1px, transparent 1px);
+                    background-size: 48px 48px;
+                    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
                 }
 
-                .stat-cell:hover { background:rgba(16,185,129,.04); }
-                .stat-cell-icon {
-                    width:30px; height:30px; border-radius:9px;
-                    background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.18);
-                    display:flex; align-items:center; justify-content:center;
-                    color:#10b981; margin-bottom:12px;
+                .sh-orb-1 {
+                    position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0;
+                    width:500px; height:500px; background:rgba(16,185,129,.04);
+                    top:-200px; left:-150px;
+                    animation: sh-glow 20s ease-in-out infinite;
                 }
-                .stat-label {
-                    font-family:'Space Mono',monospace; font-size:8px; font-weight:700;
-                    letter-spacing:.12em; text-transform:uppercase; color:rgba(226,232,240,.3); margin-bottom:4px;
+                .sh-orb-2 {
+                    position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0;
+                    width:350px; height:350px; background:rgba(6,182,212,.035);
+                    bottom:-100px; right:-80px;
+                    animation: sh-glow 25s ease-in-out infinite reverse;
                 }
-                .stat-number {
-                    font-family:'Syne',sans-serif;
-                    font-size: clamp(1.5rem, 4vw, 2.4rem);
-                    font-weight:800; line-height:1; letter-spacing:-.03em; color:#fff; margin-bottom:3px;
-                    animation:counter-up .6s ease both;
+
+                .sh-fade-up     { animation: sh-fade-up .5s ease both; }
+                .sh-modal-pop   { animation: sh-modal-pop .28s cubic-bezier(.16,1,.3,1) both; }
+                .sh-bar-fill    { animation: sh-bar-fill 1.6s cubic-bezier(.16,1,.3,1) forwards; }
+                .sh-conf-fill   { animation: sh-bar-fill 1.5s cubic-bezier(.16,1,.3,1) forwards; }
+                .sh-blink-dot   { animation: sh-blink 1.8s ease-in-out infinite; }
+                .sh-ring-expand { animation: sh-ring 2.5s ease-out infinite; }
+
+                .sh-fab::before {
+                    content:''; position:absolute; inset:-4px; border-radius:17px;
+                    border:1.5px solid rgba(16,185,129,.25);
+                    animation: sh-fab-ring 2.5s ease-out infinite;
                 }
-                .stat-sub { font-size:10px; color:rgba(226,232,240,.35); }
-                .stat-bar-track { position:absolute; bottom:0; left:0; right:0; height:2px; background:rgba(255,255,255,.05); }
-                .stat-bar-fill { height:100%; background:linear-gradient(90deg,#10b981,#06b6d4); box-shadow:0 0 8px rgba(16,185,129,.5); animation:bar-fill 1.6s cubic-bezier(.16,1,.3,1) forwards; }
+                .sh-scan-line-anim { animation: sh-scan-line 1.4s linear infinite; }
 
-                /* ── VET BANNER ── */
-                .vet-banner {
-                    position:relative; z-index:10;
-                    display:flex; align-items:flex-start; gap:14px;
-                    background:linear-gradient(135deg,rgba(6,182,212,.06) 0%,rgba(16,185,129,.04) 100%);
-                    border:1px solid rgba(6,182,212,.15); border-radius:14px;
-                    padding:16px 18px; margin-bottom:28px;
-                }
-                .vet-banner-icon { width:32px; height:32px; border-radius:9px; flex-shrink:0; background:rgba(6,182,212,.1); border:1px solid rgba(6,182,212,.2); display:flex; align-items:center; justify-content:center; color:#06b6d4; }
-                .vet-banner-title { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#06b6d4; margin-bottom:3px; }
-                .vet-banner-text { font-size:11px; color:rgba(226,232,240,.4); line-height:1.6; }
+                .sh-card:hover .sh-scan-line-el { opacity:1; animation: sh-scan-line 1.4s linear infinite; }
+                .sh-scan-line-el { opacity: 0; transition: opacity .1s; }
 
-                /* ── TOOLBAR ── */
-                .toolbar { position:relative; z-index:10; display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:24px; }
-                .search-wrap { position:relative; flex:1; min-width:180px; }
-                .search-input {
-                    width:100%; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
-                    border-radius:10px; padding:10px 12px 10px 38px; font-size:13px;
-                    font-family:'DM Sans',sans-serif; color:#e2e8f0; outline:none; transition:border-color .2s,background .2s;
-                }
-                .search-input::placeholder { color:rgba(226,232,240,.25); }
-                .search-input:focus { border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.04); }
-                .search-icon { position:absolute; top:50%; left:11px; transform:translateY(-50%); color:rgba(226,232,240,.25); pointer-events:none; }
-                .filter-pill {
-                    display:flex; align-items:center; gap:5px;
-                    font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-                    padding:9px 13px; border-radius:9px; border:1px solid rgba(255,255,255,.07);
-                    background:rgba(255,255,255,.03); color:rgba(226,232,240,.4); cursor:pointer; transition:all .2s; white-space:nowrap;
-                }
-                .filter-pill:hover { border-color:rgba(16,185,129,.25); color:#10b981; background:rgba(16,185,129,.04); }
-                .filter-pill.active { border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.1); color:#10b981; box-shadow:0 0 16px rgba(16,185,129,.1); }
+                .sh-card:hover .sh-hud-corner { opacity: 1; }
+                .sh-hud-corner { opacity: 0; transition: opacity .25s; }
 
-                /* ── SCAN GRID ── */
-                .scan-grid { position:relative; z-index:10; columns:1; column-gap:18px; }
-                @media(min-width:540px) { .scan-grid { columns:2; } }
-                @media(min-width:1024px) { .scan-grid { columns:3; } }
+                .sh-card:hover .sh-del-overlay { opacity: 1; }
+                .sh-del-overlay { opacity: 0; transition: opacity .2s; }
 
-                /* ── SCAN CARD ── */
-                .scan-card {
-                    display:inline-block; width:100%; margin-bottom:18px;
-                    border-radius:18px; overflow:hidden;
-                    border:1px solid rgba(255,255,255,.07); background:rgba(255,255,255,.025);
-                    backdrop-filter:blur(8px);
-                    transition:transform .3s cubic-bezier(.16,1,.3,1),box-shadow .3s,border-color .3s;
-                    animation:fade-up .45s ease both; position:relative;
-                }
-                .scan-card:hover { transform:translateY(-4px); border-color:rgba(16,185,129,.25); box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 30px rgba(16,185,129,.07); }
-                .scan-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,#10b981,transparent); opacity:0; transition:opacity .3s; z-index:5; }
-                .scan-card:hover::before { opacity:.7; }
-
-                .card-img-wrap { position:relative; height:200px; overflow:hidden; }
-                @media(min-width:640px) { .card-img-wrap { height:220px; } }
-                .card-img { width:100%; height:100%; object-fit:cover; transition:transform .6s cubic-bezier(.16,1,.3,1); }
-                .scan-card:hover .card-img { transform:scale(1.07); }
-
-                .card-scan-line { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,rgba(16,185,129,.7),transparent); pointer-events:none; z-index:4; top:0; opacity:0; transition:opacity .1s; }
-                .scan-card:hover .card-scan-line { opacity:1; animation:scan-line 1.4s linear infinite; }
-
-                .card-img-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(7,10,14,.85) 0%,rgba(7,10,14,.2) 50%,transparent 100%); z-index:2; }
-
-                .hud-corner { position:absolute; width:13px; height:13px; border-color:rgba(16,185,129,.6); border-style:solid; opacity:0; transition:opacity .25s; z-index:3; }
-                .scan-card:hover .hud-corner { opacity:1; }
-                .hud-tl { top:7px; left:7px; border-width:2px 0 0 2px; }
-                .hud-tr { top:7px; right:7px; border-width:2px 2px 0 0; }
-                .hud-bl { bottom:7px; left:7px; border-width:0 0 2px 2px; }
-                .hud-br { bottom:7px; right:7px; border-width:0 2px 2px 0; }
-
-                .conf-badge { position:absolute; bottom:9px; right:9px; z-index:4; font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:#000; background:linear-gradient(135deg,#10b981,#06b6d4); padding:2px 9px; border-radius:5px; box-shadow:0 2px 10px rgba(16,185,129,.4); }
-
-                .status-badge { position:absolute; top:9px; left:9px; z-index:4; font-family:'Space Mono',monospace; font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border-radius:5px; backdrop-filter:blur(8px); }
-                .status-verified { background:rgba(16,185,129,.2); border:1px solid rgba(16,185,129,.35); color:#10b981; }
-                .status-pending { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.3); color:#f59e0b; }
-
-                .delete-overlay { position:absolute; top:9px; right:9px; z-index:5; opacity:0; transition:opacity .2s; }
-                .scan-card:hover .delete-overlay { opacity:1; }
-                .btn-del-img { width:28px; height:28px; border-radius:7px; background:rgba(239,68,68,.7); border:1px solid rgba(239,68,68,.5); backdrop-filter:blur(8px); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .2s; }
-                .btn-del-img:hover { background:rgba(239,68,68,.9); }
-                .btn-del-img:disabled { opacity:.4; cursor:not-allowed; }
-
-                .card-body { padding:14px 16px 12px; }
-                .card-breed { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:#fff; letter-spacing:-.01em; margin-bottom:10px; line-height:1.2; }
-                .conf-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
-                .conf-label { font-family:'Space Mono',monospace; font-size:8px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(226,232,240,.3); }
-                .conf-val { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:#10b981; }
-                .conf-track { height:3px; border-radius:100px; background:rgba(255,255,255,.07); overflow:hidden; margin-bottom:12px; }
-                .conf-fill { height:100%; border-radius:100px; background:linear-gradient(90deg,#10b981,#06b6d4); box-shadow:0 0 6px rgba(16,185,129,.5); animation:bar-fill 1.5s cubic-bezier(.16,1,.3,1) forwards; }
-
-                .card-footer { display:flex; align-items:center; justify-content:space-between; padding:10px 16px 12px; border-top:1px solid rgba(255,255,255,.05); }
-                .card-date { display:flex; align-items:center; gap:5px; font-family:'Space Mono',monospace; font-size:9px; color:rgba(226,232,240,.25); }
-                .card-scan-id { font-family:'Space Mono',monospace; font-size:8px; color:rgba(226,232,240,.15); max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-                .btn-delete { display:flex; align-items:center; gap:4px; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; letter-spacing:.04em; color:rgba(239,68,68,.55); background:transparent; border:1px solid rgba(239,68,68,.15); border-radius:7px; padding:5px 10px; cursor:pointer; transition:all .2s; }
-                .btn-delete:hover { color:#ef4444; border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.05); }
-                .btn-delete:disabled { opacity:.35; cursor:not-allowed; }
-
-                /* ── EMPTY STATES ── */
-                .empty-state { position:relative; z-index:10; text-align:center; padding:60px 20px; border:1px solid rgba(255,255,255,.06); border-radius:20px; background:rgba(255,255,255,.02); overflow:hidden; }
-                .empty-icon-ring { position:relative; display:inline-flex; align-items:center; justify-content:center; width:72px; height:72px; border:1px solid rgba(16,185,129,.15); border-radius:50%; margin-bottom:16px; background:rgba(16,185,129,.07); color:#10b981; }
-                .empty-icon-ring::before { content:''; position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.08); animation:ring-expand 2.5s ease-out infinite; }
-                .empty-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:#fff; margin-bottom:6px; }
-                .empty-sub { font-size:12px; color:rgba(226,232,240,.35); }
-
-                /* ── QR MODAL ── */
-                .modal-bg { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); padding:16px; backdrop-filter:blur(20px); }
-                .modal-box { width:100%; max-width:340px; background:#0e1218; border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:24px; position:relative; overflow:hidden; animation:modal-pop .28s cubic-bezier(.16,1,.3,1) both; box-shadow:0 30px 80px rgba(0,0,0,.7); }
-                .modal-box::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,#10b981,#06b6d4,transparent); opacity:.5; }
-
-                /* ── FAB ── */
-                .fab { position:fixed; right:18px; bottom:18px; z-index:40; width:44px; height:44px; border-radius:13px; background:linear-gradient(135deg,#10b981,#06b6d4); border:none; color:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 0 30px rgba(16,185,129,.3),0 8px 24px rgba(0,0,0,.4); transition:transform .2s; overflow:visible; }
-                .fab::before { content:''; position:absolute; inset:-4px; border-radius:17px; border:1.5px solid rgba(16,185,129,.25); animation:ring-expand 2.5s ease-out infinite; }
-                .fab:hover { transform:scale(1.08); }
-
-                .nsb::-webkit-scrollbar { display:none; }
-                .nsb { scrollbar-width:none; }
+                .sh-nsb::-webkit-scrollbar { display:none; }
+                .sh-nsb { scrollbar-width: none; }
             `}</style>
 
-            <div className="sh-root">
-                <div className="bg-canvas" />
-                <div className="bg-grid" />
-                <div className="orb orb-1" />
-                <div className="orb orb-2" />
+            <div className="sh-font-dm relative min-h-screen overflow-x-hidden bg-slate-50 text-slate-700 dark:bg-[#070A0E] dark:text-slate-200">
+                {/* Background elements */}
+                <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_60%_40%_at_20%_10%,rgba(16,185,129,.07)_0%,transparent_70%),radial-gradient(ellipse_50%_35%_at_80%_85%,rgba(6,182,212,.05)_0%,transparent_70%)]" />
+                <div className="sh-grid-bg hidden dark:block" />
+                <div className="sh-orb-1 hidden dark:block" />
+                <div className="sh-orb-2 hidden dark:block" />
 
-                <div style={{ position: 'relative', zIndex: 20 }}>
+                <div className="relative z-20">
                     <Header />
                 </div>
 
                 {/* QR Modal */}
                 {showQRModal && (
                     <div
-                        className="modal-bg"
+                        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-xl"
                         onClick={() => setShowQRModal(false)}
                     >
                         <div
-                            className="modal-box"
+                            className="sh-modal-pop relative w-full max-w-[340px] overflow-hidden rounded-[22px] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/[.08] dark:bg-[#0e1218]"
                             onClick={(e) => e.stopPropagation()}
                         >
+                            {/* Top accent line */}
+                            <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
+
                             <button
                                 onClick={() => setShowQRModal(false)}
-                                style={{
-                                    position: 'absolute',
-                                    top: 10,
-                                    right: 10,
-                                    width: 26,
-                                    height: 26,
-                                    borderRadius: 7,
-                                    background: 'rgba(255,255,255,.06)',
-                                    border: '1px solid rgba(255,255,255,.08)',
-                                    color: 'rgba(226,232,240,.5)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                }}
+                                className="absolute top-2.5 right-2.5 flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 dark:bg-white/[.06] dark:hover:bg-white/10"
                             >
                                 <X size={12} />
                             </button>
-                            <div
-                                style={{
-                                    textAlign: 'center',
-                                    marginBottom: 18,
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 11,
-                                        background: 'rgba(16,185,129,.1)',
-                                        border: '1px solid rgba(16,185,129,.2)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#10b981',
-                                        margin: '0 auto 12px',
-                                    }}
-                                >
+
+                            <div className="mb-[18px] text-center">
+                                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[11px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
                                     <Smartphone size={18} />
                                 </div>
-                                <div
-                                    style={{
-                                        fontFamily: 'Syne,sans-serif',
-                                        fontSize: 16,
-                                        fontWeight: 800,
-                                        color: '#fff',
-                                        marginBottom: 3,
-                                    }}
-                                >
+                                <div className="sh-font-syne mb-0.5 text-base font-extrabold text-slate-900 dark:text-white">
                                     Install Mobile App
                                 </div>
-                                <div
-                                    style={{
-                                        fontSize: 11,
-                                        color: 'rgba(226,232,240,.35)',
-                                    }}
-                                >
+                                <div className="text-[11px] text-slate-400">
                                     Scan to download the Android app
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    marginBottom: 18,
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        background: '#fff',
-                                        padding: 8,
-                                        borderRadius: 12,
-                                    }}
-                                >
+
+                            <div className="mb-[18px] flex justify-center">
+                                <div className="rounded-xl bg-white p-2 shadow-lg">
                                     <img
                                         src="/doglens_apk_qr.jpeg"
                                         alt="QR"
-                                        style={{
-                                            display: 'block',
-                                            width: 112,
-                                            height: 112,
-                                        }}
+                                        className="block h-28 w-28"
                                     />
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    borderRadius: 10,
-                                    overflow: 'hidden',
-                                    border: '1px solid rgba(255,255,255,.07)',
-                                    marginBottom: 16,
-                                }}
-                            >
+
+                            <div className="mb-4 overflow-hidden rounded-[10px] border border-slate-200 dark:border-white/[.07]">
                                 {[
                                     {
                                         icon: <Download size={11} />,
@@ -441,55 +210,19 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                 ].map((f, i) => (
                                     <div
                                         key={i}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 8,
-                                            padding: '9px 12px',
-                                            fontSize: 11,
-                                            color: 'rgba(226,232,240,.45)',
-                                            borderBottom:
-                                                i < 2
-                                                    ? '1px solid rgba(255,255,255,.05)'
-                                                    : 'none',
-                                            background: 'rgba(255,255,255,.02)',
-                                        }}
+                                        className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] text-slate-600 last:border-none dark:border-white/[.05] dark:bg-white/[.02] dark:text-slate-400"
                                     >
-                                        <div
-                                            style={{
-                                                width: 20,
-                                                height: 20,
-                                                borderRadius: 5,
-                                                flexShrink: 0,
-                                                background:
-                                                    'rgba(16,185,129,.1)',
-                                                color: '#10b981',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                            }}
-                                        >
+                                        <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[5px] bg-emerald-500/10 text-emerald-500">
                                             {f.icon}
                                         </div>
                                         {f.t}
                                     </div>
                                 ))}
                             </div>
+
                             <button
                                 onClick={() => setShowQRModal(false)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    background:
-                                        'linear-gradient(135deg,#10b981,#06b6d4)',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    fontFamily: 'Syne,sans-serif',
-                                    fontWeight: 800,
-                                    fontSize: 12,
-                                    color: '#000',
-                                    cursor: 'pointer',
-                                }}
+                                className="sh-font-syne w-full rounded-[10px] bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-xs font-extrabold text-black"
                             >
                                 Close
                             </button>
@@ -497,46 +230,48 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     </div>
                 )}
 
-                <button className="fab" onClick={() => setShowQRModal(true)}>
+                {/* FAB */}
+                <button
+                    className="sh-fab fixed right-[18px] bottom-[18px] z-40 flex h-11 w-11 items-center justify-center rounded-[13px] bg-gradient-to-br from-emerald-500 to-cyan-500 text-black shadow-lg shadow-emerald-500/30 transition-transform hover:scale-105 active:scale-95"
+                    onClick={() => setShowQRModal(true)}
+                >
                     <QrCode size={17} />
                 </button>
 
                 {/* PAGE BODY */}
-                <div
-                    style={{
-                        position: 'relative',
-                        zIndex: 10,
-                        maxWidth: 1280,
-                        margin: '0 auto',
-                        padding: '0 16px 80px',
-                    }}
-                >
+                <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20">
                     {/* HERO */}
-                    <div className="hero-section">
+                    <div className="items-flex-end flex flex-wrap justify-between gap-4 border-b border-slate-200 py-8 dark:border-white/[.05]">
                         <div>
-                            <div className="hero-eyebrow">
-                                <span className="hero-eyebrow-dot" />
+                            <div className="sh-font-mono mb-3.5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-[5px] text-[10px] font-bold tracking-[.18em] text-emerald-600 uppercase dark:border-emerald-500/18 dark:text-emerald-400">
+                                <span className="sh-blink-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                 Scan Records
                             </div>
-                            <h1 className="hero-title">
-                                My <span>Scan</span>
+                            <h1 className="sh-font-syne m-0 mb-2.5 text-[clamp(2rem,8vw,4rem)] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
+                                My{' '}
+                                <span className="bg-gradient-to-br from-emerald-500 to-cyan-500 bg-clip-text text-transparent">
+                                    Scan
+                                </span>
                                 <br />
                                 History
                             </h1>
-                            <p className="hero-sub">
+                            <p className="max-w-[360px] text-[13px] leading-relaxed text-slate-400 dark:text-slate-500">
                                 View and manage your pet breed identification
                                 scans.
                             </p>
                         </div>
-                        <Link href="/scan" className="btn-newscan">
+                        <Link
+                            href="/scan"
+                            className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-[11px] text-[13px] font-extrabold whitespace-nowrap text-black no-underline shadow-lg shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:shadow-emerald-500/40"
+                        >
                             <Zap size={13} />
                             New Scan
-                            <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                            <ChevronRight size={12} className="opacity-60" />
                         </Link>
                     </div>
 
                     {/* STATS STRIP */}
-                    <div className="stats-strip" style={{ marginTop: 28 }}>
+                    <div className="mt-7 mb-7 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm sm:grid-cols-4 dark:border-white/[.06] dark:bg-white/[.02]">
                         {[
                             {
                                 icon: <History size={14} />,
@@ -573,16 +308,24 @@ export default function ScanHistory({ mockScans, user }: Props) {
                         ].map((s, i) => (
                             <div
                                 key={i}
-                                className="stat-cell"
+                                className={`sh-fade-up relative border-r border-b border-slate-100 p-5 pb-[18px] transition-colors hover:bg-emerald-500/[.04] dark:border-white/[.05] sm:[&:last-child]:border-r-0 [&:nth-child(2n)]:border-r-0 sm:[&:nth-child(2n)]:border-r [&:nth-child(n+3)]:border-b-0 sm:[&:nth-child(n+3)]:border-b-0`}
                                 style={{ animationDelay: `${i * 0.08}s` }}
                             >
-                                <div className="stat-cell-icon">{s.icon}</div>
-                                <div className="stat-label">{s.lbl}</div>
-                                <div className="stat-number">{s.val}</div>
-                                <div className="stat-sub">{s.sub}</div>
-                                <div className="stat-bar-track">
+                                <div className="mb-3 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] border border-emerald-500/18 bg-emerald-500/10 text-emerald-500 dark:border-emerald-500/20">
+                                    {s.icon}
+                                </div>
+                                <div className="sh-font-mono mb-1 text-[8px] font-bold tracking-[.12em] text-slate-400 uppercase dark:text-slate-500">
+                                    {s.lbl}
+                                </div>
+                                <div className="sh-font-syne mb-0.5 text-[clamp(1.5rem,4vw,2.4rem)] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
+                                    {s.val}
+                                </div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                                    {s.sub}
+                                </div>
+                                <div className="absolute right-0 bottom-0 left-0 h-[2px] bg-slate-100 dark:bg-white/[.05]">
                                     <div
-                                        className="stat-bar-fill"
+                                        className="sh-bar-fill h-full bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-[0_0_8px_rgba(16,185,129,.5)]"
                                         style={{
                                             width: `${s.bar}%`,
                                             animationDelay: `${i * 0.12 + 0.3}s`,
@@ -594,15 +337,15 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     </div>
 
                     {/* VET BANNER */}
-                    <div className="vet-banner">
-                        <div className="vet-banner-icon">
+                    <div className="mb-7 flex items-start gap-3.5 rounded-[14px] border border-cyan-500/15 bg-gradient-to-br from-cyan-500/[.06] to-emerald-500/[.04] p-4">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[9px] border border-cyan-500/20 bg-cyan-500/10 text-cyan-500">
                             <Shield size={14} />
                         </div>
                         <div>
-                            <div className="vet-banner-title">
+                            <div className="sh-font-syne mb-0.5 text-[12px] font-bold text-cyan-600 dark:text-cyan-400">
                                 Veterinarian Verification
                             </div>
-                            <div className="vet-banner-text">
+                            <div className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
                                 All system breed identifications can be reviewed
                                 by licensed veterinarians. Verified scans are
                                 confirmed by professional vets, while pending
@@ -612,21 +355,28 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     </div>
 
                     {/* TOOLBAR */}
-                    <div className="toolbar">
-                        <div className="search-wrap">
-                            <Search size={13} className="search-icon" />
+                    <div className="mb-6 flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[180px] flex-1">
+                            <Search
+                                size={13}
+                                className="pointer-events-none absolute top-1/2 left-[11px] -translate-y-1/2 text-slate-300 dark:text-slate-600"
+                            />
                             <input
-                                className="search-input"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Search breeds…"
+                                className="sh-font-dm w-full rounded-[10px] border border-slate-200 bg-white py-[10px] pr-3 pl-9 text-[13px] text-slate-700 transition-all outline-none placeholder:text-slate-300 focus:border-emerald-500/35 focus:bg-emerald-500/[.02] dark:border-white/[.08] dark:bg-white/[.04] dark:text-slate-200 dark:placeholder:text-slate-600 dark:focus:border-emerald-500/35 dark:focus:bg-emerald-500/[.04]"
                             />
                         </div>
                         {(['all', 'verified', 'pending'] as const).map((f) => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
-                                className={`filter-pill${filter === f ? 'active' : ''}`}
+                                className={`sh-font-mono flex items-center gap-[5px] rounded-[9px] border px-[13px] py-[9px] text-[9px] font-bold tracking-[.06em] whitespace-nowrap uppercase transition-all ${
+                                    filter === f
+                                        ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-600 shadow-[0_0_16px_rgba(16,185,129,.1)] dark:text-emerald-400'
+                                        : 'border-slate-200 bg-white text-slate-400 hover:border-emerald-500/25 hover:bg-emerald-500/[.04] hover:text-emerald-600 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-500 dark:hover:text-emerald-400'
+                                }`}
                             >
                                 <Filter size={9} />
                                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -636,21 +386,20 @@ export default function ScanHistory({ mockScans, user }: Props) {
 
                     {/* EMPTY: no scans */}
                     {mockScans.length === 0 && (
-                        <div className="empty-state">
-                            <div className="empty-icon-ring">
+                        <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-white/60 px-5 py-[60px] text-center backdrop-blur-sm dark:border-white/[.06] dark:bg-white/[.02]">
+                            <div className="relative mx-auto mb-4 inline-flex h-[72px] w-[72px] items-center justify-center rounded-full border border-emerald-500/15 bg-emerald-500/[.07] text-emerald-500">
+                                <div className="sh-ring-expand absolute inset-[-10px] rounded-full border border-emerald-500/[.08]" />
                                 <Calendar size={28} />
                             </div>
-                            <div className="empty-title">No scans yet</div>
-                            <div
-                                className="empty-sub"
-                                style={{ marginBottom: 20 }}
-                            >
+                            <div className="sh-font-syne mb-1.5 text-xl font-extrabold text-slate-900 dark:text-white">
+                                No scans yet
+                            </div>
+                            <div className="mb-5 text-[12px] text-slate-400">
                                 Start by scanning your first pet!
                             </div>
                             <Link
                                 href="/scan"
-                                className="btn-newscan"
-                                style={{ display: 'inline-flex' }}
+                                className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-[11px] text-[13px] font-extrabold text-black no-underline"
                             >
                                 <Zap size={13} />
                                 Scan Your Pet
@@ -660,12 +409,15 @@ export default function ScanHistory({ mockScans, user }: Props) {
 
                     {/* EMPTY: no results */}
                     {mockScans.length > 0 && filtered.length === 0 && (
-                        <div className="empty-state">
-                            <div className="empty-icon-ring">
+                        <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-white/60 px-5 py-[60px] text-center backdrop-blur-sm dark:border-white/[.06] dark:bg-white/[.02]">
+                            <div className="relative mx-auto mb-4 inline-flex h-[72px] w-[72px] items-center justify-center rounded-full border border-emerald-500/15 bg-emerald-500/[.07] text-emerald-500">
+                                <div className="sh-ring-expand absolute inset-[-10px] rounded-full border border-emerald-500/[.08]" />
                                 <Search size={26} />
                             </div>
-                            <div className="empty-title">No results found</div>
-                            <div className="empty-sub">
+                            <div className="sh-font-syne mb-1.5 text-xl font-extrabold text-slate-900 dark:text-white">
+                                No results found
+                            </div>
+                            <div className="text-[12px] text-slate-400">
                                 Try adjusting your search or filter.
                             </div>
                         </div>
@@ -673,67 +425,93 @@ export default function ScanHistory({ mockScans, user }: Props) {
 
                     {/* SCAN GRID */}
                     {filtered.length > 0 && (
-                        <div className="scan-grid">
+                        <div className="columns-1 gap-[18px] sm:columns-2 lg:columns-3">
                             {filtered.map((scan, idx) => (
                                 <div
                                     key={scan.id}
-                                    className="scan-card"
+                                    className="sh-card sh-fade-up group mb-[18px] inline-block w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/[.07] dark:border-white/[.07] dark:bg-white/[.025] dark:shadow-none"
                                     style={{ animationDelay: `${idx * 0.04}s` }}
-                                    onMouseEnter={() => setHoveredId(scan.id)}
-                                    onMouseLeave={() => setHoveredId(null)}
                                 >
-                                    <div className="card-img-wrap">
+                                    {/* Image */}
+                                    <div className="relative h-[200px] overflow-hidden sm:h-[220px]">
                                         <img
                                             src={scan.image}
                                             alt={scan.breed}
-                                            className="card-img"
+                                            className="h-full w-full object-cover transition-transform duration-[600ms] group-hover:scale-[1.07]"
                                         />
-                                        <div className="card-scan-line" />
-                                        <div className="card-img-overlay" />
-                                        <div className="hud-corner hud-tl" />
-                                        <div className="hud-corner hud-tr" />
-                                        <div className="hud-corner hud-bl" />
-                                        <div className="hud-corner hud-br" />
+
+                                        {/* Scan line on hover */}
                                         <div
-                                            className={`status-badge ${scan.status === 'verified' ? 'status-verified' : 'status-pending'}`}
+                                            className="sh-scan-line-el pointer-events-none absolute top-0 right-0 left-0 z-[4] h-[2px] bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent"
+                                            style={{ position: 'absolute' }}
+                                        />
+
+                                        {/* Overlay gradient */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+
+                                        {/* HUD corners */}
+                                        {[
+                                            'top-[7px] left-[7px] border-t-2 border-l-2',
+                                            'top-[7px] right-[7px] border-t-2 border-r-2',
+                                            'bottom-[7px] left-[7px] border-b-2 border-l-2',
+                                            'bottom-[7px] right-[7px] border-b-2 border-r-2',
+                                        ].map((cls, i) => (
+                                            <div
+                                                key={i}
+                                                className={`sh-hud-corner pointer-events-none absolute z-[3] h-[13px] w-[13px] border-emerald-500/60 ${cls}`}
+                                            />
+                                        ))}
+
+                                        {/* Status badge */}
+                                        <div
+                                            className={`sh-font-mono absolute top-[9px] left-[9px] z-[4] rounded-[5px] px-2 py-[3px] text-[8px] font-bold tracking-[.08em] uppercase backdrop-blur-sm ${
+                                                scan.status === 'verified'
+                                                    ? 'border border-emerald-500/35 bg-emerald-500/20 text-emerald-400'
+                                                    : 'border border-amber-500/30 bg-amber-500/15 text-amber-400'
+                                            }`}
                                         >
                                             {scan.status === 'verified'
                                                 ? '✓ Verified'
                                                 : '⏳ Pending'}
                                         </div>
-                                        <div className="delete-overlay">
+
+                                        {/* Delete button overlay */}
+                                        <div className="sh-del-overlay absolute top-[9px] right-[9px] z-[5]">
                                             <button
-                                                className="btn-del-img"
                                                 onClick={() =>
                                                     handleDelete(scan.id)
                                                 }
                                                 disabled={
                                                     deletingId === scan.id
                                                 }
+                                                className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-red-500/50 bg-red-500/70 text-white backdrop-blur-sm transition-colors hover:bg-red-500/90 disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 <Trash2 size={11} />
                                             </button>
                                         </div>
-                                        <div className="conf-badge">
+
+                                        {/* Confidence badge */}
+                                        <div className="sh-font-mono absolute right-[9px] bottom-[9px] z-[4] rounded-[5px] bg-gradient-to-r from-emerald-500 to-cyan-500 px-2 py-0.5 text-[10px] font-bold text-black shadow-lg shadow-emerald-500/40">
                                             {scan.confidence}%
                                         </div>
                                     </div>
 
-                                    <div className="card-body">
-                                        <div className="card-breed">
+                                    {/* Card body */}
+                                    <div className="px-4 pt-3.5 pb-3">
+                                        <div className="sh-font-syne mb-2.5 text-[15px] leading-tight font-bold text-slate-900 dark:text-white">
                                             {scan.breed}
                                         </div>
-                                        <div className="conf-row">
-                                            <span className="conf-label">
+                                        <div className="mb-1.5 flex items-center justify-between">
+                                            <span className="sh-font-mono text-[8px] font-bold tracking-[.1em] text-slate-400 uppercase dark:text-slate-500">
                                                 Confidence
                                             </span>
-                                            <span className="conf-val">
+                                            <span className="sh-font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                                                 {scan.confidence}%
                                             </span>
                                         </div>
-                                        <div className="conf-track">
+                                        <div className="mb-3 h-[3px] overflow-hidden rounded-full bg-slate-100 dark:bg-white/[.07]">
                                             <div
-                                                className="conf-fill"
+                                                className="sh-conf-fill h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-[0_0_6px_rgba(16,185,129,.5)]"
                                                 style={{
                                                     width: `${scan.confidence}%`,
                                                 }}
@@ -741,22 +519,23 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                         </div>
                                     </div>
 
-                                    <div className="card-footer">
+                                    {/* Card footer */}
+                                    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 dark:border-white/[.05]">
                                         <div>
-                                            <div className="card-date">
+                                            <div className="sh-font-mono mb-0.5 flex items-center gap-[5px] text-[9px] text-slate-300 dark:text-slate-600">
                                                 <Calendar size={9} />
                                                 {scan.date}
                                             </div>
-                                            <div className="card-scan-id">
+                                            <div className="sh-font-mono max-w-[110px] overflow-hidden text-[8px] text-ellipsis whitespace-nowrap text-slate-200 dark:text-slate-700">
                                                 {scan.scan_id}
                                             </div>
                                         </div>
                                         <button
-                                            className="btn-delete"
                                             onClick={() =>
                                                 handleDelete(scan.id)
                                             }
                                             disabled={deletingId === scan.id}
+                                            className="sh-font-mono flex items-center gap-1 rounded-[7px] border border-red-500/15 bg-transparent px-[10px] py-[5px] text-[9px] font-bold tracking-[.04em] text-red-400/55 transition-all hover:border-red-500/35 hover:bg-red-500/[.05] hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35"
                                         >
                                             <Trash2 size={9} />
                                             {deletingId === scan.id
