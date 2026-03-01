@@ -628,7 +628,7 @@ export default function Scan() {
                                                 Breed Detection
                                             </span>
                                         </div>
-                                        <h1 className="text-2xl leading-none font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+                                        <h1 className="text-xl leading-none font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
                                             Scan Your Dog
                                         </h1>
                                         <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
@@ -736,7 +736,7 @@ export default function Scan() {
                                         {!preview && !showCamera && (
                                             <div className="flex flex-col gap-3">
                                                 <div
-                                                    className={`sc-dz flex min-h-[250px] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-8 transition-all lg:min-h-[352px] ${isDragging ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'}`}
+                                                    className={`sc-dz flex min-h-[250px] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-8 transition-all lg:min-h-[330px] ${isDragging ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'}`}
                                                     onClick={() =>
                                                         fileInputRef.current?.click()
                                                     }
