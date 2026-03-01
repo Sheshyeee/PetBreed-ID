@@ -1369,8 +1369,8 @@ PASS1;
         ]],
         'generationConfig' => [
             'temperature'     => 0.0,
-            'maxOutputTokens' => 1500,
-            // ← responseMimeType REMOVED — causes parse failure with thinking models
+            'maxOutputTokens' => 2000,
+            'thinkingConfig'  => ['thinkingBudget' => 0], // pure measurement — no thinking needed, all tokens to output
         ],
         'safetySettings' => $this->sigmaGetSafetySettings(),
     ],
@@ -1736,8 +1736,9 @@ PASS3;
                             ],
                         ]],
                         'generationConfig' => [
-                            'temperature'    => 0.1,
+                            'temperature'     => 0.1,
                             'maxOutputTokens' => 400,
+                            'thinkingConfig'  => ['thinkingBudget' => 0],
                         ],
                         'safetySettings' => $this->sigmaGetSafetySettings(),
                     ],
@@ -2168,9 +2169,15 @@ FB;
   private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
 {
     $aiData = [
-        'description'    => "Identified as $detectedBreed.",
-        'origin_history' => [],
-        'health_risks'   => [],
+        'description'    => "Identified as {$detectedBreed}. Detailed breed information will appear shortly.",
+        'origin_history' => [
+            'country' => 'Unknown', 'country_code' => 'xx', 'region' => 'Unknown',
+            'description' => 'Origin information unavailable.', 'timeline' => [], 'details' => [],
+        ],
+        'health_risks'   => [
+            'concerns' => [], 'screenings' => [], 'lifespan' => 'Varies',
+            'care_tips' => ['Consult your veterinarian for breed-specific health guidance.'],
+        ],
     ];
 
     if ($detectedBreed === 'Unknown') {
@@ -2253,7 +2260,8 @@ CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
                     ]],
                     'generationConfig' => [
                         'temperature'     => 0.3,
-                        'maxOutputTokens' => 2000,
+                        'maxOutputTokens' => 4000,
+                        'thinkingConfig'  => ['thinkingBudget' => 0], // disable thinking — all tokens go to output
                         // NO responseMimeType — breaks thinking models
                     ],
                 ],
@@ -2343,14 +2351,35 @@ CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
             $aiData['health_risks'] = $parsed['health_risks'];
             Log::info("✓ Health risks extracted: " . count($parsed['health_risks']['concerns'] ?? []) . " concerns");
         } else {
-            Log::warning('⚠️ No health_risks in parsed data');
+            Log::warning('⚠️ No health_risks in parsed data — using safe fallback');
+            // Safe fallback so frontend never receives null arrays and crashes
+            $aiData['health_risks'] = [
+                'concerns'  => [],
+                'screenings' => [],
+                'lifespan'   => 'Varies',
+                'care_tips'  => [
+                    'Provide regular daily exercise appropriate for the breed.',
+                    'Feed a balanced diet suited to the dog's size and age.',
+                    'Schedule routine veterinary check-ups annually.',
+                    'Keep up with vaccinations and preventive care.',
+                ],
+            ];
         }
 
         if (isset($parsed['origin_data']) && !empty($parsed['origin_data'])) {
             $aiData['origin_history'] = $parsed['origin_data'];
             Log::info("✓ Origin data extracted: " . ($parsed['origin_data']['country'] ?? 'Unknown'));
         } else {
-            Log::warning('⚠️ No origin_data in parsed data');
+            Log::warning('⚠️ No origin_data in parsed data — using safe fallback');
+            // Safe fallback so frontend never receives null and crashes
+            $aiData['origin_history'] = [
+                'country'      => 'Unknown',
+                'country_code' => 'xx',
+                'region'       => 'Unknown',
+                'description'  => 'Origin information is currently unavailable for this breed.',
+                'timeline'     => [],
+                'details'      => [],
+            ];
         }
 
         Log::info('✅ AI descriptions generated successfully', [
@@ -2749,8 +2778,11 @@ private function extractPartialAiData(string $content): array
                 Log::info("✓ Image format ({$mimeType}) processed for API");
             }
 
-            // Register cleanup on shutdown (ensures file is deleted even if script crashes)
-            register_shutdown_function(function () use ($persistentTempPath) {
+            // Register cleanup on shutdown — only runs in the PARENT process.
+            // The forked child (ML API call) must NOT delete the parent's temp file.
+            $parentPid = getmypid();
+            register_shutdown_function(function () use ($persistentTempPath, $parentPid) {
+                if (getmypid() !== $parentPid) return; // child process — do nothing
                 if (file_exists($persistentTempPath)) {
                     @unlink($persistentTempPath);
                     Log::info('✓ Temp file cleaned up on shutdown: ' . basename($persistentTempPath));
