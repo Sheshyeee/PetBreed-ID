@@ -41,7 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
     Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    Route::get('/scan-results/{scan_id}', [ResultController::class, "show"]); 
+    
 
     Route::get('/model/scan-results', [ScanResultController::class, "index"]);
     Route::get('/scanhistory', [PageController::class, "scanhistory"]);

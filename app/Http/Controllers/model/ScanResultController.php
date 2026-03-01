@@ -1047,979 +1047,572 @@ class ScanResultController extends Controller
         return empty($trimmed) ? $breedName : $trimmed;
     }
 
-    // =========================================================================
-    // ███████╗██╗ ██████╗ ███╗   ███╗ █████╗     ██╗   ██╗██████╗
-    // ██╔════╝██║██╔════╝ ████╗ ████║██╔══██╗    ██║   ██║╚════██╗
-    // ███████╗██║██║  ███╗██╔████╔██║███████║    ██║   ██║ █████╔╝
-    // ╚════██║██║██║   ██║██║╚██╔╝██║██╔══██║    ╚██╗ ██╔╝██╔═══╝
-    // ███████║██║╚██████╔╝██║ ╚═╝ ██║██║  ██║     ╚████╔╝ ███████╗
-    // ╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝      ╚═══╝  ╚══════╝
-    //
-    // SIGMA v2 — SEQUENTIAL INTELLIGENCE WITH GUIDED MORPHOMETRIC ANALYSIS
-    //
-    // ARCHITECTURE: 4-PASS ADVERSARIAL ELIMINATION + CROSS-VERIFICATION
-    //
-    // THE PROBLEM WITH v1 AND ALL SINGLE-CALL SYSTEMS:
-    // ─────────────────────────────────────────────────
-    // Even with measurement fingerprints, a single-call model will still
-    // holistically pattern-match first and rationalize second. It sees
-    // "wolf-like dog + thick coat" and fires Malamute even when individual
-    // measurements disprove it. The model's latent-space nearest-neighbor
-    // bias overwhelms explicit reasoning instructions.
-    //
-    // THE v2 FIX: FORCED TEMPORAL SEPARATION + ADVERSARIAL JURY
-    // ─────────────────────────────────────────────────────────
-    // Each pass is a SEPARATE API call. The model cannot retroactively
-    // modify its measurements to fit a breed it hasn't named yet.
-    //
-    // PASS 1 — BLIND MORPHOMETRIC EXTRACTION (Flash, temp=0.0)
-    //   35-point structured JSON measurement. The model is PHYSICALLY
-    //   PREVENTED from naming breeds — it can only fill in measurement
-    //   fields. No anchoring possible because no breed is ever named.
-    //   New in v2: adds microstructure fields (individual hair texture,
-    //   ear leather thickness, dewlap presence, pastern angle, coat
-    //   pattern genetic markers) that catch fine-grained differences.
-    //
-    // PASS 2 — ADVERSARIAL ELIMINATION TRIBUNAL (Pro thinking, budget=5000)
-    //   Model receives: (a) image + (b) morph JSON from Pass 1
-    //   Forced protocol:
-    //     → Name 5 candidates (not 4)
-    //     → For each candidate, find FATAL CONTRADICTIONS in the morphometrics
-    //     → Score each elimination: FATAL(100)/STRONG(75)/WEAK(50)/POSSIBLE(25)
-    //     → Eliminate any candidate with cumulative score ≥ 75
-    //     → Survivors go to verification
-    //   New in v2: 50 breed-specific DNA fingerprints (was 8). These encode
-    //   the actual breed standard measurements that distinguish look-alikes.
-    //   e.g. Goberian vs Malamute: 6 simultaneous contradictions
-    //   e.g. Goldendoodle vs Labradoodle: head shape + tail + coat color
-    //
-    // PASS 3 — DEVIL'S ADVOCATE CHALLENGE (Flash, temp=0.15)
-    //   Only fires when Pass 2 confidence ≥ 72.
-    //   Model is told: "Pass 2 said X. Your job is to DISPROVE it."
-    //   If it finds compelling counter-evidence → override triggered.
-    //   If it cannot disprove → confidence boosted.
-    //   This is the Sherlock Holmes inversion: eliminate what's impossible,
-    //   then challenge what remains.
-    //   New in v2: uses Pass 1 morphometrics as hard evidence against
-    //   itself, not just image impressions.
-    //
-    // PASS 4 — CONFIDENCE CALIBRATION (Flash, temp=0.0, only if conf < 78)
-    //   Targeted re-examination of exactly the uncertain features.
-    //   Does NOT re-open the breed question — only resolves ambiguity
-    //   in the 2-3 specific measurements that caused uncertainty.
-    //
-    // EXPECTED ACCURACY (validated against test suite):
-    //   Pure breeds:      ~97%  (v2 was ~82%, SIGMA v1 ~96%)
-    //   Similar pairs:    ~94%  (v2 was ~60%, SIGMA v1 ~89%)
-    //   Named hybrids:    ~91%  (v2 was ~50%, SIGMA v1 ~89%)
-    //   ASPIN:            ~98%  (v2 was ~70%, SIGMA v1 ~97%)
-    // =========================================================================
-
-    // =========================================================================
-    // ███████╗██╗ ██████╗ ███╗   ███╗ █████╗     ██╗   ██╗██████╗
-    // ██╔════╝██║██╔════╝ ████╗ ████║██╔══██╗    ██║   ██║╚════██╗
-    // ███████╗██║██║  ███╗██╔████╔██║███████║    ██║   ██║ █████╔╝
-    // ╚════██║██║██║   ██║██║╚██╔╝██║██╔══██║    ╚██╗ ██╔╝██╔═══╝
-    // ███████║██║╚██████╔╝██║ ╚═╝ ██║██║  ██║     ╚████╔╝ ███████╗
-    // ╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝      ╚═══╝  ╚══════╝
-    //
-    // SIGMA v3 — UNIVERSAL MORPHOMETRIC IDENTIFICATION ENGINE
-    //
-    // PHILOSOPHY: NO HARDCODED BREED RULES.
-    // ─────────────────────────────────────────────────────
-    // Previous versions encoded specific breed fingerprints (Samoyed rules,
-    // Vallhund rules, Goberian rules, etc.). This creates a whack-a-mole
-    // problem: fix one breed, create a blind spot for a similar breed.
-    // The model memorizes rules instead of understanding anatomy.
-    //
-    // v3 takes the opposite approach: teach the model HOW to think about
-    // breed identification universally, not WHAT to think about specific breeds.
-    //
-    // THE THREE UNIVERSAL PRINCIPLES:
-    //
-    // PRINCIPLE 1 — STRUCTURE OVER APPEARANCE
-    //   Coat color and pattern are the LEAST reliable identifiers.
-    //   Bone structure, body proportions, and skull shape cannot be faked
-    //   by lighting, grooming, or individual variation. Always measure
-    //   structure first, use color/pattern only to break ties.
-    //
-    // PRINCIPLE 2 — PROPORTION IS THE PRIMARY SPLITTER
-    //   Body length-to-height ratio and leg length relative to body depth
-    //   are the single most powerful discriminators between visually similar
-    //   breeds. Two dogs can have identical coats, ears, and tails yet be
-    //   completely different breeds (Swedish Vallhund vs Norwegian Elkhound).
-    //   The model must always measure proportion before naming any breed.
-    //
-    // PRINCIPLE 3 — ELIMINATION NOT SELECTION
-    //   Do not ask "what does this look like?" — ask "what can this NOT be?"
-    //   Every breed has hard physical constraints from its standard.
-    //   Find what is IMPOSSIBLE for each candidate, not what fits best.
-    //   The last survivor of elimination is the answer.
-    //
-    // ARCHITECTURE: 3-PASS UNIVERSAL PIPELINE
-    //
-    // PASS 1 — UNIVERSAL MORPHOMETRIC SURVEY (Flash, temp=0.0)
-    //   Measures 40 physical parameters. No breed names allowed.
-    //   Organized into 6 anatomical systems: Skull, Muzzle/Dentition,
-    //   Ears/Eyes, Coat/Skin, Body Structure, Extremities.
-    //   Each system captures measurements that are breed-standard constraints.
-    //
-    // PASS 2 — UNIVERSAL ELIMINATION REASONING (Pro thinking, budget=8000)
-    //   Receives: (a) image + (b) full morphometric survey from Pass 1.
-    //   Protocol: Form candidates from anatomy only → test each against its
-    //   own breed standard using the measured data → eliminate by contradiction
-    //   → verify survivor → classify type.
-    //   No rules are pre-loaded. The model reasons from its complete training
-    //   knowledge of breed standards applied to the measured data.
-    //   Higher thinking budget (8000) for deeper cross-breed comparison.
-    //
-    // PASS 3 — STRUCTURAL VERIFICATION CHALLENGE (Flash, temp=0.1)
-    //   Fires when confidence ≥ 80 OR when top-2 candidates are within 20pts.
-    //   Asks: "What structural feature definitively separates your answer from
-    //   its closest competitor? Locate and measure that feature right now."
-    //   Forces the model to commit to a specific anatomical measurement that
-    //   distinguishes the winner — prevents pattern-match rationalization.
-    //   If it cannot find the distinguishing feature: confidence drops.
-    //   If it finds it clearly: confidence rises and answer is locked.
-    // =========================================================================
-
     /**
-     * SIGMA v3 — identifyBreedWithAPI
-     * Universal morphometric identification. No hardcoded breed rules.
+     * ==========================================
+     * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
+     * ==========================================
+     */
+    /**
+     * ==========================================
+     * GEMINI BREED IDENTIFICATION
+     * Two-call approach:
+     * Call 1 — deep thinking for primary breed
+     * Call 2 — alternatives with realistic confidence
+     * ==========================================
      */
     private function identifyBreedWithAPI($imagePath, $isObjectStorage = false, $mlBreed = null, $mlConfidence = null): array
     {
-        Log::info('╔══════════════════════════════════════════════════════════╗');
-        Log::info('║  SIGMA v3 — Universal Morphometric Identification Engine ║');
-        Log::info('╚══════════════════════════════════════════════════════════╝');
-        Log::info('Image: ' . $imagePath . ' | ObjectStorage: ' . ($isObjectStorage ? 'YES' : 'NO'));
+        Log::info('=== STARTING GEMINI BREED IDENTIFICATION (v2 SINGLE-CALL) ===');
+        Log::info('Image path: ' . $imagePath);
+        Log::info('Is object storage: ' . ($isObjectStorage ? 'YES' : 'NO'));
 
-        $apiKey = env('GEMINI_API_KEY') ?: config('services.gemini.api_key');
+        $apiKey = env('GEMINI_API_KEY');
         if (empty($apiKey)) {
-            Log::error('✗ GEMINI_API_KEY not configured');
+            Log::error('✗ GEMINI_API_KEY not configured in environment');
             return ['success' => false, 'error' => 'Gemini API key not configured'];
         }
+        Log::info('✓ Gemini API key is configured');
 
-        // ── IMAGE LOADING ──────────────────────────────────────────────────
         try {
+            // ----------------------------------------------------------------
+            // LOAD IMAGE — identical to original
+            // ----------------------------------------------------------------
             if ($isObjectStorage) {
                 if (!Storage::disk('object-storage')->exists($imagePath)) {
-                    return ['success' => false, 'error' => 'Image not found in object storage'];
+                    Log::error('✗ Image not found in object storage: ' . $imagePath);
+                    return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = Storage::disk('object-storage')->get($imagePath);
+                Log::info('✓ Image loaded from object storage');
             } else {
                 if (!file_exists($imagePath)) {
+                    Log::error('✗ Image not found locally: ' . $imagePath);
                     return ['success' => false, 'error' => 'Image file not found'];
                 }
                 $imageContents = file_get_contents($imagePath);
+                Log::info('✓ Image loaded from local filesystem');
             }
 
-            if (empty($imageContents)) throw new \Exception('Failed to load image data');
+            if (empty($imageContents)) {
+                throw new \Exception('Failed to load image data');
+            }
 
             $imageInfo = @getimagesizefromstring($imageContents);
-            if ($imageInfo === false) throw new \Exception('Invalid image file');
-
-            // Resize if too large in dimensions OR filesize > 500KB (avoids 6MB base64 payloads)
-            $imgW = $imageInfo[0] ?? 0;
-            $imgH = $imageInfo[1] ?? 0;
-            if ($imgW > 1024 || $imgH > 1024 || strlen($imageContents) > 512000) {
-                $targetDim     = 1024;
-                $imageContents = $this->sigmaResizeImage($imageContents, $imageInfo, $targetDim);
-                $imageInfo     = @getimagesizefromstring($imageContents) ?: $imageInfo;
-                Log::info('✓ Resized for API: ' . $imgW . 'x' . $imgH . ' → max ' . $targetDim . 'px (' . round(strlen($imageContents)/1024) . 'KB)');
+            if ($imageInfo === false) {
+                throw new \Exception('Invalid image file');
             }
 
-            $mimeType     = $imageInfo['mime'] ?? 'image/jpeg';
-            $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-            if (!in_array($mimeType, $allowedMimes)) {
-                $imageContents = $this->sigmaToJpeg($imageContents);
-                $mimeType      = 'image/jpeg';
-            }
-
+            $mimeType  = $imageInfo['mime'];
             $imageData = base64_encode($imageContents);
-            Log::info('✓ Image ready — ' . strlen($imageContents) . ' bytes, ' . $mimeType);
-        } catch (\Exception $e) {
-            Log::error('✗ Image load failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
 
-        // ── ENDPOINTS ─────────────────────────────────────────────────────
-      $flashUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey;
-       $proUrl   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=' . $apiKey;
-        $client = new \GuzzleHttp\Client([
-            'timeout'         => 45,
-            'connect_timeout' => 10,
-            'http_errors'     => false,
-        ]);
+            Log::info('✓ Image encoded — size: ' . strlen($imageContents) . ' bytes');
 
-        $overallStart = microtime(true);
+            $encodedUrl = 'aHR0cHM6Ly9nZW5lcmF0aXZlbGFuZ3VhZ2UuZ29vZ2xlYXBpcy5jb20vdjFiZXRhL21vZGVscy9nZW1pbmktMy1mbGFzaC1wcmV2aWV3OmdlbmVyYXRlQ29udGVudD9rZXk9';
+            $fullUrl    = base64_decode($encodedUrl) . $apiKey;
 
-        // ── ML CORROBORATION (100% only) ───────────────────────────────────
-        $mlNote = '';
-        if (!empty($mlBreed) && (float)$mlConfidence >= 100.0) {
-            $mlNote = "BACKGROUND NOTE: A secondary vision model independently predicted \"{$mlBreed}\" at 100% certainty. This is weak corroboration only — your anatomical analysis has full priority.\n\n";
-            Log::info('ML corroboration note added (100% only): ' . $mlBreed);
-        }
+            $client = new \GuzzleHttp\Client([
+                'timeout'         => 150,
+                'connect_timeout' => 15,
+            ]);
 
-        // ══════════════════════════════════════════════════════════════════
-        // PASS 1 — UNIVERSAL MORPHOMETRIC SURVEY
-        //
-        // 40-parameter anatomical survey organized into 6 systems.
-        // Model forbidden from naming any breed.
-        // Temperature = 0.0 for maximum measurement reproducibility.
-        //
-        // WHY 6 SYSTEMS:
-        // Each anatomical system captures different breed-standard constraints:
-        // - Skull system: separates molosser/spitz/dolichocephalic types
-        // - Body system: proportion is the #1 splitter for similar-looking breeds
-        // - Coat system: texture and structure (not color) reveal lineage
-        // - Extremity system: leg ratio catches long-low vs square confusion
-        // ══════════════════════════════════════════════════════════════════
-        Log::info('── SIGMA v3 PASS 1: Universal 40-Point Morphometric Survey ──');
-        $p1Start   = microtime(true);
-        $morphData = null;
+            $overallStart = microtime(true);
 
-        $pass1Prompt = <<<'PASS1'
-You are a veterinary anatomist performing a blind morphometric examination. You are ABSOLUTELY FORBIDDEN from naming, implying, or suggesting any dog breed anywhere in your response. You may only fill in the measurement fields below.
+            // ----------------------------------------------------------------
+            // ML CONTEXT INJECTION
+            // Give Gemini the YOLO result as a weak directional hint only.
+            // Gemini's own visual analysis ALWAYS takes priority.
+            // ----------------------------------------------------------------
+            $mlContextPrefix = '';
+            if (!empty($mlBreed) && !empty($mlConfidence)) {
+                $mlConfPct = round($mlConfidence, 1);
 
-FIRST: Add a top-level field "is_dog" with value "YES" if the image contains a dog (any breed, puppy, partial view, any setting), or "NO" if it does not. This is the only field where you make a non-measurement judgment.
+                if ($mlConfPct >= 98) {
+                    // Near-certain — strong signal, still visually verified
+                    $mlContextPrefix = <<<MLCONTEXT
+ML MODEL SIGNAL (very high confidence — treat as strong starting point):
+A trained computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
+• Confirm physical traits match this breed standard visually.
+• Check if this could be a hybrid that resembles this breed.
+• If clear visual contradiction exists — trust your eyes over this signal.
 
-Measure every field with maximum precision. This is objective anatomy — no subjective breed impressions.
+MLCONTEXT;
+                    Log::info('✓ ML hint — HIGH CONFIDENCE (' . $mlConfPct . '%)', [
+                        'ml_breed' => $mlBreed,
+                    ]);
+                } elseif ($mlConfPct >= 75) {
+                    // Moderate — very weak hint, Gemini leads
+                    $mlContextPrefix = <<<MLCONTEXT
+ML MODEL HINT (weak — low priority, do NOT anchor to this):
+A computer vision model predicted: "{$mlBreed}" at {$mlConfPct}% confidence.
+• WEAK hint only. Your visual forensic analysis takes complete priority.
+• Only consider this if your analysis is genuinely uncertain between two very similar breeds.
+• If your visual reading disagrees — ignore this hint entirely.
 
-Complete all 40 fields using the allowed values. Output ONLY the JSON object.
-
-{
-  "is_dog": "YES | NO",
-  "SYSTEM_1_SKULL": {
-    "skull_profile": "domed | flat | wedge | blocky-square | chiseled-fine | rounded-moderate | very-broad-flat | narrow-elongated",
-    "skull_width_to_length_ratio": "very-wide(>70%) | wide(55-70%) | medium(45-55%) | narrow(35-45%) | very-narrow(<35%)",
-    "occiput": "very-prominent-knob | prominent | moderate | slight | flat-absent",
-    "stop_angle": "very-abrupt(90deg) | pronounced(60-90deg) | moderate(30-60deg) | slight(10-30deg) | absent(0deg)",
-    "forehead": "very-wrinkled | slightly-wrinkled | smooth-flat | smooth-domed",
-    "cheeks": "very-prominent-bulging | prominent | moderate-flat | lean-chiseled"
-  },
-  "SYSTEM_2_MUZZLE": {
-    "muzzle_to_skull_length_ratio": "numeric 0.25-0.70 — fraction of total head length that is muzzle. 0.25=brachycephalic, 0.35=short, 0.45=moderate, 0.50=equal, 0.55=long, 0.65=very-long",
-    "muzzle_shape_top_view": "blunt-square | parallel-rectangular | tapering-wedge | very-narrow-snipey | conical",
-    "muzzle_depth": "very-deep(height≈length) | deep | moderate | shallow(height<<length)",
-    "lips": "very-tight-clean | tight | moderate | pendulous | very-pendulous-jowly | flews-present",
-    "nose": "very-broad-flat | broad | medium | narrow | butterfly-split",
-    "jaw_width": "very-broad | broad | medium | narrow"
-  },
-  "SYSTEM_3_EARS_EYES": {
-    "ear_attachment": "very-high(crown) | high(above-eye-line) | medium(at-eye-line) | low(below-eye-line) | very-low(jaw-level)",
-    "ear_form": "fully-erect-triangular | semi-erect-tipped | rose-folded-back | button-folded-forward | pendant-medium | long-pendant-lobular | bat-oversized-erect | cropped-erect",
-    "ear_leather_weight": "very-heavy-thick | medium | fine-thin",
-    "ear_size_vs_head": "very-large | large | proportionate | small",
-    "eye_placement": "forward-facing | slight-oblique | very-oblique-slanted",
-    "eye_form": "almond-sharp-corners | soft-oval | round-full | triangular-hooded | deep-set | very-prominent",
-    "eye_spacing": "very-wide-set | wide | medium | close-set",
-    "eye_color_primary": "blue | dark-brown | medium-brown | amber-yellow | green | odd-eyes"
-  },
-  "SYSTEM_4_COAT": {
-    "outer_coat_length": "very-short(<1cm) | short(1-3cm) | medium(3-6cm) | long(6-10cm) | very-long(>10cm)",
-    "outer_coat_texture": "smooth-flat-lying | rough-harsh-stand-off | soft-silky | wavy | loose-curly | tight-curly | corded | double-plush-dense | fluffy-stand-off-body",
-    "undercoat": "very-dense-woolly | dense | moderate | minimal | absent",
-    "feathering_present": "yes-on-legs-tail-belly | yes-on-tail-only | yes-light-fringing | no",
-    "coat_pattern_type": "solid | bicolor | tricolor | sable-gradient | agouti-banded-individual-hairs | saddle-blanket | merle | brindle | piebald | ticked | roan | phantom-tan-points",
-    "primary_color": "free description of dominant coat color — be precise e.g. pure-white, jet-black, golden-yellow, silver-grey, wolf-grey-agouti, liver-brown, blue-grey, red-mahogany, cream-pale, fawn-tan",
-    "secondary_color": "free description of secondary color if present, else null",
-    "any_warm_golden_tones": "yes | partial | no — is there golden/cream/apricot/red-gold warmth anywhere in the coat?"
-  },
-  "SYSTEM_5_BODY": {
-    "body_length_to_height": "long-low(<0.85) | slightly-long(0.85-0.95) | square(0.95-1.05) | slightly-tall(1.05-1.15) | tall-leggy(>1.15) — measure length from prosternum to buttock vs height at withers",
-    "leg_length_to_chest_depth": "very-short-legs(chest_depth≥leg_length_below_elbow) | short-legs(chest_depth≈0.8x_leg) | normal-legs(chest_depth≈0.6x_leg) | long-legs(chest_depth≈0.4x_leg) | very-long-legs(chest_depth<0.4x_leg)",
-    "chest_depth": "very-deep(reaches_elbow_or_below) | deep(near_elbow) | moderate | shallow",
-    "chest_width": "very-broad | broad | moderate | narrow | very-narrow",
-    "topline": "level-straight | slight-slope-rump | strong-slope-rump | roached-arched | slight-rise-over-loin",
-    "tuck_up": "very-pronounced | moderate | slight | absent",
-    "bone_substance": "very-heavy-coarse | heavy | moderate | fine | very-fine-delicate",
-    "muscle_mass": "very-muscular-powerful | well-muscled | moderate | lean-athletic | lightly-muscled",
-    "overall_weight_estimate": "toy(<5kg) | small(5-10kg) | medium(10-25kg) | large(25-45kg) | giant(>45kg)"
-  },
-  "SYSTEM_6_EXTREMITIES": {
-    "tail_set": "very-high | high | medium | low",
-    "tail_length": "long(reaches-hock-or-below) | medium(mid-thigh) | short(above-mid-thigh) | stub-bobtail | absent",
-    "tail_carriage": "tightly-curled-over-back | loosely-curled-sickle | plume-curl | feathered-straight-otter | sabre-low-natural | whip-straight | gay-tail-up | corkscrew",
-    "tail_feathering": "heavy-feathering | moderate-feathering | light-brush | no-feathering",
-    "feet_shape": "cat-foot-compact-round | oval-medium | hare-foot-long | very-large-webbed",
-    "rear_angulation": "very-angulated | well-angulated | moderate | straight-upright",
-    "is_puppy": "true | false",
-    "gender": "male | female | unknown",
-    "visible_cross_type_conflict": "CRITICAL: describe any features that seem to come from two different breed types simultaneously, suggesting hybrid lineage — e.g. one parent's head on another parent's body, coat from one type on skeleton of another. Write null only if all features appear internally consistent for one type."
-  }
-}
-
-RULES:
-1. Output ONLY the JSON. No text before or after. No breed names anywhere.
-2. "is_dog" must be the very first field and must be "YES" or "NO" only.
-3. muzzle_to_skull_length_ratio MUST be a decimal number (e.g. 0.43), not a string category.
-4. Every field must have a value. Only secondary_color and visible_cross_type_conflict may be null.
-5. Measure what you SEE, not what you infer. If a feature is obscured, note the closest visible approximation.
-PASS1;
-
-        try {
-           $r1 = $client->post($flashUrl, [
-    'json' => [
-        'contents' => [[
-            'parts' => [
-                ['text' => $pass1Prompt],
-                ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
-            ],
-        ]],
-        'generationConfig' => [
-            'temperature'     => 0.0,
-            'maxOutputTokens' => 2000,
-            'thinkingConfig'  => ['thinkingBudget' => 0], // pure measurement — no thinking needed, all tokens to output
-        ],
-        'safetySettings' => $this->sigmaGetSafetySettings(),
-    ],
-]);
-
-            $r1Body    = $r1->getBody()->getContents();
-            $r1Raw     = json_decode($r1Body, true);
-            $r1Text    = $this->sigmaExtractText($r1Raw);
-            $r1Text    = preg_replace('/```json|```/i', '', trim($r1Text));
-            $morphData = json_decode($r1Text, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE || empty($morphData)) {
-                Log::warning('⚠️ Pass 1 parse failed — proceeding without morphometrics');
-                $morphData = null;
-            } else {
-                // ── DOG VALIDATION embedded in Pass 1 ───────────────────────────
-                $isDogFromPass1 = strtoupper(trim($morphData['is_dog'] ?? 'YES'));
-                if ($isDogFromPass1 === 'NO') {
-                    Log::warning('⚠️ Pass 1: not a dog — rejecting early');
-                    return [
-                        'success'    => false,
-                        'not_a_dog'  => true,
-                        'error'      => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
-                    ];
+MLCONTEXT;
+                    Log::info('✓ ML hint — WEAK mode (' . $mlConfPct . '%)', [
+                        'ml_breed' => $mlBreed,
+                    ]);
+                } else {
+                    // Low confidence (<75%) — suppress entirely, Gemini works blind
+                    $mlContextPrefix = '';
+                    Log::info('⚠️ ML confidence too low (' . $mlConfPct . '%) — hint suppressed, Gemini working independently');
                 }
-                $body   = $morphData['SYSTEM_5_BODY'] ?? [];
-                $skull  = $morphData['SYSTEM_1_SKULL'] ?? [];
-                $coat   = $morphData['SYSTEM_4_COAT'] ?? [];
-                $extrem = $morphData['SYSTEM_6_EXTREMITIES'] ?? [];
-                Log::info('✓ Pass 1 complete in ' . round(microtime(true) - $p1Start, 2) . 's', [
-                    'body_ratio'      => $body['body_length_to_height'] ?? '?',
-                    'leg_ratio'       => $body['leg_length_to_chest_depth'] ?? '?',
-                    'bone'            => $body['bone_substance'] ?? '?',
-                    'skull'           => $skull['skull_profile'] ?? '?',
-                    'muzzle_ratio'    => $morphData['SYSTEM_2_MUZZLE']['muzzle_to_skull_length_ratio'] ?? '?',
-                    'coat_texture'    => $coat['outer_coat_texture'] ?? '?',
-                    'tail_carriage'   => $extrem['tail_carriage'] ?? '?',
-                    'conflicts'       => $extrem['visible_cross_type_conflict'] ?? 'none',
-                ]);
             }
-        } catch (\Exception $e) {
-            Log::warning('⚠️ Pass 1 failed: ' . $e->getMessage() . ' — continuing without morphometrics');
-        }
 
-        // ══════════════════════════════════════════════════════════════════
-        // PASS 2 — UNIVERSAL ELIMINATION REASONING
-        //
-        // The model receives the complete morphometric survey and reasons
-        // from its OWN knowledge of breed standards — no pre-loaded rules.
-        //
-        // WHY THIS IS BETTER THAN HARDCODED FINGERPRINTS:
-        // Hardcoded rules (Samoyed = white coat, Vallhund = short legs) create
-        // false certainty and break when breeds vary or images are unusual.
-        // A model that UNDERSTANDS breed standards can handle any breed,
-        // any variation, any lighting, any angle — because it reasons from
-        // anatomy to standard, not from appearance to memorized rule.
-        //
-        // The prompt teaches universal reasoning METHOD, not breed-specific facts.
-        // thinkingBudget = 8000 (highest yet) for complete standard comparison.
-        // ══════════════════════════════════════════════════════════════════
-        Log::info('── SIGMA v3 PASS 2: Universal Elimination Reasoning ──');
-        $p2Start = microtime(true);
+            // ----------------------------------------------------------------
+            // PROMPT
+            // ----------------------------------------------------------------
+            $combinedPrompt = $mlContextPrefix . <<<'PROMPT'
+You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs (Aspin, Bangkaew, Phu Quoc Ridgeback, Taiwan Dog, Kintamani, etc.), and ALL recognized designer/hybrid breeds.
 
-        $morphBlock = '';
-        if (!empty($morphData)) {
-            $morphBlock  = "═══════════════════════════════════════════════════════════\n";
-            $morphBlock .= "OBJECTIVE ANATOMICAL SURVEY — 40-POINT BLIND MEASUREMENT\n";
-            $morphBlock .= "═══════════════════════════════════════════════════════════\n";
-            $morphBlock .= json_encode($morphData, JSON_PRETTY_PRINT) . "\n\n";
-            $morphBlock .= "These measurements are HARD EVIDENCE from blind examination.\n";
-            $morphBlock .= "Any breed whose standard CANNOT accommodate these measurements is ELIMINATED.\n";
-            $morphBlock .= "Pay special attention to: body_length_to_height, leg_length_to_chest_depth, bone_substance, muzzle_to_skull_length_ratio — these are the primary splitters.\n\n";
-        }
+YOUR TASK: Identify this dog's breed with maximum accuracy using pure visual forensic analysis.
 
-        $pass2Prompt = $mlNote . $morphBlock . <<<'PASS2'
-You are the world's leading authority on canine breed identification — a combination of FCI judge, veterinary geneticist, and breed historian with complete knowledge of every AKC, FCI, UKC, KC, CKC recognized breed, all designer hybrids, and Southeast Asian native dogs including the Philippine Aspin.
+══════════════════════════════════════════════════════════════
+STEP 1 — VISUAL INDEPENDENCE (do this FIRST)
+══════════════════════════════════════════════════════════════
+Before anything else, look at the image with completely fresh eyes.
+- IGNORE any ML hint provided above until you have formed your own initial impression.
+- Ask yourself: "If I had no hint at all, what breed(s) would I identify from these physical traits?"
+- Only AFTER forming your own impression should you cross-reference the ML hint.
+- If your impression contradicts the ML hint — TRUST YOUR IMPRESSION.
 
-YOUR IDENTIFICATION PROTOCOL — UNIVERSAL ELIMINATION METHOD
+══════════════════════════════════════════════════════════════
+STEP 2 — PUPPY vs ADULT ASSESSMENT
+══════════════════════════════════════════════════════════════
+Determine if this is a puppy (under ~12 months):
+- Puppies: rounder head, oversized paws, shorter muzzle, softer coat, larger ears proportionally, less muscle definition
+- If puppy: adjust trait analysis — focus on bone structure, ear set, coat texture (reliable in puppies), not facial proportions
+- Do NOT confuse puppy face roundness with brachycephalic breed features
 
-═══════════════════════════════════════════════════════════
-PHASE 0 — ASPIN PRIORITY CHECK (Philippine native dog)
-═══════════════════════════════════════════════════════════
-Check FIRST before anything else.
-The Aspin (Asong Pinoy) is NOT a mixed breed — it is a primitive native landrace.
-It is the most commonly scanned dog in this system.
+══════════════════════════════════════════════════════════════
+STEP 3 — FORENSIC TRAIT ANALYSIS (complete before any decision)
+══════════════════════════════════════════════════════════════
+Examine every visible trait with maximum precision:
 
-Classify as ASPIN if the MAJORITY of these are visible:
-✓ Lean body, visible tuck-up, nothing exaggerated or excessively developed
-✓ Short, smooth, close-lying coat in any color
-✓ Wedge-shaped or moderately rounded head
-✓ Almond-shaped dark brown eyes (never blue, never heterochromatic)
-✓ Semi-erect, erect, or slightly tipped ears (never long pendant/lobular)
-✓ Sickle-tail, curled tail, or low-carried tail
+COAT: texture (smooth/short/wire/wavy/curly/loose-curl/tight-curl/double/silky/harsh/fluffy/corded), length, density, color, pattern (solid/spotted/ticked/merle/parti/saddle/blanket/sable/brindle/tricolor/phantom/roan)
+
+HEAD & SKULL: shape (domed/flat/wedge/chiseled/broad/narrow/blocky/refined/brachycephalic/dolichocephalic), stop angle (pronounced/moderate/slight/absent), muzzle length vs skull length ratio, occiput prominence, cheek muscles, wrinkles, flews
+
+EARS: set (high/mid/low), shape (erect/semi-erect/rose/button/pendant/folded/lobular/tipped), leather thickness, length relative to muzzle
+
+EYES: shape (almond/oval/round/triangular), set (deep/prominent), spacing, color
+
+NECK & BODY: neck length and arch, body length-to-height ratio, chest depth and width, forechest, tuck-up, topline (level/roached/sloping), loin
+
+LIMBS: bone substance (fine/moderate/heavy), angulation, hock angle, feet shape (cat/hare/oval), dewclaws
+
+TAIL: set, length, carriage (sabre/sickle/curl/otter/whip/bobtail/gay/plume/corkscrew)
+
+SIZE: estimate weight (toy <5kg / small 5–10kg / medium 10–25kg / large 25–45kg / giant >45kg)
+
+FCI TYPE: sighthound / scenthound / gundog / terrier / spitz / molosser / herding / primitive / companion / toy
+
+══════════════════════════════════════════════════════════════
+STEP 4 — HYBRID / CROSS DETECTION (CRITICAL — always do this)
+══════════════════════════════════════════════════════════════
+BEFORE committing to any purebred, check:
+• Does this dog show traits from TWO breed types simultaneously?
+• Are the coat, head, and body internally inconsistent for any single purebred standard?
+• Would a breeder immediately see two parent breeds?
+
+If YES to any → identify BOTH parent breeds visually, then check the hybrid list.
+
+IDENTIFYING DOODLES & POODLE CROSSES CORRECTLY:
+When you see curly/wavy coat, do NOT default to common doodles. Instead:
+1. Ignore the curly coat temporarily
+2. Examine the HEAD SHAPE, BODY SIZE, BONE STRUCTURE, and EAR SET
+3. These features reveal the NON-POODLE parent precisely:
+   - Long rectangular head + large body + wiry texture under curl = Airedale Terrier parent → AIREDOODLE
+   - Broad blocky head + heavy bone + tan/black markings = Rottweiler parent → ROTTLE
+   - Wedge-shaped herding head + merle pattern = Australian Shepherd parent → AUSSIEDOODLE
+   - Long low body + short legs = Dachshund parent → DOXIEPOO
+   - Floppy ears + hound expression + scent hound body = Beagle parent → POOGLE
+   - Broad retriever head + otter tail + yellow/gold coat = Golden Retriever parent → GOLDENDOODLE
+   - Broad retriever head + black/chocolate coat + otter tail = Labrador parent → LABRADOODLE
+   - Refined spaniel head + long pendulous ears = Cocker Spaniel parent → COCKAPOO
+   - Narrow Collie head + merle or tricolor = Border Collie parent → BORDOODLE
+   - Shepherd head + saddle markings + large body = German Shepherd parent → SHEPADOODLE
+   - Husky mask/blue eyes/thick double coat under curl = Husky parent → HUSKYDOODLE
+   - Heavy Bernese tricolor markings + large body = Bernese Mountain Dog parent → BERNEDOODLE
+   - OES shaggy coloring + large body = Old English Sheepdog parent → SHEEPADOODLE
+
+RECOGNIZED DESIGNER HYBRID REFERENCE (apply full knowledge beyond this list):
+── POODLE CROSSES ──
+Goldendoodle = Golden Retriever × Poodle
+Labradoodle = Labrador Retriever × Poodle
+Cockapoo = Cocker Spaniel × Poodle
+Maltipoo = Maltese × Poodle
+Schnoodle = Schnauzer × Poodle
+Cavapoo = Cavalier King Charles Spaniel × Poodle
+Yorkipoo = Yorkshire Terrier × Poodle
+Aussiedoodle = Australian Shepherd × Poodle
+Bernedoodle = Bernese Mountain Dog × Poodle
+Sheepadoodle = Old English Sheepdog × Poodle
+Whoodle = Soft Coated Wheaten Terrier × Poodle
+Airedoodle = Airedale Terrier × Poodle
+Bordoodle = Border Collie × Poodle
+Boxerdoodle = Boxer × Poodle
+Rottle = Rottweiler × Poodle
+Shepadoodle = German Shepherd × Poodle
+Huskydoodle = Siberian Husky × Poodle
+Irishdoodle = Irish Setter × Poodle
+Springerdoodle = English Springer Spaniel × Poodle
+Weimardoodle = Weimaraner × Poodle
+Doberdoodle = Doberman Pinscher × Poodle
+Saint Berdoodle = Saint Bernard × Poodle
+Newfypoo = Newfoundland × Poodle
+Pyredoodle = Great Pyrenees × Poodle
+Doxiepoo = Dachshund × Poodle
+Corgipoo = Corgi × Poodle
+Shih-Poo = Shih Tzu × Poodle
+Pomapoo = Pomeranian × Poodle
+Peekapoo = Pekingese × Poodle
+Bichpoo = Bichon Frise × Poodle
+Lhasapoo = Lhasa Apso × Poodle
+Westiepoo = West Highland White Terrier × Poodle
+Cairnoodle = Cairn Terrier × Poodle
+Scoodle = Scottish Terrier × Poodle
+Jackapoo = Jack Russell Terrier × Poodle
+Havapoo = Havanese × Poodle
+Chipoo = Chihuahua × Poodle
+Pugapoo = Pug × Poodle
+Poogle = Poodle × Beagle
+── SMALL CROSSES ──
+Puggle = Pug × Beagle
+Affenhuahua = Affenpinscher × Chihuahua
+Shorkie = Shih Tzu × Yorkshire Terrier
+Morkie = Maltese × Yorkshire Terrier
+Pomchi = Pomeranian × Chihuahua
+Chiweenie = Chihuahua × Dachshund
+Chorkie = Chihuahua × Yorkshire Terrier
+ShiChi = Chihuahua × Shih Tzu
+Malshi = Maltese × Shih Tzu
+Chug = Chihuahua × Pug
+Bugg = Boston Terrier × Pug
+Jug = Jack Russell Terrier × Pug
+Frug = French Bulldog × Pug
+Pomsky = Pomeranian × Husky
+── LARGE/MEDIUM CROSSES ──
+Goberian = Husky × Golden Retriever
+Gerberian Shepsky = Husky × German Shepherd
+Alusky = Husky × Malamute
+Sheprador = German Shepherd × Labrador Retriever
+Labrottie = Rottweiler × Labrador Retriever
+Beagador = Beagle × Labrador Retriever
+Jackabee = Jack Russell Terrier × Beagle
+Bocker = Cocker Spaniel × Beagle
+Horgi = Corgi × Husky
+Aussie-Corgi = Corgi × Australian Shepherd
+(Apply your FULL expert knowledge for any cross not listed — the list is illustrative, not exhaustive)
+
+══════════════════════════════════════════════════════════════
+STEP 5 — ASPIN RULE (MANDATORY — highest priority for Philippine/SE Asian dogs)
+══════════════════════════════════════════════════════════════
+The Aspin (Asong Pinoy) is the Philippine native dog — extremely common in SE Asia.
+Classify as Aspin if the MAJORITY of these are present:
+✓ Lean, lightly muscled body with visible tuck-up
+✓ Short, smooth, close-lying coat (any color — tan, black, spotted, brindle, white all valid)
+✓ Wedge-shaped or slightly rounded head, moderate stop
+✓ Almond-shaped dark brown eyes
+✓ Semi-erect, erect, or slightly tipped ears (NOT fully pendant or lobular)
+✓ Sickle-shaped, curled, or low-carried tail
 ✓ Medium size, fine to moderate bone
-✓ Primitive/pariah overall appearance — no Western breed exaggerations
-→ classification_type = "aspin"
-→ NEVER label Aspin as "Village Dog", "Mixed Breed", or any Western breed name
-→ Skip all other phases if ASPIN criteria met
+✓ Overall primitive/pariah dog appearance — nothing exaggerated
+✓ No heavy coat, no dewlap, no extreme wrinkles, no heavy angulation
 
-═══════════════════════════════════════════════════════════
-PHASE 1 — ANATOMY-FIRST CANDIDATE FORMATION
-═══════════════════════════════════════════════════════════
-Using ONLY the anatomical measurements above (not color, not coat pattern):
+→ primary_breed = "Aspin", classification_type = "aspin"
+→ NEVER label an Aspin as: Village Dog, Mixed Breed, Mutt, Street Dog, or any foreign breed name
 
-Step 1 — Identify the PRIMARY STRUCTURAL TYPE from body proportions:
-  • body_length_to_height + leg_length_to_chest_depth together define the structural type
-  • long-low + very-short-legs → low-slung type (Corgis, Dachshunds, Bassets, Vallhund, Skye Terrier)
-  • square/balanced + normal-legs → standard type (most breeds)
-  • tall-leggy + long-legs → elegant type (Greyhounds, Doberman, Poodle)
-  • square + very-heavy-bone → molosser type (Mastiffs, Rottweiler, Boxer)
+══════════════════════════════════════════════════════════════
+STEP 6 — FINAL CLASSIFICATION DECISION
+══════════════════════════════════════════════════════════════
+Apply EXACTLY ONE in priority order:
 
-Step 2 — Identify the SKULL TYPE from measurements:
-  • brachycephalic (muzzle_ratio < 0.35) → Bulldogs, Pugs, Boxers, Shih Tzu, Pekingese
-  • mesocephalic (muzzle_ratio 0.40-0.52) → most breeds
-  • dolichocephalic (muzzle_ratio > 0.55) → Greyhounds, Collies, Shelties, Borzoi
+1. ASPIN → Step 5 criteria met
+   classification_type = "aspin", recognized_hybrid_name = null
 
-Step 3 — Identify the COAT TYPE:
-  • double-plush-dense or fluffy-stand-off + dense undercoat → spitz/nordic types
-  • smooth-flat-lying + absent/minimal undercoat → hound/terrier/gundog types
-  • curly/wavy → poodle crosses or specific curly breeds (Barbet, Portuguese Water Dog)
-  • rough-harsh → wire-haired types (terriers, Griffons)
+2. RECOGNIZED DESIGNER HYBRID → Step 4 identified a known cross
+   primary_breed = full hybrid name (e.g. "Airedoodle", "Goldendoodle")
+   classification_type = "designer_hybrid"
+   recognized_hybrid_name = same as primary_breed
+   alternatives = [parent breed 1, parent breed 2]
 
-From structural type + skull type + coat type → form your 5 candidate breeds/groups.
-Do NOT let color or pattern drive candidate selection.
+3. PUREBRED → 80%+ of traits match one breed standard consistently
+   classification_type = "purebred", recognized_hybrid_name = null
+   alternatives = [2 most structurally similar breeds]
 
-═══════════════════════════════════════════════════════════
-PHASE 2 — STANDARD-BASED ELIMINATION
-═══════════════════════════════════════════════════════════
-For each of your 5 candidates, test it against its ACTUAL breed standard:
+4. UNNAMED MIXED BREED → Two visible breeds, no recognized hybrid name
+   primary_breed = dominant parent breed full name
+   classification_type = "mixed", recognized_hybrid_name = null
+   alternatives = [secondary parent, next closest]
 
-Ask for each candidate:
-"According to this breed's official standard, is [measured_value] for [parameter] 
-physically possible within acceptable variation for this breed?"
+══════════════════════════════════════════════════════════════
+CONFIDENCE SCORING
+══════════════════════════════════════════════════════════════
+primary_confidence (65–98):
+• 90–98: completely certain, traits unmistakably consistent
+• 80–89: very confident, minor uncertainty only
+• 70–79: reasonably confident, some ambiguous traits
+• 65–69: moderate confidence, notable uncertainty
+alternative confidence: lower than primary, range 15–84
+Be HONEST — reflect actual certainty, do not always output the same number.
 
-The elimination test has three levels:
-• DISQUALIFYING: This measurement violates the breed's hard physical standard → ELIMINATE
-• ATYPICAL: This measurement is outside typical range but not disqualifying → PENALIZE (-20pts)
-• ACCEPTABLE: This measurement fits within the standard's normal range → PASS
+══════════════════════════════════════════════════════════════
+OUTPUT RULES
+══════════════════════════════════════════════════════════════
+- Output ONLY valid JSON. No markdown. No explanation. No preamble.
+- NEVER abbreviate: "Labrador Retriever" not "Lab", "Airedale Terrier" not "Airedale"
+- For hybrids: use the FULL recognized hybrid name ("Airedoodle" not "Airedale Mix")
+- alternatives: exactly 2 entries with "breed" and "confidence"
+- Each alternative must differ from primary_breed
+- Trim all breed names
 
-Eliminate any candidate with 1+ DISQUALIFYING contradictions.
-Rank remaining candidates by penalty points — fewest penalties wins.
+Output EXACTLY this structure:
+{"primary_breed":"Full Official Breed Name or Hybrid Name","primary_confidence":87.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Official Breed Name","confidence":65.0},{"breed":"Full Official Breed Name","confidence":48.0}]}
+PROMPT;
 
-KEY UNIVERSAL STANDARD CONSTRAINTS to test for every candidate:
-— Size: Every breed has a standard weight/height range. Giant breeds cannot be small, toy breeds cannot be large.
-— Bone substance: Heavy-boned breeds CANNOT have fine bone. Fine-boned breeds CANNOT have heavy bone.
-— Body proportion: Low-slung breeds require long-low ratio. Square breeds CANNOT be long-low.
-— Leg length: Short-legged breeds have a specific leg-to-chest-depth ratio. Normal-legged breeds cannot match short-legged breeds' ratio.
-— Muzzle ratio: Brachycephalic breeds have <0.35 ratio. Dolichocephalic breeds have >0.55 ratio. These are hard constraints.
-— Ear type: Breeds with erect ears CANNOT have pendant ears. Breeds with pendant ears CANNOT have erect ears.
-— Coat type: Breeds with smooth coats CANNOT have fluffy stand-off coats and vice versa.
+            $callStart = microtime(true);
 
-═══════════════════════════════════════════════════════════
-PHASE 3 — HYBRID DETECTION
-═══════════════════════════════════════════════════════════
-Run this BEFORE committing to purebred — check the visible_cross_type_conflict field.
-
-If visible_cross_type_conflict is populated, OR if your survivors show traits from two structural types:
-→ Identify the two parent structural types from the anatomy
-→ Identify the specific parent breeds
-→ Determine if a recognized hybrid name exists for this cross
-
-For curly/wavy coated dogs: The poodle parent contributes the coat only.
-Read the non-curly parent from: skull shape, body proportions, bone, size, ear type.
-A blocky square lab skull on a curly body = Labradoodle.
-A refined retriever skull with feathered otter tail on a curly body = Goldendoodle.
-A long narrow terrier skull on a large curly body = Airedoodle.
-A herding-type wedge skull with merle on a curly body = Aussiedoodle.
-Apply this universal principle to ALL hybrid types, not just doodles.
-
-═══════════════════════════════════════════════════════════
-PHASE 4 — CLASSIFICATION AND CONFIDENCE
-═══════════════════════════════════════════════════════════
-After elimination:
-
-Classification (in priority order):
-1. ASPIN → Phase 0 criteria met → classification_type = "aspin"
-2. RECOGNIZED HYBRID → Phase 3 identified named cross → classification_type = "designer_hybrid"
-   recognized_hybrid_name = full hybrid name
-   alternatives = [parent_breed_1, parent_breed_2]
-3. PUREBRED → single survivor from elimination → classification_type = "purebred"
-   alternatives = [2 hardest-to-eliminate runners-up]
-4. UNNAMED MIX → two parent lineages, no recognized name → classification_type = "mixed"
-   primary_breed = dominant parent structural type
-   alternatives = [secondary_parent, next closest]
-
-Confidence calibration:
-95-98: zero contradictions, all measurements fit perfectly, unmistakable
-87-94: one ATYPICAL measurement, very high confidence
-78-86: two ATYPICAL measurements or one ambiguous structural feature
-68-77: meaningful uncertainty, proportion or type is borderline
-65-67: best available answer under significant ambiguity
-
-uncertain_features: list the specific measured parameters that caused uncertainty.
-If confidence ≥ 85: uncertain_features = []
-
-═══════════════════════════════════════════════════════════
-OUTPUT — STRICT JSON ONLY
-═══════════════════════════════════════════════════════════
-No markdown. No preamble. No explanation. Valid JSON only.
-Full official breed names: "Labrador Retriever" not "Lab"
-Full hybrid names: "Goldendoodle" not "Golden Doodle" or "Golden mix"
-alternatives: exactly 2 objects with "breed" and "confidence"
-
-{"primary_breed":"Full Name","primary_confidence":91.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Name","confidence":72.0},{"breed":"Full Name","confidence":45.0}],"uncertain_features":[]}
-PASS2;
-
-        $parsed   = null;
-        $p2Failed = false;
-
-        try {
-            $r2 = $client->post($proUrl, [
+            $response = $client->post($fullUrl, [
                 'json' => [
-                    'contents' => [[
-                        'parts' => [
-                            ['text' => $pass2Prompt],
-                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $combinedPrompt],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mimeType,
+                                        'data'      => $imageData,
+                                    ],
+                                ],
+                            ],
                         ],
-                    ]],
+                    ],
                     'generationConfig' => [
                         'temperature'     => 0.1,
-                        'maxOutputTokens' => 2000,
-                        'thinkingConfig'  => ['thinkingBudget' => 3000],
+                        'maxOutputTokens' => 2500,  // JSON output ~150 tokens, 1500 = safe buffer
+                        'thinkingConfig'  => [
+                            'thinkingBudget' => 2500, // Sufficient for accurate breed ID, ~8-12s
+                        ],
                     ],
-                    'safetySettings' => $this->sigmaGetSafetySettings(),
+                    'safetySettings' => [
+                        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
+                        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
+                    ],
                 ],
             ]);
 
-            $r2Status = $r2->getStatusCode();
-            $r2Body   = $r2->getBody()->getContents();
-            $r2Raw    = json_decode($r2Body, true);
+            Log::info('✓ Single combined call completed in ' . round(microtime(true) - $callStart, 2) . 's');
 
-            if ($r2Status !== 200) {
-                Log::error('✗ Pass 2 HTTP error: ' . ($r2Raw['error']['message'] ?? 'HTTP ' . $r2Status));
-                $p2Failed = true;
-            } else {
-                $r2Text = $this->sigmaExtractText($r2Raw);
-                $r2Text = preg_replace('/```json|```/i', '', trim($r2Text));
-                $parsed = json_decode($r2Text, true);
+            $body   = $response->getBody()->getContents();
+            $result = json_decode($body, true);
 
-                if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
-                    Log::warning('⚠️ Pass 2 JSON parse failed — trying regex recovery');
-                    $parsed = $this->sigmaRecoverJson($r2Text);
-                }
+            Log::info('📥 Raw Gemini response: ' . substr($body, 0, 1000));
 
-                if (empty($parsed['primary_breed'])) {
-                    Log::error('✗ Pass 2 recovery failed');
-                    $p2Failed = true;
-                } else {
-                    Log::info('✓ Pass 2 complete in ' . round(microtime(true) - $p2Start, 2) . 's', [
-                        'breed'      => $parsed['primary_breed'],
-                        'confidence' => $parsed['primary_confidence'] ?? '?',
-                        'class_type' => $parsed['classification_type'] ?? '?',
-                    ]);
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('✗ Pass 2 exception: ' . $e->getMessage());
-            $p2Failed = true;
-        }
+            // ----------------------------------------------------------------
+            // EXTRACT JSON TEXT FROM RESPONSE PARTS — identical to original
+            // ----------------------------------------------------------------
+            $jsonText = '';
 
-        if ($p2Failed) {
-            Log::warning('⚠️ Pass 2 failed — running SIGMA v3 fallback');
-            return $this->sigmaFallback($client, $proUrl, $mimeType, $imageData, $mlNote, $overallStart);
-        }
-
-        $p2Confidence      = (float)($parsed['primary_confidence'] ?? 80.0);
-        $p2Breed           = trim($parsed['primary_breed'] ?? '');
-        $uncertainFeatures = $parsed['uncertain_features'] ?? [];
-        $topAltBreed       = $parsed['alternatives'][0]['breed'] ?? '';
-        $topAltConf        = (float)($parsed['alternatives'][0]['confidence'] ?? 0);
-
-        // ══════════════════════════════════════════════════════════════════
-        // PASS 3 — STRUCTURAL VERIFICATION CHALLENGE
-        //
-        // Fires when: confidence ≥ 80 (high confidence needs verification)
-        //          OR top-2 candidates are within 20 confidence points (close race)
-        //
-        // Unlike v2's "Devil's Advocate" (which was too aggressive and overrode
-        // correct answers like Samoyed→Husky), Pass 3 here is STRUCTURAL:
-        //
-        // It asks the model to identify and MEASURE the single anatomical feature
-        // that definitively separates the winner from its closest competitor.
-        // This is not "try to disprove" — it's "prove it with anatomy."
-        //
-        // OUTCOMES:
-        // A) Clear distinguishing feature found → confidence locked high
-        // B) Cannot find distinguishing feature → confidence drops (uncertainty acknowledged)
-        // C) Distinguishing feature found but points to DIFFERENT breed → override
-        //    (Override only happens when structural evidence is unambiguous)
-        // ══════════════════════════════════════════════════════════════════
-        // ── PASS 3 TRIGGER: Only fire when genuinely uncertain ──────────────
-        // Skip Pass 3 entirely when confidence ≥ 95 (already certain)
-        // Close race threshold tightened to 15pts (was 20) to reduce extra API calls
-        $closeRace = ($topAltConf > 0) && (($p2Confidence - $topAltConf) <= 15);
-
-        if (($p2Confidence >= 80 && $p2Confidence < 95) || $closeRace) {
-            Log::info('── SIGMA v3 PASS 3: Structural Verification Challenge ──', [
-                'p2_breed'   => $p2Breed,
-                'p2_conf'    => $p2Confidence,
-                'top_alt'    => $topAltBreed,
-                'alt_conf'   => $topAltConf,
-                'close_race' => $closeRace,
-            ]);
-            $p3Start = microtime(true);
-
-            // Build a compact structural summary from Pass 1 for Pass 3
-            $structSummary = '';
-            if (!empty($morphData)) {
-                $body5  = $morphData['SYSTEM_5_BODY'] ?? [];
-                $skull1 = $morphData['SYSTEM_1_SKULL'] ?? [];
-                $muzz2  = $morphData['SYSTEM_2_MUZZLE'] ?? [];
-                $extrem = $morphData['SYSTEM_6_EXTREMITIES'] ?? [];
-                $struct = [
-                    'body_length_to_height'      => $body5['body_length_to_height'] ?? 'unknown',
-                    'leg_length_to_chest_depth'  => $body5['leg_length_to_chest_depth'] ?? 'unknown',
-                    'bone_substance'             => $body5['bone_substance'] ?? 'unknown',
-                    'overall_weight_estimate'    => $body5['overall_weight_estimate'] ?? 'unknown',
-                    'skull_profile'              => $skull1['skull_profile'] ?? 'unknown',
-                    'muzzle_to_skull_ratio'      => $muzz2['muzzle_to_skull_length_ratio'] ?? 'unknown',
-                    'tail_carriage'              => $extrem['tail_carriage'] ?? 'unknown',
-                    'tail_feathering'            => $extrem['tail_feathering'] ?? 'unknown',
-                    'visible_cross_type_conflict' => $extrem['visible_cross_type_conflict'] ?? null,
-                ];
-                $structSummary = "KEY STRUCTURAL MEASUREMENTS:\n" . json_encode($struct, JSON_PRETTY_PRINT) . "\n\n";
-            }
-
-            $pass3Prompt = <<<PASS3
-{$structSummary}Pass 2 identified: "{$p2Breed}" at {$p2Confidence}%.
-Closest competitor: "{$topAltBreed}" at {$topAltConf}%.
-
-YOUR TASK — STRUCTURAL VERIFICATION:
-Do NOT try to disprove "{$p2Breed}". Instead, answer this question with precision:
-
-"What is the single most important anatomical measurement or structural feature that 
-physically separates '{$p2Breed}' from '{$topAltBreed}'?"
-
-Look at the image RIGHT NOW and locate that specific feature.
-Measure or describe it precisely — be specific about what you see, not what you expect.
-
-Then answer:
-1. What is the distinguishing structural feature?
-2. What does the breed standard for "{$p2Breed}" require for that feature?
-3. What does the breed standard for "{$topAltBreed}" require for that feature?
-4. What do you ACTUALLY SEE for that feature in this image?
-5. Which breed does what you SEE match?
-
-Based on this structural verification:
-— If what you see matches "{$p2Breed}": set verdict="confirmed", keep or raise confidence
-— If what you see definitively matches "{$topAltBreed}" instead: set verdict="structural_override"
-— If the feature is unclear or both breeds could match: set verdict="confirmed" with lower confidence
-
-Output ONLY valid JSON:
-{"verdict":"confirmed|structural_override","confirmed_breed":"Full Name","updated_confidence":91.0,"distinguishing_feature":"name of feature","what_observed":"precise description of what you measured","structural_reason":"one sentence why this supports your verdict"}
-PASS3;
-
-            try {
-                $r3 = $client->post($flashUrl, [
-                    'json' => [
-                        'contents' => [[
-                            'parts' => [
-                                ['text' => $pass3Prompt],
-                                ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
-                            ],
-                        ]],
-                        'generationConfig' => [
-                            'temperature'     => 0.1,
-                            'maxOutputTokens' => 400,
-                            'thinkingConfig'  => ['thinkingBudget' => 0],
-                        ],
-                        'safetySettings' => $this->sigmaGetSafetySettings(),
-                    ],
-                ]);
-
-                $r3Body = $r3->getBody()->getContents();
-                $r3Raw  = json_decode($r3Body, true);
-                $r3Text = $this->sigmaExtractText($r3Raw);
-                $r3Text = preg_replace('/```json|```/i', '', trim($r3Text));
-                $r3Data = json_decode($r3Text, true);
-
-                if (json_last_error() === JSON_ERROR_NONE && !empty($r3Data['verdict'])) {
-                    $verdict     = $r3Data['verdict'];
-                    $updatedConf = (float)($r3Data['updated_confidence'] ?? $p2Confidence);
-
-                    if ($verdict === 'structural_override' && !empty($r3Data['confirmed_breed'])) {
-                        $newBreed = trim($r3Data['confirmed_breed']);
-                        Log::info('🔄 Pass 3 STRUCTURAL OVERRIDE: ' . $p2Breed . ' → ' . $newBreed, [
-                            'feature'  => $r3Data['distinguishing_feature'] ?? '?',
-                            'observed' => $r3Data['what_observed'] ?? '?',
-                            'reason'   => $r3Data['structural_reason'] ?? '?',
-                        ]);
-                        $parsed['primary_breed']      = $newBreed;
-                        $parsed['primary_confidence'] = max(68.0, min(94.0, $updatedConf));
-                    } else {
-                        // Confirmed — update confidence
-                        $parsed['primary_confidence'] = max($p2Confidence, min(98.0, $updatedConf));
-                        Log::info('✓ Pass 3 STRUCTURAL CONFIRMED: ' . $p2Breed, [
-                            'feature'      => $r3Data['distinguishing_feature'] ?? '?',
-                            'updated_conf' => $parsed['primary_confidence'],
-                        ]);
+            if (!empty($result['candidates'][0]['content']['parts'])) {
+                // Pass 1: prefer non-thought text parts
+                foreach ($result['candidates'][0]['content']['parts'] as $part) {
+                    if (isset($part['text']) && empty($part['thought'])) {
+                        $jsonText = trim($part['text']);
+                        break;
                     }
                 }
-                Log::info('✓ Pass 3 done in ' . round(microtime(true) - $p3Start, 2) . 's');
-            } catch (\Exception $e) {
-                Log::warning('⚠️ Pass 3 failed: ' . $e->getMessage() . ' — Pass 2 result kept');
+                // Pass 2: fallback — grab any text part
+                if (empty($jsonText)) {
+                    foreach ($result['candidates'][0]['content']['parts'] as $part) {
+                        if (isset($part['text'])) {
+                            $jsonText = trim($part['text']);
+                            break;
+                        }
+                    }
+                }
+                // Pass 3: last resort — find any part containing our expected JSON key
+                if (empty($jsonText)) {
+                    foreach ($result['candidates'][0]['content']['parts'] as $part) {
+                        if (isset($part['text']) && str_contains($part['text'], '"primary_breed"')) {
+                            $jsonText = trim($part['text']);
+                            break;
+                        }
+                    }
+                }
             }
-        } else {
-            Log::info('⏭️ Pass 3 skipped (conf=' . $p2Confidence . ' < 80, gap=' . round($p2Confidence - $topAltConf, 1) . ')');
-        }
 
-        // ── BUILD FINAL RESULT ─────────────────────────────────────────────
-        $classType   = trim($parsed['classification_type'] ?? 'purebred');
-        $hybridName  = isset($parsed['recognized_hybrid_name'])
-            ? trim((string)$parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`") : null;
-        if (empty($hybridName) || strtolower($hybridName) === 'null') $hybridName = null;
+            // Strip any accidental markdown fences
+            $jsonText = preg_replace('/```json\s*|\s*```/i', '', $jsonText);
+            $jsonText = trim($jsonText);
 
-        $primaryRaw   = trim($parsed['primary_breed'] ?? '', " \t\n\r\0\x0B\"'`");
-        $primaryRaw   = substr(preg_replace('/\s+/', ' ', $primaryRaw), 0, 120);
-        $cleanedBreed = ($classType === 'designer_hybrid') ? $primaryRaw : $this->cleanBreedName($primaryRaw);
-        if (empty($cleanedBreed)) $cleanedBreed = 'Unknown';
+            Log::info('📝 Cleaned JSON text: ' . $jsonText);
 
-        $actualConf = max(65.0, min(98.0, (float)($parsed['primary_confidence'] ?? 78.0)));
+            $parsed = json_decode($jsonText, true);
 
-        $topPredictions = [['breed' => $cleanedBreed, 'confidence' => round($actualConf, 1)]];
-        foreach (($parsed['alternatives'] ?? []) as $alt) {
-            if (empty($alt['breed'])) continue;
-            $ab = substr(preg_replace('/\s+/', ' ', trim($alt['breed'], " \t\n\r\0\x0B\"'`")), 0, 120);
-            if (empty($ab) || strtolower($ab) === strtolower($cleanedBreed)) continue;
-            $topPredictions[] = [
-                'breed'      => $ab,
-                'confidence' => round(max(15.0, min(84.0, (float)($alt['confidence'] ?? 35.0))), 1),
-            ];
-        }
+            // ── TRUNCATED JSON RECOVERY ───────────────────────────────────────
+            // If Gemini's output was cut mid-JSON, extract primary_breed via
+            // regex before giving up and falling back to YOLO's wrong answer.
+            if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
+                Log::warning('JSON parse failed — attempting truncation recovery. Raw: ' . $jsonText);
+                $recovered = [];
+                if (preg_match('/"primary_breed"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['primary_breed'] = $m[1];
+                if (preg_match('/"primary_confidence"\s*:\s*([\d.]+)/', $jsonText, $m))
+                    $recovered['primary_confidence'] = (float) $m[1];
+                if (preg_match('/"classification_type"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['classification_type'] = $m[1];
+                $recovered['recognized_hybrid_name'] = null;
+                if (preg_match('/"recognized_hybrid_name"\s*:\s*"([^"]+)"/', $jsonText, $m))
+                    $recovered['recognized_hybrid_name'] = $m[1];
+                $recovered['alternatives'] = [];
+                preg_match_all(
+                    '/"breed"\s*:\s*"([^"]+)"\s*,\s*"confidence"\s*:\s*([\d.]+)/',
+                    $jsonText,
+                    $altMatches,
+                    PREG_SET_ORDER
+                );
+                foreach ($altMatches as $alt)
+                    $recovered['alternatives'][] = ['breed' => $alt[1], 'confidence' => (float) $alt[2]];
 
-        $totalTime = round(microtime(true) - $overallStart, 2);
-        $passesRun = ($p2Confidence >= 80 || $closeRace) ? 3 : 2;
+                if (!empty($recovered['primary_breed'])) {
+                    Log::info('✓ Truncated JSON recovered — breed: ' . $recovered['primary_breed']);
+                    $parsed = $recovered;
+                } else {
+                    Log::error('✗ JSON recovery failed. Raw: ' . $jsonText);
+                    if (isset($result['error']))
+                        return ['success' => false, 'error' => 'Gemini API error: ' . ($result['error']['message'] ?? 'Unknown')];
+                    $finishReason = $result['candidates'][0]['finishReason'] ?? '';
+                    if (in_array($finishReason, ['SAFETY', 'RECITATION']))
+                        return ['success' => false, 'error' => 'Gemini blocked response: ' . $finishReason];
+                    return ['success' => false, 'error' => 'Failed to parse Gemini response'];
+                }
+            }
 
-        Log::info('╔══════════════════════════════════════════════════════════╗');
-        Log::info('║  SIGMA v3 COMPLETE                                       ║');
-        Log::info('╚══════════════════════════════════════════════════════════╝');
-        Log::info('Result', [
-            'breed'        => $cleanedBreed,
-            'confidence'   => $actualConf,
-            'class_type'   => $classType,
-            'passes_run'   => $passesRun,
-            'morph_used'   => !empty($morphData),
-            'total_time_s' => $totalTime,
-        ]);
+            // ----------------------------------------------------------------
+            // BUILD PRIMARY BREED NAME — identical to original
+            // ----------------------------------------------------------------
+            $classType            = trim($parsed['classification_type'] ?? 'purebred');
+            $recognizedHybridName = isset($parsed['recognized_hybrid_name'])
+                ? trim((string) $parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
+                : null;
 
-        return [
-            'success'         => true,
-            'method'          => 'sigma_v3_gemini',
-            'breed'           => $cleanedBreed,
-            'confidence'      => round($actualConf, 1),
-            'top_predictions' => $topPredictions,
-            'metadata'        => [
-                'model'               => 'sigma_v3_universal',
-                'response_time_s'     => $totalTime,
-                'classification_type' => $classType,
-                'recognized_hybrid'   => $hybridName,
-                'passes_run'          => $passesRun,
-            ],
-        ];
-    }
+            if (empty($recognizedHybridName) || strtolower($recognizedHybridName) === 'null') {
+                $recognizedHybridName = null;
+            }
 
-    // ── SIGMA v3 HELPERS ──────────────────────────────────────────────────
+            $primaryBreedRaw = trim($parsed['primary_breed'], " \t\n\r\0\x0B\"'`");
+            $primaryBreedRaw = preg_replace('/\s+/', ' ', $primaryBreedRaw);
+            $primaryBreedRaw = substr($primaryBreedRaw, 0, 120);
 
-    /** Extract clean non-thought text from Gemini response parts */
-    private function sigmaExtractText(array $result): string
-    {
-        $parts = $result['candidates'][0]['content']['parts'] ?? [];
-        foreach ($parts as $p) {
-            if (isset($p['text']) && empty($p['thought'])) return trim($p['text']);
-        }
-        foreach ($parts as $p) {
-            if (isset($p['text'])) return trim($p['text']);
-        }
-        return '';
-    }
+            if ($classType === 'designer_hybrid') {
+                $cleanedBreed = $primaryBreedRaw;
+            } else {
+                $cleanedBreed = $this->cleanBreedName($primaryBreedRaw);
+            }
 
-    /** Regex-based JSON recovery for truncated/malformed responses */
-    private function sigmaRecoverJson(string $raw): array
-    {
-        $r = [];
-        if (preg_match('/"primary_breed"\s*:\s*"([^"]+)"/', $raw, $m))         $r['primary_breed'] = $m[1];
-        if (preg_match('/"primary_confidence"\s*:\s*([\d.]+)/', $raw, $m))      $r['primary_confidence'] = (float)$m[1];
-        if (preg_match('/"classification_type"\s*:\s*"([^"]+)"/', $raw, $m))    $r['classification_type'] = $m[1];
-        if (preg_match('/"recognized_hybrid_name"\s*:\s*"([^"]+)"/', $raw, $m)) $r['recognized_hybrid_name'] = $m[1];
-        else                                                                      $r['recognized_hybrid_name'] = null;
-        $r['alternatives']     = [];
-        $r['uncertain_features'] = [];
-        preg_match_all('/"breed"\s*:\s*"([^"]+)"\s*,\s*"confidence"\s*:\s*([\d.]+)/', $raw, $ms, PREG_SET_ORDER);
-        foreach ($ms as $m) $r['alternatives'][] = ['breed' => $m[1], 'confidence' => (float)$m[2]];
-        return $r;
-    }
+            if (empty($cleanedBreed)) {
+                $cleanedBreed = 'Unknown';
+            }
 
-    /** Resize image in memory using GD */
-    private function sigmaResizeImage(string $data, array $info, int $maxDim): string
-    {
-        try {
-            $src = imagecreatefromstring($data);
-            if (!$src) return $data;
-            $ratio = min($maxDim / $info[0], $maxDim / $info[1]);
-            $nw = (int)($info[0] * $ratio);
-            $nh = (int)($info[1] * $ratio);
-            $dst = imagecreatetruecolor($nw, $nh);
-            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $info[0], $info[1]);
-            imagedestroy($src);
-            ob_start(); imagejpeg($dst, null, 90); $out = ob_get_clean();
-            imagedestroy($dst);
-            return $out ?: $data;
-        } catch (\Exception $e) { return $data; }
-    }
+            // ----------------------------------------------------------------
+            // CONFIDENCE — identical to original
+            // ----------------------------------------------------------------
+            $rawConfidence    = isset($parsed['primary_confidence']) ? (float) $parsed['primary_confidence'] : 85.0;
+            $microVariance    = (mt_rand(-30, 30) / 10);
+            $actualConfidence = max(65.0, min(98.0, $rawConfidence + $microVariance));
 
-    /** Convert any GD-supported image to JPEG in memory */
-    private function sigmaToJpeg(string $data): string
-    {
-        try {
-            $img = imagecreatefromstring($data);
-            if (!$img) return $data;
-            ob_start(); imagejpeg($img, null, 92); $out = ob_get_clean();
-            imagedestroy($img);
-            return $out ?: $data;
-        } catch (\Exception $e) { return $data; }
-    }
-
-    /** Standard safety settings */
-    private function sigmaGetSafetySettings(): array
-    {
-        return [
-            ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
-            ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
-            ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
-            ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
-        ];
-    }
-
-    /**
-     * SIGMA v3 FALLBACK — universal single-call when Pass 2 fails.
-     * No hardcoded rules. Gemini reasons from anatomy universally.
-     */
-    private function sigmaFallback(
-        \GuzzleHttp\Client $client,
-        string $proUrl,
-        string $mimeType,
-        string $imageData,
-        string $mlNote,
-        float  $startTime
-    ): array {
-        Log::info('→ Running SIGMA v3 fallback (universal single-call)');
-
-        $prompt = $mlNote . <<<'FB'
-You are the world's leading canine breed identification expert with complete knowledge of all AKC, FCI, UKC breeds, all designer hybrids, and Southeast Asian native dogs.
-
-UNIVERSAL IDENTIFICATION METHOD — reason from anatomy, not appearance:
-
-STEP 1 — ASPIN CHECK (highest priority):
-If the dog has: lean body + short smooth coat + wedge head + dark almond eyes + semi-erect/erect ears + sickle tail + medium size + nothing exaggerated → classify as ASPIN (Philippine native dog). Never use a Western breed name for Aspin.
-
-STEP 2 — STRUCTURAL ASSESSMENT:
-Before anything else, measure these key proportions:
-• Body length-to-height ratio (long-low vs square vs tall)
-• Leg length vs chest depth (corgi-short vs normal vs long)
-• Bone substance (very-heavy vs moderate vs fine)
-• Muzzle-to-skull ratio (brachycephalic <0.35 vs normal vs long >0.55)
-These structural measurements eliminate entire breed groups immediately.
-
-STEP 3 — ELIMINATION:
-List 4 candidates. For each, find what their breed standard REQUIRES that CONTRADICTS what you measured. Eliminate breeds with contradictions. The survivor is your answer.
-
-STEP 4 — HYBRID CHECK:
-If the dog shows anatomy from two different breed types, identify both parents and name the hybrid if recognized.
-
-Output ONLY valid JSON — no markdown, no explanation:
-{"primary_breed":"Full Official Name","primary_confidence":82.0,"classification_type":"purebred","recognized_hybrid_name":null,"alternatives":[{"breed":"Full Name","confidence":55.0},{"breed":"Full Name","confidence":35.0}],"uncertain_features":[]}
-FB;
-
-        try {
-            $r = $client->post($proUrl, [
-                'json' => [
-                    'contents' => [[
-                        'parts' => [
-                            ['text' => $prompt],
-                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
-                        ],
-                    ]],
-                    'generationConfig' => [
-                        'temperature'    => 0.1,
-                        'maxOutputTokens' => 2000,
-                        'thinkingConfig'  => ['thinkingBudget' => 2000],
-                    ],
-                    'safetySettings' => $this->sigmaGetSafetySettings(),
+            // ----------------------------------------------------------------
+            // BUILD top_predictions — identical to original
+            // ----------------------------------------------------------------
+            $topPredictions = [
+                [
+                    'breed'      => $cleanedBreed,
+                    'confidence' => round($actualConfidence, 1),
                 ],
+            ];
+
+            if (!empty($parsed['alternatives']) && is_array($parsed['alternatives'])) {
+                foreach ($parsed['alternatives'] as $alt) {
+                    if (empty($alt['breed']) || !isset($alt['confidence'])) {
+                        continue;
+                    }
+
+                    $altBreed = trim($alt['breed'], " \t\n\r\0\x0B\"'`");
+                    $altBreed = preg_replace('/\s+/', ' ', $altBreed);
+                    $altBreed = substr($altBreed, 0, 120);
+
+                    if (empty($altBreed)) {
+                        continue;
+                    }
+
+                    if (strtolower($altBreed) === strtolower($cleanedBreed)) {
+                        continue;
+                    }
+
+                    $altConfidence = max(15.0, min(84.0, (float) $alt['confidence']));
+
+                    $topPredictions[] = [
+                        'breed'      => $altBreed,
+                        'confidence' => round($altConfidence, 1),
+                    ];
+                }
+            }
+
+            $totalTime = round(microtime(true) - $overallStart, 2);
+
+            Log::info('Breed name finalized', [
+                'raw'                   => $primaryBreedRaw,
+                'final'                 => $cleanedBreed,
+                'classification_type'   => $classType,
+                'recognized_hybrid'     => $recognizedHybridName,
+                'confidence'            => $actualConfidence,
+                'alternatives_count'    => count($topPredictions) - 1,
+                'total_time_s'          => $totalTime,
+                'ml_context_used'       => !empty($mlBreed),
             ]);
 
-            $body   = $r->getBody()->getContents();
-            $raw    = json_decode($body, true);
-            $text   = $this->sigmaExtractText($raw);
-            $text   = preg_replace('/```json|```/i', '', trim($text));
-            $parsed = json_decode($text, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
-                $parsed = $this->sigmaRecoverJson($text);
-            }
-            if (empty($parsed['primary_breed'])) {
-                return ['success' => false, 'error' => 'Fallback parse failed: ' . substr($text, 0, 200)];
-            }
-
-            $classType    = trim($parsed['classification_type'] ?? 'purebred');
-            $hybridName   = isset($parsed['recognized_hybrid_name'])
-                ? trim((string)$parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`") : null;
-            if (empty($hybridName) || strtolower($hybridName) === 'null') $hybridName = null;
-
-            $primaryRaw   = substr(preg_replace('/\s+/', ' ', trim($parsed['primary_breed'] ?? '', " \t\n\r\0\x0B\"'`")), 0, 120);
-            $cleanedBreed = ($classType === 'designer_hybrid') ? $primaryRaw : $this->cleanBreedName($primaryRaw);
-            if (empty($cleanedBreed)) $cleanedBreed = 'Unknown';
-
-            $actualConf = max(65.0, min(98.0, (float)($parsed['primary_confidence'] ?? 75.0)));
-            $topPreds   = [['breed' => $cleanedBreed, 'confidence' => round($actualConf, 1)]];
-            foreach (($parsed['alternatives'] ?? []) as $alt) {
-                if (empty($alt['breed'])) continue;
-                $ab = substr(preg_replace('/\s+/', ' ', trim($alt['breed'], " \t\n\r\0\x0B\"'`")), 0, 120);
-                if (empty($ab) || strtolower($ab) === strtolower($cleanedBreed)) continue;
-                $topPreds[] = ['breed' => $ab, 'confidence' => round(max(15.0, min(84.0, (float)($alt['confidence'] ?? 35.0))), 1)];
-            }
-
-            $totalTime = round(microtime(true) - $startTime, 2);
-            Log::info('✓ Fallback complete', ['breed' => $cleanedBreed, 'conf' => $actualConf, 'time_s' => $totalTime]);
+            Log::info('✓ Breed identification complete', [
+                'breed'        => $cleanedBreed,
+                'confidence'   => $actualConfidence,
+                'alternatives' => count($topPredictions) - 1,
+                'total_time_s' => $totalTime,
+            ]);
 
             return [
                 'success'         => true,
-                'method'          => 'sigma_v3_fallback',
+                'method'          => 'gemini_vision',
                 'breed'           => $cleanedBreed,
-                'confidence'      => round($actualConf, 1),
-                'top_predictions' => $topPreds,
+                'confidence'      => round($actualConfidence, 1),
+                'top_predictions' => $topPredictions,
                 'metadata'        => [
-                    'model'               => 'sigma_v3_fallback',
+                    'model'               => 'gemini-3-flash-preview',
                     'response_time_s'     => $totalTime,
                     'classification_type' => $classType,
-                    'recognized_hybrid'   => $hybridName,
-                    'passes_run'          => 1,
+                    'recognized_hybrid'   => $recognizedHybridName,
                 ],
             ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $errorBody = $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : '';
+            Log::error('✗ Gemini API Request Error: ' . $e->getMessage(), [
+                'response_body' => substr($errorBody, 0, 500),
+            ]);
+            return ['success' => false, 'error' => 'Gemini API Error: ' . $e->getMessage()];
         } catch (\Exception $e) {
-            Log::error('✗ SIGMA v3 fallback failed: ' . $e->getMessage());
+            Log::error('✗ Gemini breed identification failed: ' . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    // ── END SIGMA v3 ENGINE ────────────────────────────────────────────────
+
+
+
+
+
+
+
 
     // ============================================================
     // 3. extractBreedFromGeminiResponse()
@@ -2103,8 +1696,10 @@ FB;
 
             $mlService = new \App\Services\MLApiService();
 
-            // ── FAST PATH: skip health check entirely, just attempt prediction with short timeout ──
-            // If the ML API is slow or down, we don't block — Gemini is always the primary.
+            if (!$mlService->isHealthy()) {
+                throw new \Exception('ML API is not available or unhealthy');
+            }
+
             $startTime     = microtime(true);
             $result        = $mlService->predictBreed($imagePath);
             $executionTime = round(microtime(true) - $startTime, 2);
@@ -2166,304 +1761,194 @@ FB;
      * FIXED: Generate AI descriptions with better error handling
      * ==========================================
      */
-  private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
-{
-    $aiData = [
-        'description'    => "Identified as {$detectedBreed}. Detailed breed information will appear shortly.",
-        'origin_history' => [
-            'country' => 'Unknown', 'country_code' => 'xx', 'region' => 'Unknown',
-            'description' => 'Origin information unavailable.', 'timeline' => [], 'details' => [],
-        ],
-        'health_risks'   => [
-            'concerns' => [], 'screenings' => [], 'lifespan' => 'Varies',
-            'care_tips' => ['Consult your veterinarian for breed-specific health guidance.'],
-        ],
-    ];
+    private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
+    {
+        $aiData = [
+            'description' => "Identified as $detectedBreed.",
+            'origin_history' => [],
+            'health_risks' => [],
+        ];
 
-    if ($detectedBreed === 'Unknown') {
-        Log::info('⏭️ Skipping AI generation for Unknown breed');
-        return $aiData;
-    }
+        if ($detectedBreed === 'Unknown') {
+            Log::info('⏭️ Skipping AI generation for Unknown breed');
+            return $aiData;
+        }
 
-    try {
-        Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
+        try {
+            Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
-        $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
+            $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
-
-CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
-- ALL string values must be on a single line. Never use a literal newline inside a string value.
-- Use a space instead of newline when you want a line break inside text.
-- Do not use tab characters inside string values.
-- Do not use backslash-n (\\n) inside string values.
-- Output raw JSON only — no markdown, no code fences, no backticks.
 
 1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
 
 2. 'health_risks': {
      'concerns': [
-       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'High Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' },
-       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' },
-       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'Low Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' }
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
      ],
      'screenings': [
-       { 'name': 'Exam Name', 'description': 'Detailed explanation in one continuous line.' },
-       { 'name': 'Exam Name', 'description': 'Detailed explanation in one continuous line.' }
+       { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
+       { 'name': 'Exam Name', 'description': 'Detailed explanation.' }
      ],
-     'lifespan': '10-12',
+     'lifespan': 'e.g. 10-12',
      'care_tips': [
-       'One tip about exercise in 8-10 words.',
-       'One tip about diet in 8-10 words.',
-       'One tip about grooming in 8-10 words.',
-       'One tip about training in 8-10 words.'
+        '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
+        '(generate only 8-10 words only) tip about diet or weight management.',
+        '(generate only 8-10 words only) tip about grooming or coat care.',
+        '(generate only 8-10 words only) tip about training or temperament management.'
      ]
-   },
+},
 
 3. 'origin_data': {
-    'country': 'Country Name',
-    'country_code': 'ISO 2-letter lowercase code',
-    'region': 'Specific Region',
-    'description': 'Two sentence description of geography and climate in one continuous line.',
+    'country': 'Country Name (e.g. United Kingdom)',
+    'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
+    'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
+    'description': 'Write a rich, descriptive paragraph (2 sentences) about the geography and climate of the origin region and how it influenced the breed.',
     'timeline': [
-        { 'year': '1860s', 'event': '2-3 sentences about this milestone all on one line.' },
-        { 'year': 'Year', 'event': 'One sentence on one line.' },
-        { 'year': 'Year', 'event': 'One sentence on one line.' },
-        { 'year': 'Year', 'event': 'One sentence on one line.' },
-        { 'year': 'Year', 'event': 'One sentence on one line.' }
+        { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' }
     ],
     'details': [
-        { 'title': 'Ancestry & Lineage', 'content': '70-80 word paragraph all on one continuous line.' },
-        { 'title': 'Original Purpose', 'content': '70-80 word paragraph all on one continuous line.' },
-        { 'title': 'Modern Roles', 'content': '70-80 word paragraph all on one continuous line.' }
+        { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 70-80 words) tracing the breed\\'s genetic ancestors and early development.' },
+        { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 70-80 words) describing exactly what work the dog was bred to do, including specific tasks.' },
+        { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 70-80 words) about the breed\\'s current status as pets, service dogs, or working dogs.' }
     ]
-}";
+}
 
-        $apiKey = config('services.gemini.api_key');
-        if (empty($apiKey)) {
-            Log::error('❌ Gemini API key not configured');
-            return $aiData;
-        }
+Be verbose and detailed. Output ONLY the JSON.";
 
-        Log::info("📤 Sending request to Gemini API...");
-
-        $client    = new \GuzzleHttp\Client(['timeout' => 25, 'connect_timeout' => 8]);
-        $startTime = microtime(true);
-
-        $response = $client->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey,
-            [
-                'json' => [
-                    'contents' => [[
-                        'parts' => [[
-                            'text' => "You are a veterinary historian. Output ONLY raw valid JSON. No markdown. No code fences. No literal newlines inside string values — use spaces instead.\n\n" . $combinedPrompt
-                        ]]
-                    ]],
-                    'generationConfig' => [
-                        'temperature'     => 0.3,
-                        'maxOutputTokens' => 4000,
-                        'thinkingConfig'  => ['thinkingBudget' => 0], // disable thinking — all tokens go to output
-                        // NO responseMimeType — breaks thinking models
-                    ],
-                ],
-            ]
-        );
-
-        $duration = round(microtime(true) - $startTime, 2);
-        Log::info("📥 Gemini response received in {$duration}s");
-
-        $responseBody = $response->getBody()->getContents();
-        $result       = json_decode($responseBody, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error('❌ Failed to parse Gemini response envelope: ' . json_last_error_msg());
-            return $aiData;
-        }
-
-        // ── THINKING-AWARE TEXT EXTRACTION — skip thought blocks ────────────
-        $content = '';
-        $parts   = $result['candidates'][0]['content']['parts'] ?? [];
-        foreach ($parts as $p) {
-            if (isset($p['text']) && empty($p['thought'])) {
-                $content = trim($p['text']);
-                break;
-            }
-        }
-        if (empty($content)) {
-            foreach ($parts as $p) {
-                if (isset($p['text'])) {
-                    $content = trim($p['text']);
-                    break;
-                }
-            }
-        }
-
-        if (empty($content)) {
-            Log::error('❌ Gemini returned empty content. FinishReason: ' . ($result['candidates'][0]['finishReason'] ?? 'unknown'));
-            return $aiData;
-        }
-
-        Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
-
-        // ── AGGRESSIVE CLEANING BEFORE json_decode ──────────────────────────
-        // Step 1: Strip markdown code fences
-        $content = preg_replace('/^```json\s*/i', '', $content);
-        $content = preg_replace('/^```\s*/i',     '', $content);
-        $content = preg_replace('/\s*```$/i',     '', $content);
-        $content = trim($content);
-
-        // Step 2: Remove all ASCII control characters except:
-        //   0x09 = tab, 0x0A = newline, 0x0D = carriage return (valid JSON whitespace)
-        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
-
-        // Step 3: THE KEY FIX — replace literal newlines/tabs INSIDE JSON string values
-        // JSON strings cannot contain unescaped newlines. We replace them with a space.
-        // This regex finds content between quotes and replaces control chars inside.
-        $content = $this->cleanJsonStringValues($content);
-
-        // ── PARSE ────────────────────────────────────────────────────────────
-        $parsed = json_decode($content, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error('❌ JSON parse failed after cleaning: ' . json_last_error_msg());
-            Log::error('Content preview: ' . substr($content, 0, 800));
-
-            // Last resort: try to extract partial data with regex
-            $parsed = $this->extractPartialAiData($content);
-            if (empty($parsed)) {
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                Log::error('❌ Gemini API key not configured in services.gemini.api_key');
                 return $aiData;
             }
-            Log::info('⚠️ Using partial regex extraction as fallback');
-        }
 
-        if (!$parsed) {
-            Log::error('❌ Parsed result is null/false');
+            Log::info("📤 Sending request to Gemini API...");
+
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 30,
+                'connect_timeout' => 10
+            ]);
+
+            $startTime = microtime(true);
+
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => "You are a veterinary historian. Output only valid JSON. Be verbose and detailed.\n\n" . $combinedPrompt
+                                ]
+                            ]
+                        ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.3,
+                        'maxOutputTokens' => 2000, // Increased for more detailed content
+                        'responseMimeType' => 'application/json'
+                    ]
+                ]
+            ]);
+
+            $duration = round(microtime(true) - $startTime, 2);
+            Log::info("📥 Gemini response received in {$duration}s");
+
+            $responseBody = $response->getBody()->getContents();
+            $result = json_decode($responseBody, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('❌ Failed to parse Gemini response as JSON: ' . json_last_error_msg());
+                Log::error('Raw response: ' . substr($responseBody, 0, 500));
+                return $aiData;
+            }
+
+            // Check if response has the expected structure
+            if (!isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+                Log::error('❌ Unexpected Gemini response structure');
+                Log::error('Response keys: ' . json_encode(array_keys($result)));
+
+                // Check for safety blocks
+                if (isset($result['candidates'][0]['finishReason'])) {
+                    Log::error('Finish reason: ' . $result['candidates'][0]['finishReason']);
+                }
+
+                return $aiData;
+            }
+
+            $content = $result['candidates'][0]['content']['parts'][0]['text'];
+
+            if (empty($content)) {
+                Log::error('❌ Gemini returned empty content');
+                return $aiData;
+            }
+
+            Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
+
+            // Parse the JSON content
+            $parsed = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('❌ Failed to parse Gemini content as JSON: ' . json_last_error_msg());
+                Log::error('Content preview: ' . substr($content, 0, 500));
+                return $aiData;
+            }
+
+            if (!$parsed) {
+                Log::error('❌ Gemini content parsed to null/false');
+                return $aiData;
+            }
+
+            // Extract and validate each field
+            if (isset($parsed['description'])) {
+                $aiData['description'] = $parsed['description'];
+                Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
+            } else {
+                Log::warning('⚠️ No description field in parsed data');
+            }
+
+            if (isset($parsed['health_risks'])) {
+                $aiData['health_risks'] = $parsed['health_risks'];
+                $concernsCount = count($parsed['health_risks']['concerns'] ?? []);
+                Log::info("✓ Health risks extracted: {$concernsCount} concerns");
+            } else {
+                Log::warning('⚠️ No health_risks field in parsed data');
+            }
+
+            if (isset($parsed['origin_data'])) {
+                $aiData['origin_history'] = $parsed['origin_data'];
+                $country = $parsed['origin_data']['country'] ?? 'Unknown';
+                Log::info("✓ Origin data extracted: {$country}");
+            } else {
+                Log::warning('⚠️ No origin_data field in parsed data');
+            }
+
+            Log::info('✅ AI descriptions generated successfully with Gemini', [
+                'breed' => $detectedBreed,
+                'has_description' => !empty($aiData['description']),
+                'has_health_risks' => !empty($aiData['health_risks']),
+                'has_origin' => !empty($aiData['origin_history'])
+            ]);
+
+            return $aiData;
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            Log::error("❌ Gemini API request failed: " . $e->getMessage());
+            if ($e->hasResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                Log::error("API Error Response: " . substr($errorBody, 0, 500));
+            }
+            return $aiData;
+        } catch (\Exception $e) {
+            Log::error("❌ AI generation failed: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
             return $aiData;
         }
-
-        if (isset($parsed['description']) && !empty($parsed['description'])) {
-            $aiData['description'] = $parsed['description'];
-            Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
-        } else {
-            Log::warning('⚠️ No description in parsed data');
-        }
-
-        if (isset($parsed['health_risks']) && !empty($parsed['health_risks'])) {
-            $aiData['health_risks'] = $parsed['health_risks'];
-            Log::info("✓ Health risks extracted: " . count($parsed['health_risks']['concerns'] ?? []) . " concerns");
-        } else {
-            Log::warning('⚠️ No health_risks in parsed data — using safe fallback');
-            // Safe fallback so frontend never receives null arrays and crashes
-            $aiData['health_risks'] = [
-                'concerns'  => [],
-                'screenings' => [],
-                'lifespan'   => 'Varies',
-                'care_tips'  => [
-                    'Provide regular daily exercise appropriate for the breed.',
-                    'Feed a balanced diet suited to the dog\'s size and age.',
-                    'Schedule routine veterinary check-ups annually.',
-                    'Keep up with vaccinations and preventive care.',
-                ],
-            ];
-        }
-
-        if (isset($parsed['origin_data']) && !empty($parsed['origin_data'])) {
-            $aiData['origin_history'] = $parsed['origin_data'];
-            Log::info("✓ Origin data extracted: " . ($parsed['origin_data']['country'] ?? 'Unknown'));
-        } else {
-            Log::warning('⚠️ No origin_data in parsed data — using safe fallback');
-            // Safe fallback so frontend never receives null and crashes
-            $aiData['origin_history'] = [
-                'country'      => 'Unknown',
-                'country_code' => 'xx',
-                'region'       => 'Unknown',
-                'description'  => 'Origin information is currently unavailable for this breed.',
-                'timeline'     => [],
-                'details'      => [],
-            ];
-        }
-
-        Log::info('✅ AI descriptions generated successfully', [
-            'breed'           => $detectedBreed,
-            'has_description' => !empty($aiData['description']),
-            'has_health'      => !empty($aiData['health_risks']),
-            'has_origin'      => !empty($aiData['origin_history']),
-        ]);
-
-        return $aiData;
-
-    } catch (\GuzzleHttp\Exception\RequestException $e) {
-        Log::error("❌ Gemini API request failed: " . $e->getMessage());
-        if ($e->hasResponse()) {
-            Log::error("API Error: " . substr($e->getResponse()->getBody()->getContents(), 0, 500));
-        }
-        return $aiData;
-    } catch (\Exception $e) {
-        Log::error("❌ AI generation failed: " . $e->getMessage());
-        return $aiData;
     }
-}
-
-/**
- * Replace literal newlines and tabs inside JSON string values with spaces.
- * This is the fix for Gemini inserting \n inside string content.
- */
-private function cleanJsonStringValues(string $json): string
-{
-    $result  = '';
-    $inStr   = false;
-    $escaped = false;
-    $len     = strlen($json);
-
-    for ($i = 0; $i < $len; $i++) {
-        $char = $json[$i];
-        $ord  = ord($char);
-
-        if ($escaped) {
-            $result  .= $char;
-            $escaped  = false;
-            continue;
-        }
-
-        if ($char === '\\' && $inStr) {
-            $result  .= $char;
-            $escaped  = true;
-            continue;
-        }
-
-        if ($char === '"') {
-            $inStr  = !$inStr;
-            $result .= $char;
-            continue;
-        }
-
-        // Inside a string: replace ANY control character (0x00–0x1F) with space
-        // This catches \n \r \t AND every other bare control char Gemini emits
-        if ($inStr && $ord <= 0x1F) {
-            $result .= ' ';
-            continue;
-        }
-
-        $result .= $char;
-    }
-
-    return $result;
-}
-
-/**
- * Last-resort regex extraction when JSON is too broken to parse.
- * Pulls out just the description field so at least something displays.
- */
-private function extractPartialAiData(string $content): array
-{
-    $data = [];
-
-    // Try to grab description
-    if (preg_match('/"description"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/s', $content, $m)) {
-        $data['description'] = stripslashes($m[1]);
-    }
-
-    return $data;
-}
     /**
      * ==========================================
      * OPTIMIZED: Faster feature extraction with detailed prompt
@@ -2476,89 +1961,77 @@ private function extractPartialAiData(string $content): array
      * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
      * ==========================================
      */
-   private function validateDogImage($imagePath): array
-{
-    try {
-        Log::info('🔍 Starting dog validation with Gemini Vision', [
-            'image_path' => $imagePath
-        ]);
+    private function validateDogImage($imagePath): array
+    {
+        try {
+            Log::info('🔍 Starting dog validation with Gemini Vision', [
+                'image_path' => $imagePath
+            ]);
 
-        $imageData = base64_encode(file_get_contents($imagePath));
-        $mimeType  = mime_content_type($imagePath);
+            // Read image and convert to base64
+            $imageData = base64_encode(file_get_contents($imagePath));
+            $mimeType = mime_content_type($imagePath);
 
-        $apiKey = config('services.gemini.api_key');
-        if (empty($apiKey)) {
-            Log::error('✗ Gemini API key not configured');
-            return ['is_dog' => true, 'error' => 'Gemini API key not configured'];
-        }
+            // Use Gemini API instead of OpenAI
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                Log::error('✗ Gemini API key not configured');
+                return [
+                    'is_dog' => true,
+                    'error' => 'Gemini API key not configured'
+                ];
+            }
 
-        $client = new \GuzzleHttp\Client(['timeout' => 30]);
-
-        $response = $client->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey,
-            [
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' . $apiKey, [
                 'json' => [
-                    'contents' => [[
-                        'parts' => [
-                            [
-                                'text' => 'Look at this image. Is there a dog (canine) anywhere in it — including in the background, partially visible, or in any setting (outdoors, indoors, park, street, etc.)? Any dog breed counts, including puppies, fluffy dogs, white dogs, dark dogs, mixed breeds, or native dogs. Respond with ONLY the single word YES or NO.'
-                            ],
-                            [
-                                'inlineData' => [
-                                    'mimeType' => $mimeType,
-                                    'data'     => $imageData
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => 'Analyze this image carefully. Is there a dog visible in this image? Respond with ONLY "YES" if you can clearly see a dog (any breed, puppy or adult), or "NO" if there is no dog, if it\'s a different animal (cat, bird, etc.), or if you\'re uncertain. Be strict - only respond YES if you are confident there is a dog.'
+                                ],
+                                [
+                                    'inlineData' => [
+                                        'mimeType' => $mimeType,
+                                        'data' => $imageData
+                                    ]
                                 ]
                             ]
                         ]
-                    ]],
+                    ],
                     'generationConfig' => [
-                        'temperature'    => 0.0,
-                        'maxOutputTokens' => 5,
-                    ],
-                    'safetySettings' => [
-                        ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_NONE'],
-                        ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
-                        ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
-                        ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
-                    ],
-                ],
-            ]
-        );
+                        'maxOutputTokens' => 10
+                    ]
+                ]
+            ]);
 
-        $result = json_decode($response->getBody()->getContents(), true);
+            $result = json_decode($response->getBody()->getContents(), true);
+            $answer = trim(strtoupper($result['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+            $isDog = str_contains($answer, 'YES');
 
-        // Handle thinking model — skip thought blocks
-        $answer = '';
-        $parts  = $result['candidates'][0]['content']['parts'] ?? [];
-        foreach ($parts as $p) {
-            if (isset($p['text']) && empty($p['thought'])) {
-                $answer = trim(strtoupper($p['text']));
-                break;
-            }
+            Log::info('✓ Gemini dog validation complete', [
+                'answer' => $answer,
+                'is_dog' => $isDog
+            ]);
+
+            return [
+                'is_dog' => $isDog,
+                'raw_response' => $answer
+            ];
+        } catch (\Exception $e) {
+            Log::error('❌ Dog validation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // On error, allow the image through (fail-open approach)
+            return [
+                'is_dog' => true,
+                'error' => $e->getMessage()
+            ];
         }
-        if (empty($answer)) {
-            foreach ($parts as $p) {
-                if (isset($p['text'])) {
-                    $answer = trim(strtoupper($p['text']));
-                    break;
-                }
-            }
-        }
-
-        $isDog = str_contains($answer, 'YES');
-
-        Log::info('✓ Dog validation complete', [
-            'answer' => $answer,
-            'is_dog' => $isDog
-        ]);
-
-        return ['is_dog' => $isDog, 'raw_response' => $answer];
-
-    } catch (\Exception $e) {
-        Log::error('❌ Dog validation failed — failing open', ['error' => $e->getMessage()]);
-        return ['is_dog' => true, 'error' => $e->getMessage()];
     }
-}
 
     /**
      * ==========================================
@@ -2709,30 +2182,14 @@ private function extractPartialAiData(string $content): array
                         throw new \Exception("Failed to load image with GD");
                     }
 
-                    // ── Resize to max 1024px BEFORE saving — keeps API payload small ──
-                    $origW  = imagesx($gdImage);
-                    $origH  = imagesy($gdImage);
-                    $maxDim = 1024;
-                    if ($origW > $maxDim || $origH > $maxDim) {
-                        $ratio   = min($maxDim / $origW, $maxDim / $origH);
-                        $newW    = (int)($origW * $ratio);
-                        $newH    = (int)($origH * $ratio);
-                        $resized = imagecreatetruecolor($newW, $newH);
-                        imagecopyresampled($resized, $gdImage, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                    // Save as PNG (universally supported by OpenAI)
+                    if (!imagepng($gdImage, $persistentTempPath, 9)) {
                         imagedestroy($gdImage);
-                        $gdImage = $resized;
-                        Log::info("✓ Image resized to {$newW}x{$newH} before format conversion");
-                    }
-
-                    // Save as JPEG (not PNG-9 which was the main perf killer — 3-7s on large images)
-                    $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.jpg';
-                    if (!imagejpeg($gdImage, $persistentTempPath, 90)) {
-                        imagedestroy($gdImage);
-                        throw new \Exception("Failed to save converted JPEG");
+                        throw new \Exception("Failed to save converted PNG");
                     }
 
                     imagedestroy($gdImage);
-                    Log::info("✓ Image converted & resized to JPEG for API compatibility");
+                    Log::info("✓ Image converted to PNG for OpenAI API compatibility");
                 } catch (\Exception $e) {
                     Log::error("✗ Image conversion failed: " . $e->getMessage());
 
@@ -2743,46 +2200,19 @@ private function extractPartialAiData(string $content): array
                     );
                 }
             } else {
-                // Supported format — resize to max 1024px JPEG to keep API payload small
-                // Large raw files (e.g. 6MB JPEG/PNG) massively slow down base64 + API transfer
-                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.jpg';
-                try {
-                    $imgInfo    = @getimagesize($tempPath);
-                    $origW      = $imgInfo[0] ?? 0;
-                    $origH      = $imgInfo[1] ?? 0;
-                    $maxDim     = 1024;
-                    $needsResize = ($origW > $maxDim || $origH > $maxDim || filesize($tempPath) > 500000);
+                // Supported format - copy directly (no conversion needed)
+                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $storageExtension;
 
-                    if ($needsResize && $origW > 0) {
-                        $gdSrc = imagecreatefromstring(file_get_contents($tempPath));
-                        if ($gdSrc !== false) {
-                            $ratio = min($maxDim / $origW, $maxDim / $origH);
-                            $newW  = max(1, (int)($origW * $ratio));
-                            $newH  = max(1, (int)($origH * $ratio));
-                            $gdDst = imagecreatetruecolor($newW, $newH);
-                            imagecopyresampled($gdDst, $gdSrc, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
-                            imagedestroy($gdSrc);
-                            imagejpeg($gdDst, $persistentTempPath, 88);
-                            imagedestroy($gdDst);
-                            Log::info("✓ Image resized {$origW}x{$origH} → {$newW}x{$newH} JPEG (" . round(filesize($persistentTempPath)/1024) . "KB)");
-                        } else {
-                            copy($tempPath, $persistentTempPath);
-                        }
-                    } else {
-                        copy($tempPath, $persistentTempPath);
-                    }
-                } catch (\Exception $resizeEx) {
-                    Log::warning("⚠️ Resize failed, using original: " . $resizeEx->getMessage());
-                    @copy($tempPath, $persistentTempPath);
+                // Copy to our controlled temp location
+                if (!copy($tempPath, $persistentTempPath)) {
+                    throw new \Exception('Failed to create temporary image file');
                 }
-                Log::info("✓ Image format ({$mimeType}) processed for API");
+
+                Log::info("✓ Image format ({$mimeType}) is OpenAI compatible - no conversion needed");
             }
 
-            // Register cleanup on shutdown — only runs in the PARENT process.
-            // The forked child (ML API call) must NOT delete the parent's temp file.
-            $parentPid = getmypid();
-            register_shutdown_function(function () use ($persistentTempPath, $parentPid) {
-                if (getmypid() !== $parentPid) return; // child process — do nothing
+            // Register cleanup on shutdown (ensures file is deleted even if script crashes)
+            register_shutdown_function(function () use ($persistentTempPath) {
                 if (file_exists($persistentTempPath)) {
                     @unlink($persistentTempPath);
                     Log::info('✓ Temp file cleaned up on shutdown: ' . basename($persistentTempPath));
@@ -2795,11 +2225,42 @@ private function extractPartialAiData(string $content): array
 
             // ==========================================
             // STEP 1: DOG VALIDATION
-            // NOTE: Dog validation is now embedded inside SIGMA Pass 1 (identifyBreedWithAPI).
-            // This saves ~4s by eliminating a separate Gemini Flash round trip.
-            // The SIGMA pipeline will return early with a not_a_dog response if needed.
             // ==========================================
-            Log::info('✓ Dog validation merged into SIGMA Pass 1 — skipping separate validation call');
+            Log::info('→ Starting dog validation...');
+
+            // Validate file exists before dog validation
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Image file was lost during processing');
+            }
+
+            $dogValidation = $this->validateDogImage($fullPath);
+
+            if (!$dogValidation['is_dog']) {
+                // Clean up temp file before returning
+                if (file_exists($persistentTempPath)) {
+                    @unlink($persistentTempPath);
+                }
+
+                Log::warning('⚠️ Image rejected - Not a dog', [
+                    'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
+                ]);
+
+                // Return error response for non-dog images
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                        'not_a_dog' => true
+                    ], 400);
+                }
+
+                return redirect()->back()->with('error', [
+                    'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                    'not_a_dog' => true
+                ]);
+            }
+
+            Log::info('✓ Dog validation passed - proceeding with breed analysis');
 
             // ==========================================
             // STEP 2: STORE IMAGE (only after dog validation passes)
@@ -2944,145 +2405,92 @@ private function extractPartialAiData(string $content): array
                     throw new \Exception('Image file was lost before breed identification');
                 }
 
-                // ── STEP A: ML API — fire-and-forget in background shell process ──────
-                // ML runs in parallel with SIGMA Pass 1 so we don't pay 4s sequentially.
-                // Result is written to a temp file; we read it after Gemini Pass 1 finishes.
-                $mlResultFile = sys_get_temp_dir() . '/ml_result_' . getmypid() . '.json';
-                $mlScriptPath = $fullPath;
-                $mlService    = new \App\Services\MLApiService();
+                // ── STEP A: ML API (YOLO — fast classification + hybrid flag) ──────────
+                $mlResult = $this->identifyBreedWithModel($fullPath);
 
-                // Serialize the call via a closure executed as a forked process if pcntl available,
-                // otherwise fall back to sequential (same as before)
-                $mlResult     = null;
-                $mlPid        = null;
+                if ($mlResult['success']) {
+                    $mlBreed        = $mlResult['breed'];
+                    $mlConfidence   = $mlResult['confidence']; // already percentage
+                    $mlMethod       = $mlResult['method'];
+                    $isHybridProne  = $mlResult['metadata']['learning_stats']['is_hybrid_prone'] ?? false;
 
-                if (function_exists('pcntl_fork')) {
-                    $mlPid = pcntl_fork();
-                    if ($mlPid === 0) {
-                        // ── CHILD: run ML prediction, write JSON result, exit ──
-                        try {
-                            $r = $mlService->predictBreed($mlScriptPath);
-                            file_put_contents($mlResultFile, json_encode($r));
-                        } catch (\Exception $e) {
-                            file_put_contents($mlResultFile, json_encode(['success' => false, 'error' => $e->getMessage()]));
-                        }
-                        exit(0);
-                    }
-                    // ── PARENT continues immediately into SIGMA Pass 1 ──────────
-                    Log::info('→ ML API running in background (pid ' . $mlPid . '), starting SIGMA now');
-                } else {
-                    // pcntl not available — run sequentially (safe fallback)
-                    Log::info('→ pcntl_fork unavailable — ML running sequentially');
-                    $mlResult = $this->identifyBreedWithModel($fullPath);
-                }
-
-                $mlBreed      = null;
-                $mlConfidence = null;
-                $mlMethod     = 'gemini_primary';
-
-                // ── STEP B: GEMINI — sole decision maker for ALL scans ───────────────
-                // Gemini always runs. It is the only source of truth for breed ID.
-                // The ML hint (if provided) is explicitly marked as weak corroboration.
-                Log::info('→ Running SIGMA v2 (Gemini primary — full forensic analysis)...');
-
-                $geminiResult = $this->identifyBreedWithAPI(
-                    $fullPath,
-                    false,
-                    null,   // ML result not yet known — will apply hint below if 100%
-                    null
-                );
-
-                // ── Collect ML result (child finished during SIGMA Pass 1) ───────────
-                if ($mlPid !== null) {
-                    // Wait for child (should already be done — Pass 1 took ~10s, ML takes ~4s)
-                    pcntl_waitpid($mlPid, $status, WNOHANG);
-                    // Give it up to 1s more if not done yet
-                    $waited = 0;
-                    while (!file_exists($mlResultFile) && $waited < 10) {
-                        usleep(100000); // 0.1s
-                        $waited++;
-                    }
-                    if (file_exists($mlResultFile)) {
-                        $mlResult = json_decode(file_get_contents($mlResultFile), true);
-                        @unlink($mlResultFile);
-                        Log::info('✓ ML background result collected');
-                    } else {
-                        Log::warning('⚠️ ML background result timed out — ignoring');
-                        $mlResult = ['success' => false, 'error' => 'timeout'];
-                    }
-                }
-
-                if (!empty($mlResult['success'])) {
-                    $mlRawConfidence = (float)($mlResult['confidence'] ?? 0);
-                    $mlRawBreed      = $mlResult['breed'] ?? '';
-                    $mlMethod        = $mlResult['method'] ?? 'ml';
-                    Log::info('✓ ML model result (advisory only)', [
-                        'breed'      => $mlRawBreed,
-                        'confidence' => $mlRawConfidence,
-                        'trusted'    => $mlRawConfidence >= 100.0 ? 'YES (100% only)' : 'NO — suppressed',
+                    Log::info('✓ ML model result', [
+                        'breed'          => $mlBreed,
+                        'confidence'     => $mlConfidence,
+                        'method'         => $mlMethod,
+                        'is_hybrid_prone' => $isHybridProne,
                     ]);
-                    // Apply ML hint retroactively only when 100% — SIGMA already ran without it,
-                    // so this only matters for the metadata log; accuracy is unaffected.
-                    if ($mlRawConfidence >= 100.0) {
-                        $mlBreed      = $mlRawBreed;
-                        $mlConfidence = $mlRawConfidence;
-                        Log::info('✓ ML 100% hint noted (SIGMA ran independently — result already final)');
+
+                    // ── STEP B: GEMINI Pro Preview — the sole intelligent brain ──────────
+                    // Always runs on every new image.
+                    // When YOLO flagged a hybrid-prone breed, we inject that signal
+                    // so Gemini knows to apply extra scrutiny for hybrid detection.
+                    // Gemini Pro Preview (not Flash) makes the final call on everything.
+                    $hybridContext = '';
+                    if ($isHybridProne) {
+                        $hybridContext = " NOTE: The ML model flagged \"{$mlBreed}\" as a hybrid-prone breed — pay extra attention to hybrid indicators (coat texture, mixed proportions, features from two breeds). Check carefully if this could be a recognized designer hybrid (Cockapoo, Goldendoodle, Labradoodle, Cavapoo, Maltipoo, etc.).";
+                        Log::info('⚠️ Hybrid-prone breed flagged — injecting hybrid context into Gemini Pro prompt');
+                    }
+
+                    Log::info('→ Running Gemini Pro Preview (full forensic analysis)...');
+
+                    $geminiResult = $this->identifyBreedWithAPI(
+                        $fullPath,
+                        false,
+                        $mlBreed . $hybridContext,
+                        $mlConfidence
+                    );
+
+                    if ($geminiResult['success']) {
+                        $geminiBreed      = $geminiResult['breed'];
+                        $geminiConfidence = $geminiResult['confidence'];
+
+                        if (strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed)) && $geminiConfidence >= 75) {
+                            // Gemini disagrees with YOLO — trust Gemini
+                            // This covers both hybrid corrections AND breed corrections
+                            $detectedBreed    = $geminiBreed;
+                            $confidence       = $geminiConfidence;
+                            $predictionMethod = $isHybridProne ? 'gemini_hybrid_override' : 'gemini_override';
+                            Log::info('✓ Gemini overrides YOLO', [
+                                'yolo_breed'   => $mlBreed,
+                                'gemini_breed' => $geminiBreed,
+                                'gemini_conf'  => $geminiConfidence,
+                                'hybrid_prone' => $isHybridProne,
+                            ]);
+                        } else {
+                            // Gemini agrees with YOLO — use YOLO breed, take higher confidence
+                            $detectedBreed    = $mlBreed;
+                            $confidence       = max($mlConfidence, $geminiConfidence);
+                            $predictionMethod = 'ml_gemini_confirmed';
+                            Log::info('✓ Gemini confirms YOLO breed', [
+                                'breed'      => $detectedBreed,
+                                'confidence' => $confidence,
+                            ]);
+                        }
+
+                        $topPredictions = $geminiResult['top_predictions'];
+                    } else {
+                        // Gemini failed — use ML result only
+                        Log::warning('⚠️ Gemini failed — using ML result only', [
+                            'error' => $geminiResult['error'] ?? 'unknown',
+                        ]);
+                        $detectedBreed    = $mlBreed;
+                        $confidence       = $mlConfidence;
+                        $predictionMethod = $mlMethod;
+                        $topPredictions   = $mlResult['top_predictions'];
                     }
                 } else {
-                    Log::warning('⚠️ ML API unavailable — Gemini working fully independently', [
+                    // ML API unavailable — fall back to Gemini-only (original behaviour)
+                    Log::warning('⚠️ ML API unavailable — falling back to Gemini-only', [
                         'error' => $mlResult['error'] ?? 'unknown',
                     ]);
-                }
 
-                // ── Handle embedded dog validation rejection ──────────────────
-                if (!empty($geminiResult['not_a_dog'])) {
-                    // Clean up temp file
-                    if (isset($persistentTempPath) && file_exists($persistentTempPath)) {
-                        @unlink($persistentTempPath);
-                    }
-                    // Clean up object storage
-                    if ($path && Storage::disk('object-storage')->exists($path)) {
-                        Storage::disk('object-storage')->delete($path);
-                    }
-                    if ($request->expectsJson() || $request->is('api/*')) {
-                        return response()->json([
-                            'success'   => false,
-                            'message'   => $geminiResult['error'],
-                            'not_a_dog' => true,
-                        ], 400);
-                    }
-                    return redirect()->back()->with('error', [
-                        'message'   => $geminiResult['error'],
-                        'not_a_dog' => true,
-                    ]);
-                }
+                    $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
 
-                if ($geminiResult['success']) {
-                    $detectedBreed    = $geminiResult['breed'];
-                    $confidence       = $geminiResult['confidence'];
-                    $predictionMethod = 'sigma_v2_gemini';
-                    $topPredictions   = $geminiResult['top_predictions'];
+                    if (!$predictionResult['success']) {
+                        Log::error('✗ Both ML and Gemini failed: ' . ($predictionResult['error'] ?? ''));
 
-                    Log::info('✓ SIGMA v2 Gemini result', [
-                        'breed'      => $detectedBreed,
-                        'confidence' => $confidence,
-                        'ml_used'    => !is_null($mlBreed) ? 'corroboration_only' : 'none',
-                    ]);
-                } else {
-                    // Gemini failed — only now fall back to ML if available
-                    Log::warning('⚠️ Gemini SIGMA v2 failed — checking ML fallback', [
-                        'error' => $geminiResult['error'] ?? 'unknown',
-                    ]);
-
-                    if ($mlResult['success']) {
-                        Log::warning('⚠️ Using ML as emergency fallback (Gemini unavailable)');
-                        $detectedBreed    = $mlResult['breed'];
-                        $confidence       = $mlResult['confidence'];
-                        $predictionMethod = 'ml_emergency_fallback';
-                        $topPredictions   = $mlResult['top_predictions'];
-                    } else {
-                        // Both Gemini and ML failed — throw user-friendly error
-                        $errorMessage = $geminiResult['error'] ?? '';
+                        $errorMessage = $predictionResult['error'] ?? '';
                         $userMessage  = 'Unable to identify the dog breed. Please try again.';
 
                         if (str_contains($errorMessage, 'API key not configured')) {
@@ -3099,6 +2507,11 @@ private function extractPartialAiData(string $content): array
 
                         throw new \Exception($userMessage);
                     }
+
+                    $detectedBreed    = $predictionResult['breed'];
+                    $confidence       = $predictionResult['confidence'];
+                    $predictionMethod = $predictionResult['method'];
+                    $topPredictions   = $predictionResult['top_predictions'];
                 }
 
                 Log::info('✓ Final breed identification', [
@@ -3209,8 +2622,8 @@ private function extractPartialAiData(string $content): array
                 ], 200);
             }
 
-            // For web requests, redirect to the specific scan result
-            return redirect('/scan-results/' . $dbResult->scan_id);
+            // For web requests, redirect to scan-results page
+            return redirect('/scan-results');
         } catch (\Exception $e) {
             Log::error('Analyze Error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
@@ -3650,7 +3063,7 @@ private function extractPartialAiData(string $content): array
             Log::error('Get recent results error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch scan history '
+                'message' => 'Failed to fetch scan history'
             ], 500);
         }
     }
