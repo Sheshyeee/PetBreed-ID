@@ -2359,7 +2359,7 @@ CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
                 'lifespan'   => 'Varies',
                 'care_tips'  => [
                     'Provide regular daily exercise appropriate for the breed.',
-                    'Feed a balanced diet suited to the dog's size and age.',
+                    'Feed a balanced diet suited to the dog\'s size and age.',
                     'Schedule routine veterinary check-ups annually.',
                     'Keep up with vaccinations and preventive care.',
                 ],
