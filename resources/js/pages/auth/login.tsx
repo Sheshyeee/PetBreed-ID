@@ -1,6 +1,6 @@
 import AuthLayout from '@/layouts/auth-layout';
 import { usePage } from '@inertiajs/react';
-import { CheckCircle2, PawPrint, Shield, XCircle } from 'lucide-react';
+import { CheckCircle2, PawPrint, XCircle } from 'lucide-react';
 
 interface LoginProps {
     status?: string;
@@ -24,39 +24,39 @@ export default function Login({ status }: LoginProps) {
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
                 @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.7)} }
-                @keyframes lv-ring  { 0%{transform:scale(.8);opacity:.65} 70%,100%{transform:scale(1.3);opacity:0} }
+                @keyframes lv-ring  { 0%{transform:scale(.8);opacity:.6} 70%,100%{transform:scale(1.3);opacity:0} }
                 @keyframes lv-paw   { 0%,100%{transform:rotate(0deg)} 30%{transform:rotate(-10deg)} 70%{transform:rotate(10deg)} }
                 @keyframes lv-orb   { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
                 @keyframes lv-orb2  { from{transform:rotate(180deg) translateX(20px) rotate(-180deg)} to{transform:rotate(540deg) translateX(20px) rotate(-540deg)} }
                 @keyframes lv-sweep { 0%{left:-80%} 100%{left:160%} }
                 @keyframes lv-fade  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes lv-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+                @keyframes lv-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
 
                 .lv-f1 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .05s both; }
                 .lv-f2 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .14s both; }
                 .lv-f3 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .22s both; }
                 .lv-f4 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .30s both; }
 
-                /* ── CARD WRAPPER ── */
+                .lv-root { font-family:'Plus Jakarta Sans',sans-serif; }
+
+                /* ── CARD ── */
                 .lv-card {
-                    font-family: 'Plus Jakarta Sans', sans-serif;
                     display: flex;
-                    border-radius: 20px;
+                    border-radius: 18px;
                     overflow: hidden;
-                    box-shadow: 0 20px 60px rgba(0,0,0,.12);
-                    border: 1px solid rgba(0,0,0,.07);
+                    border: 1px solid rgba(0,0,0,.08);
+                    box-shadow: 0 16px 48px rgba(0,0,0,.1);
                     background: #fff;
-                    min-height: 360px;
                 }
                 :is(.dark) .lv-card {
                     background: #0D1117;
                     border-color: rgba(255,255,255,.07);
-                    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+                    box-shadow: 0 16px 48px rgba(0,0,0,.5);
                 }
 
-                /* ── LEFT VISUAL PANEL ── */
+                /* ── LEFT ── */
                 .lv-left {
-                    width: 200px;
+                    width: 190px;
                     flex-shrink: 0;
                     position: relative;
                     overflow: hidden;
@@ -64,179 +64,145 @@ export default function Login({ status }: LoginProps) {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    padding: 28px 20px;
-                    background: linear-gradient(160deg, #0f2b1e 0%, #0a1f2e 100%);
+                    padding: 28px 18px;
+                    gap: 18px;
+                    background: linear-gradient(160deg, #0d2b1f 0%, #091e2d 100%);
                 }
-
-                /* dot grid */
                 .lv-left::before {
-                    content: '';
-                    position: absolute; inset: 0; pointer-events: none;
-                    background-image: radial-gradient(circle, rgba(16,185,129,.12) 1px, transparent 1px);
-                    background-size: 20px 20px;
-                    -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
-                    mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
+                    content:'';
+                    position:absolute; inset:0; pointer-events:none;
+                    background-image:radial-gradient(circle, rgba(16,185,129,.11) 1px, transparent 1px);
+                    background-size:20px 20px;
+                    -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
+                    mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
                 }
-                /* top beam */
                 .lv-left-beam {
-                    position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
-                    background: linear-gradient(90deg, transparent, #10b981 50%, transparent);
-                    opacity: .6;
+                    position:absolute; top:0; left:0; right:0; height:1.5px;
+                    background:linear-gradient(90deg,transparent,#10b981 50%,transparent);
+                    opacity:.55;
                 }
-                /* glow blobs */
-                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:160px; height:160px; border-radius:50%; background:rgba(16,185,129,.08); filter:blur(50px); pointer-events:none; }
-                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:120px; height:120px; border-radius:50%; background:rgba(6,182,212,.06); filter:blur(45px); pointer-events:none; }
+                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.07); filter:blur(48px); pointer-events:none; }
+                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.05); filter:blur(42px); pointer-events:none; }
 
                 /* icon */
                 .lv-icon-wrap {
-                    position: relative;
-                    width: 80px; height: 80px;
-                    display: flex; align-items: center; justify-content: center;
-                    margin-bottom: 20px;
-                    animation: lv-float 4s ease-in-out infinite;
+                    position:relative; width:76px; height:76px;
+                    display:flex; align-items:center; justify-content:center;
+                    animation:lv-float 4s ease-in-out infinite;
                 }
                 .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.2); animation:lv-ring 2.8s ease-out infinite; }
                 .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:lv-ring 2.8s ease-out infinite .9s; }
                 .lv-orb  { position:absolute; width:6px; height:6px; border-radius:50%; top:50%; left:50%; margin:-3px 0 0 -3px; background:#10b981; box-shadow:0 0 10px #10b981; animation:lv-orb 3.4s linear infinite; }
-                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; box-shadow:0 0 8px #06b6d4; animation:lv-orb2 4s linear infinite; }
+                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; box-shadow:0 0 7px #06b6d4; animation:lv-orb2 4s linear infinite; }
                 .lv-icon-bg {
-                    width: 80px; height: 80px; border-radius: 24px;
-                    display: flex; align-items: center; justify-content: center;
-                    border: 1px solid rgba(16,185,129,.25);
-                    background: linear-gradient(135deg, rgba(16,185,129,.15), rgba(6,182,212,.07));
-                    box-shadow: 0 0 30px rgba(16,185,129,.2), inset 0 0 20px rgba(16,185,129,.05);
+                    width:76px; height:76px; border-radius:22px;
+                    display:flex; align-items:center; justify-content:center;
+                    border:1px solid rgba(16,185,129,.22);
+                    background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(6,182,212,.06));
+                    box-shadow:0 0 28px rgba(16,185,129,.18),inset 0 0 18px rgba(16,185,129,.05);
                 }
 
                 /* left text */
+                .lv-left-body { text-align:center; }
                 .lv-left-title {
-                    font-size: 17px; font-weight: 800; color: #fff;
-                    text-align: center; line-height: 1.25; letter-spacing: -.01em;
-                    margin-bottom: 6px;
+                    font-size:16px; font-weight:800; color:#fff;
+                    line-height:1.25; letter-spacing:-.01em; margin-bottom:6px;
                 }
                 .lv-left-title span {
-                    background: linear-gradient(135deg, #10b981, #06b6d4);
-                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                    background-clip: text;
+                    background:linear-gradient(135deg,#10b981,#06b6d4);
+                    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+                    background-clip:text;
                 }
                 .lv-left-sub {
-                    font-size: 10px; color: rgba(255,255,255,.38);
-                    text-align: center; line-height: 1.55; max-width: 150px;
+                    font-size:10px; color:rgba(255,255,255,.35);
+                    line-height:1.55; max-width:145px; margin:0 auto;
                 }
 
-                /* dots indicator (decorative) */
-                .lv-dots { display:flex; gap:5px; margin-top:20px; }
-                .lv-dot  { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.2); }
-                .lv-dot.active { background:#10b981; box-shadow:0 0 6px #10b981; width:16px; border-radius:99px; transition:all .3s; }
+                /* dots */
+                .lv-dots { display:flex; gap:5px; justify-content:center; margin-top:16px; }
+                .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.18); }
+                .lv-dot.on { width:16px; background:#10b981; box-shadow:0 0 6px #10b981; }
 
-                /* ── RIGHT FORM ── */
+                /* ── RIGHT ── */
                 .lv-right {
-                    flex: 1;
-                    padding: 28px 26px;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    gap: 0;
-                    background: #fff;
+                    flex:1;
+                    min-width:0;
+                    padding:26px 22px;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:center;
+                    gap:14px;
+                    background:#fff;
                 }
-                :is(.dark) .lv-right { background: #0D1117; }
+                :is(.dark) .lv-right { background:#0D1117; }
 
-                /* brand pill */
+                /* brand */
                 .lv-brand {
-                    display: inline-flex; align-items: center; gap: 5px;
-                    padding: 3px 10px; border-radius: 99px;
-                    border: 1px solid rgba(16,185,129,.2);
-                    background: rgba(16,185,129,.07);
-                    margin-bottom: 14px; width: fit-content;
+                    display:inline-flex; align-items:center; gap:5px;
+                    padding:3px 10px; border-radius:99px;
+                    border:1px solid rgba(16,185,129,.2);
+                    background:rgba(16,185,129,.07);
+                    width:fit-content;
                 }
                 .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; box-shadow:0 0 5px #10b981; animation:lv-pulse 2s ease-in-out infinite; }
                 .lv-brand-text { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; }
 
-                .lv-form-title {
-                    font-size: 20px; font-weight: 800; letter-spacing: -.015em;
-                    color: #0f172a; line-height: 1.2; margin-bottom: 4px;
-                }
-                :is(.dark) .lv-form-title { color: #f8fafc; }
-
-                .lv-form-sub {
-                    font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 22px;
-                }
+                .lv-title { font-size:19px; font-weight:800; letter-spacing:-.015em; color:#0f172a; line-height:1.2; }
+                :is(.dark) .lv-title { color:#f8fafc; }
+                .lv-sub { font-size:11px; color:#94a3b8; line-height:1.5; margin-top:3px; }
 
                 /* Google btn */
                 .lv-google {
-                    position: relative; overflow: hidden; width: 100%;
-                    display: flex; align-items: center; justify-content: center; gap: 9px;
-                    padding: 12px 18px; border-radius: 11px;
-                    background: #fff;
-                    border: 1.5px solid #e2e8f0;
-                    color: #1e293b; font-size: 13px; font-weight: 700;
-                    font-family: 'Plus Jakarta Sans', sans-serif;
-                    cursor: pointer;
-                    transition: transform .18s, box-shadow .18s, border-color .18s;
-                    box-shadow: 0 1px 4px rgba(0,0,0,.07);
-                    margin-bottom: 16px;
+                    position:relative; overflow:hidden; width:100%;
+                    display:flex; align-items:center; justify-content:center; gap:9px;
+                    padding:12px 16px; border-radius:11px;
+                    background:#fff; border:1.5px solid #e2e8f0;
+                    color:#1e293b; font-size:13px; font-weight:700;
+                    font-family:'Plus Jakarta Sans',sans-serif;
+                    cursor:pointer;
+                    transition:transform .17s, box-shadow .17s, border-color .17s;
+                    box-shadow:0 1px 4px rgba(0,0,0,.07);
                 }
                 .lv-google:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.1); border-color:#cbd5e1; }
                 .lv-google:active { transform:translateY(0); }
                 :is(.dark) .lv-google { background:#161d27; border-color:rgba(255,255,255,.09); color:#f1f5f9; box-shadow:none; }
                 :is(.dark) .lv-google:hover { border-color:rgba(16,185,129,.3); box-shadow:0 6px 20px rgba(16,185,129,.08); }
-                .lv-shine {
-                    position:absolute; top:0; left:-80%; width:40%; height:100%;
-                    background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
-                    transform:skewX(-18deg); pointer-events:none;
-                }
+                .lv-shine { position:absolute; top:0; left:-80%; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); transform:skewX(-18deg); pointer-events:none; }
                 .lv-google:hover .lv-shine { animation:lv-sweep .5s ease forwards; }
 
                 /* divider */
-                .lv-divider { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+                .lv-divider { display:flex; align-items:center; gap:10px; }
                 .lv-div-line { flex:1; height:1px; background:#f1f5f9; }
                 :is(.dark) .lv-div-line { background:rgba(255,255,255,.07); }
-                .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
-                :is(.dark) .lv-div-text { color:rgba(255,255,255,.2); }
+                .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
+                :is(.dark) .lv-div-text { color:rgba(255,255,255,.18); }
 
-                /* trust row */
-                .lv-trust { display:flex; gap:8px; }
-                .lv-trust-item {
-                    flex:1; display:flex; align-items:center; gap:7px;
-                    padding: 9px 10px; border-radius:10px;
-                    border:1px solid #f1f5f9;
-                    background:#fafafa;
-                }
-                :is(.dark) .lv-trust-item { border-color:rgba(255,255,255,.06); background:rgba(255,255,255,.025); }
-                .lv-trust-ico {
-                    width:24px; height:24px; border-radius:7px; flex-shrink:0;
-                    display:flex; align-items:center; justify-content:center;
-                }
-                .lv-trust-name { font-size:11px; font-weight:700; color:#334155; line-height:1; }
-                :is(.dark) .lv-trust-name { color:rgba(255,255,255,.75); }
-                .lv-trust-sub  { font-size:9px; color:#94a3b8; margin-top:2px; }
+                /* footer note */
+                .lv-note { font-size:10px; color:#94a3b8; text-align:center; line-height:1.5; }
+                :is(.dark) .lv-note { color:rgba(255,255,255,.25); }
 
                 /* alerts */
-                .lv-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:12px; }
+                .lv-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:10px; }
                 .lv-ok  { border:1px solid rgba(16,185,129,.25); background:rgba(16,185,129,.07); color:#059669; }
                 :is(.dark) .lv-ok { color:#6ee7b7; }
                 .lv-err { border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.07); color:#dc2626; }
                 :is(.dark) .lv-err { color:#fca5a5; }
 
-                /* responsive: stack on mobile */
-                @media (max-width: 560px) {
-                    .lv-card { flex-direction: column; }
-                    .lv-left { width: 100%; min-height: 180px; padding: 24px 20px; flex-direction: row; gap: 16px; justify-content: flex-start; align-items: center; }
-                    .lv-icon-wrap { margin-bottom: 0; width:60px; height:60px; flex-shrink:0; }
-                    .lv-icon-bg { width:60px; height:60px; border-radius:18px; }
-                    .lv-left-title { text-align:left; font-size:15px; }
-                    .lv-left-sub { text-align:left; }
-                    .lv-dots { margin-top:8px; }
-                    .lv-right { padding: 22px 20px; }
+                /* mobile */
+                @media (max-width:540px) {
+                    .lv-card { flex-direction:column; }
+                    .lv-left { width:100%; flex-direction:row; padding:20px 18px; gap:14px; justify-content:flex-start; min-height:auto; }
+                    .lv-icon-wrap { animation:none; flex-shrink:0; }
+                    .lv-left-body { text-align:left; }
+                    .lv-left-sub { margin:0; }
+                    .lv-dots { justify-content:flex-start; }
+                    .lv-right { padding:20px 18px; }
                 }
             `}</style>
 
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {/* Alerts above card */}
+            <div className="lv-root">
                 {status && (
-                    <div
-                        className="lv-alert lv-ok lv-f1"
-                        style={{ marginBottom: 12 }}
-                    >
+                    <div className="lv-alert lv-ok lv-f1">
                         <CheckCircle2
                             size={13}
                             style={{ flexShrink: 0, marginTop: 1 }}
@@ -245,10 +211,7 @@ export default function Login({ status }: LoginProps) {
                     </div>
                 )}
                 {flash?.error && (
-                    <div
-                        className="lv-alert lv-err lv-f1"
-                        style={{ marginBottom: 12 }}
-                    >
+                    <div className="lv-alert lv-err lv-f1">
                         <XCircle
                             size={13}
                             style={{ flexShrink: 0, marginTop: 1 }}
@@ -258,13 +221,12 @@ export default function Login({ status }: LoginProps) {
                 )}
 
                 <div className="lv-card">
-                    {/* ── LEFT ── */}
+                    {/* LEFT */}
                     <div className="lv-left">
                         <div className="lv-left-beam" />
                         <div className="lv-blob1" />
                         <div className="lv-blob2" />
 
-                        {/* floating icon */}
                         <div className="lv-icon-wrap">
                             <div className="lv-ring1" />
                             <div className="lv-ring2" />
@@ -272,7 +234,7 @@ export default function Login({ status }: LoginProps) {
                             <div className="lv-orb2" />
                             <div className="lv-icon-bg">
                                 <PawPrint
-                                    size={32}
+                                    size={30}
                                     style={{
                                         animation:
                                             'lv-paw 3s ease-in-out infinite',
@@ -282,7 +244,7 @@ export default function Login({ status }: LoginProps) {
                             </div>
                         </div>
 
-                        <div>
+                        <div className="lv-left-body">
                             <p className="lv-left-title">
                                 Identify any
                                 <br />
@@ -293,24 +255,26 @@ export default function Login({ status }: LoginProps) {
                                 health insights
                             </p>
                             <div className="lv-dots">
-                                <div className="lv-dot active" />
+                                <div className="lv-dot on" />
                                 <div className="lv-dot" />
                                 <div className="lv-dot" />
                             </div>
                         </div>
                     </div>
 
-                    {/* ── RIGHT ── */}
+                    {/* RIGHT */}
                     <div className="lv-right">
                         <div className="lv-brand lv-f1">
                             <span className="lv-brand-dot" />
                             <span className="lv-brand-text">DogLens</span>
                         </div>
 
-                        <p className="lv-form-title lv-f2">Welcome back</p>
-                        <p className="lv-form-sub lv-f2">
-                            Sign in to access your breed analysis
-                        </p>
+                        <div className="lv-f2">
+                            <p className="lv-title">Welcome back</p>
+                            <p className="lv-sub">
+                                Sign in to access your breed analysis
+                            </p>
+                        </div>
 
                         <button
                             onClick={() =>
@@ -346,7 +310,7 @@ export default function Login({ status }: LoginProps) {
                             Continue with Google
                         </button>
 
-                        <div className="lv-divider lv-f3">
+                        <div className="lv-divider lv-f4">
                             <div className="lv-div-line" />
                             <span className="lv-div-text">
                                 secured · oauth 2.0
@@ -354,44 +318,10 @@ export default function Login({ status }: LoginProps) {
                             <div className="lv-div-line" />
                         </div>
 
-                        <div className="lv-trust lv-f4">
-                            {[
-                                {
-                                    icon: <Shield size={13} color="#10b981" />,
-                                    bg: 'rgba(16,185,129,.1)',
-                                    name: 'Secure Login',
-                                    sub: 'OAuth 2.0',
-                                },
-                                {
-                                    icon: (
-                                        <CheckCircle2
-                                            size={13}
-                                            color="#06b6d4"
-                                        />
-                                    ),
-                                    bg: 'rgba(6,182,212,.1)',
-                                    name: 'Vet Verified',
-                                    sub: 'Licensed review',
-                                },
-                            ].map((c, i) => (
-                                <div className="lv-trust-item" key={i}>
-                                    <div
-                                        className="lv-trust-ico"
-                                        style={{ background: c.bg }}
-                                    >
-                                        {c.icon}
-                                    </div>
-                                    <div>
-                                        <div className="lv-trust-name">
-                                            {c.name}
-                                        </div>
-                                        <div className="lv-trust-sub">
-                                            {c.sub}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <p className="lv-note lv-f4">
+                            By signing in you agree to our terms &amp; privacy
+                            policy
+                        </p>
                     </div>
                 </div>
             </div>
