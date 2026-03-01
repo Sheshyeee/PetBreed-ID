@@ -96,6 +96,7 @@ export default function Scan() {
     const [scanPhase, setScanPhase] = useState(0);
 
     const hudLabels = ['INITIALIZING', 'SCANNING', 'PROCESSING', 'READY'];
+
     const isCameraOk = () =>
         !!navigator.mediaDevices?.getUserMedia &&
         /chrome|chromium|crios|edg|safari|firefox|fxios/.test(
@@ -301,26 +302,22 @@ export default function Scan() {
         { text: 'Only dog images are accepted', bold: true },
     ];
 
-    /* ─── tiny reusable panel shell ─── */
+    /* reusable sidebar panel */
     const Panel = ({
         icon,
         title,
         children,
-        className = '',
     }: {
         icon: React.ReactNode;
         title: string;
         children: React.ReactNode;
-        className?: string;
     }) => (
-        <div
-            className={`panel relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720] dark:shadow-none ${className}`}
-        >
-            <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/[.06] dark:bg-white/[.03]">
+        <div className="sc-panel relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720] dark:shadow-none">
+            <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-white/[.06] dark:bg-white/[.025]">
                 <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
                     {icon}
                 </div>
-                <span className="jb text-[10px] font-bold tracking-[.12em] text-slate-400 uppercase dark:text-slate-500">
+                <span className="sc-mono text-[10px] font-bold tracking-[.12em] text-slate-400 uppercase dark:text-slate-500">
                     {title}
                 </span>
             </div>
@@ -333,120 +330,117 @@ export default function Scan() {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-                @keyframes scan-beam  { from{top:-4px}     to{top:calc(100% + 4px)} }
-                @keyframes ring-out   { 0%{transform:scale(.85);opacity:.65} 70%,100%{transform:scale(1.15);opacity:0} }
-                @keyframes img-sweep  { 0%{top:-100%}  100%{top:100%} }
-                @keyframes dot-pulse  { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:.5} }
-                @keyframes cam-line   { from{top:-4px}     to{top:calc(100% + 4px)} }
-                @keyframes cam-dot    { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.8);opacity:.3} }
-                @keyframes bar-fill   { from{width:0} }
-                @keyframes slide-dn   { from{transform:translateY(-8px);opacity:0} to{transform:translateY(0);opacity:1} }
-                @keyframes fade-rise  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes modal-rise { from{transform:translateY(16px) scale(.97);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
-                @keyframes fab-pulse  { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(1.35);opacity:0} }
-                @keyframes hud-dim    { 0%,88%,100%{opacity:1} 94%{opacity:.12} }
-                @keyframes particle   { from{transform:translate(-50%,-50%) scale(1);opacity:1} to{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0} }
-                @keyframes ticker-blink { from{opacity:.28} to{opacity:1} }
+                @keyframes sc-beam      { from{top:-3px} to{top:calc(100% + 3px)} }
+                @keyframes sc-ring      { 0%{transform:scale(.86);opacity:.6} 70%,100%{transform:scale(1.16);opacity:0} }
+                @keyframes sc-sweep     { 0%{top:-100%} 100%{top:100%} }
+                @keyframes sc-dpulse    { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:.5} }
+                @keyframes sc-camline   { from{top:-3px} to{top:calc(100% + 3px)} }
+                @keyframes sc-camdot    { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.8);opacity:.3} }
+                @keyframes sc-barfill   { from{width:0} }
+                @keyframes sc-slidein   { from{transform:translateY(-8px);opacity:0} to{transform:translateY(0);opacity:1} }
+                @keyframes sc-faderise  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes sc-modalrise { from{transform:translateY(14px) scale(.97);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+                @keyframes sc-fabring   { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(1.34);opacity:0} }
+                @keyframes sc-huddim    { 0%,88%,100%{opacity:1} 94%{opacity:.12} }
+                @keyframes sc-particle  { from{transform:translate(-50%,-50%) scale(1);opacity:1} to{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0} }
+                @keyframes sc-ticker    { from{opacity:.26} to{opacity:1} }
 
                 .sc-root { font-family:'Plus Jakarta Sans',sans-serif; }
                 .sc-root * { box-sizing:border-box; }
-                .jb { font-family:'JetBrains Mono',monospace !important; }
+                .sc-mono { font-family:'JetBrains Mono',monospace !important; }
 
-                /* subtle dot-grid background */
-                .dot-grid {
+                /* dot grid bg */
+                .sc-dotgrid {
                     position:fixed; inset:0; pointer-events:none; z-index:0;
-                    background-image: radial-gradient(circle, rgba(16,185,129,.09) 1px, transparent 1px);
-                    background-size: 28px 28px;
-                    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 100%);
-                    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 100%);
+                    background-image:radial-gradient(circle,rgba(16,185,129,.08) 1px,transparent 1px);
+                    background-size:28px 28px;
+                    -webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%);
+                    mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%);
                 }
-                .dark .dot-grid {
-                    background-image: radial-gradient(circle, rgba(16,185,129,.07) 1px, transparent 1px);
-                }
+                .dark .sc-dotgrid { background-image:radial-gradient(circle,rgba(16,185,129,.06) 1px,transparent 1px); }
 
-                /* panel top accent */
-                .panel::before,.main-wrap::before {
+                /* panel / main-card accent line */
+                .sc-panel::before,.sc-maincard::before {
                     content:''; position:absolute; top:0; left:0; right:0; height:1.5px;
-                    background:linear-gradient(90deg,transparent 0%,#10b981 40%,#06b6d4 60%,transparent 100%);
-                    opacity:.35;
+                    background:linear-gradient(90deg,transparent,#10b981 45%,#06b6d4 55%,transparent);
+                    opacity:.32;
                 }
 
-                /* ── Drop zone animations ── */
-                .dz-wrap { position:relative; overflow:hidden; }
-                .dz-beam {
-                    position:absolute; left:0; top:-4px; width:100%; height:2px;
+                /* drop-zone scanning beam */
+                .sc-dz { position:relative; overflow:hidden; }
+                .sc-dzbeam {
+                    position:absolute; left:0; top:-3px; width:100%; height:2px;
                     background:linear-gradient(90deg,transparent,#10b981,transparent);
-                    filter:blur(1px); opacity:0; pointer-events:none; z-index:2;
-                    transition:opacity .25s;
+                    filter:blur(1px); opacity:0; pointer-events:none; z-index:2; transition:opacity .25s;
                 }
-                .dz-wrap:hover .dz-beam,.dz-wrap.active .dz-beam { opacity:1; animation:scan-beam 1.9s linear infinite; }
-                .dz-edge {
+                .sc-dz:hover .sc-dzbeam,.sc-dz.sc-dz-on .sc-dzbeam { opacity:1; animation:sc-beam 1.9s linear infinite; }
+                .sc-dzedge {
                     position:absolute; width:1.5px; top:0; height:100%;
                     background:linear-gradient(180deg,transparent,#10b981,transparent);
-                    opacity:0; pointer-events:none; z-index:2; transition:opacity .35s;
+                    opacity:0; pointer-events:none; z-index:2; transition:opacity .3s;
                 }
-                .dz-wrap:hover .dz-edge,.dz-wrap.active .dz-edge { opacity:.25; }
+                .sc-dz:hover .sc-dzedge,.sc-dz.sc-dz-on .sc-dzedge { opacity:.22; }
 
-                /* upload icon rings */
-                .ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.16); animation:ring-out 2.6s ease-out infinite; }
-                .ring2 { position:absolute; inset:-22px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:ring-out 2.6s ease-out infinite .7s; }
+                /* upload rings */
+                .sc-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.16); animation:sc-ring 2.6s ease-out infinite; }
+                .sc-ring2 { position:absolute; inset:-22px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:sc-ring 2.6s ease-out infinite .7s; }
 
-                /* image preview overlay */
-                .img-sweep {
+                /* preview overlay */
+                .sc-imgsweep {
                     position:absolute; left:0; top:-100%; width:100%; height:100%;
-                    background:linear-gradient(180deg,transparent 0%,rgba(16,185,129,.04) 46%,rgba(16,185,129,.14) 50%,rgba(16,185,129,.04) 54%,transparent 100%);
-                    animation:img-sweep 3s ease-in-out infinite; pointer-events:none; z-index:3;
+                    background:linear-gradient(180deg,transparent 0%,rgba(16,185,129,.04) 46%,rgba(16,185,129,.13) 50%,rgba(16,185,129,.04) 54%,transparent 100%);
+                    animation:sc-sweep 3s ease-in-out infinite; pointer-events:none; z-index:3;
                 }
-                .img-lines {
+                .sc-imglines {
                     position:absolute; inset:0; pointer-events:none; z-index:2;
-                    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.016) 2px,rgba(0,0,0,.016) 4px);
+                    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.015) 2px,rgba(0,0,0,.015) 4px);
                 }
 
-                /* HUD corner marks */
-                .hm  { position:absolute; width:14px; height:14px; border-color:#10b981; border-style:solid; z-index:4; pointer-events:none; }
-                .htl { top:7px;    left:7px;  border-width:2px 0 0 2px; }
-                .htr { top:7px;    right:7px; border-width:2px 2px 0 0; }
-                .hbl { bottom:7px; left:7px;  border-width:0 0 2px 2px; }
-                .hbr { bottom:7px; right:7px; border-width:0 2px 2px 0; }
+                /* HUD corners */
+                .sc-hc  { position:absolute; width:14px; height:14px; border-color:#10b981; border-style:solid; z-index:4; pointer-events:none; }
+                .sc-htl { top:7px;    left:7px;  border-width:2px 0 0 2px; }
+                .sc-htr { top:7px;    right:7px; border-width:2px 2px 0 0; }
+                .sc-hbl { bottom:7px; left:7px;  border-width:0 0 2px 2px; }
+                .sc-hbr { bottom:7px; right:7px; border-width:0 2px 2px 0; }
 
                 /* camera overlay */
-                .cam-beam { position:absolute; left:0; top:-4px; width:100%; height:3px; background:linear-gradient(90deg,transparent,#10b981,transparent); filter:blur(2px); animation:cam-line 2s linear infinite; pointer-events:none; z-index:3; }
-                .cam-h { position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(16,185,129,.35); transform:translateY(-50%); }
-                .cam-v { position:absolute; top:0; bottom:0; left:50%; width:1px; background:rgba(16,185,129,.35); transform:translateX(-50%); }
-                .cam-dot { position:absolute; top:50%; left:50%; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 10px #10b981; animation:cam-dot 1.6s ease-in-out infinite; }
+                .sc-cambeam { position:absolute; left:0; top:-3px; width:100%; height:3px; background:linear-gradient(90deg,transparent,#10b981,transparent); filter:blur(2px); animation:sc-camline 2s linear infinite; pointer-events:none; z-index:3; }
+                .sc-camh { position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(16,185,129,.35); transform:translateY(-50%); }
+                .sc-camv { position:absolute; top:0; bottom:0; left:50%; width:1px; background:rgba(16,185,129,.35); transform:translateX(-50%); }
+                .sc-camdot { position:absolute; top:50%; left:50%; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 10px #10b981; animation:sc-camdot 1.6s ease-in-out infinite; }
 
-                /* particle burst */
-                .pt { position:absolute; width:3px; height:3px; border-radius:50%; background:#10b981; box-shadow:0 0 4px #10b981; top:50%; left:50%; animation:particle .75s ease-out forwards; }
+                /* particles */
+                .sc-pt { position:absolute; width:3px; height:3px; border-radius:50%; background:#10b981; box-shadow:0 0 4px #10b981; top:50%; left:50%; animation:sc-particle .75s ease-out forwards; }
 
                 /* button shimmer */
-                .shim { position:relative; overflow:hidden; }
-                .shim::before { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent); transform:skewX(-18deg); transition:left .5s; }
-                .shim:hover::before { left:160%; }
+                .sc-shim { position:relative; overflow:hidden; }
+                .sc-shim::before { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent); transform:skewX(-18deg); transition:left .5s; }
+                .sc-shim:hover::before { left:160%; }
 
-                /* FAB */
-                .fab::before { content:''; position:absolute; inset:-4px; border-radius:15px; border:1.5px solid rgba(16,185,129,.28); animation:fab-pulse 2.1s ease-out infinite; }
+                /* FAB ring */
+                .sc-fab::before { content:''; position:absolute; inset:-4px; border-radius:15px; border:1.5px solid rgba(16,185,129,.27); animation:sc-fabring 2.1s ease-out infinite; }
 
                 /* misc */
-                .hud-blink { animation:hud-dim 3s ease-in-out infinite; }
-                .ticker    { animation:ticker-blink 1.3s ease-in-out infinite alternate; }
-                .fu        { animation:fade-rise .48s cubic-bezier(.16,1,.3,1) both; }
-                .fu1       { animation-delay:.06s; }
-                .fu2       { animation-delay:.12s; }
-                .bg-fill   { animation:bar-fill 1.5s ease-out forwards; }
-                .modal-up  { animation:modal-rise .28s cubic-bezier(.16,1,.3,1) both; }
-                .alert-in  { animation:slide-dn .28s ease both; }
-                .nsb::-webkit-scrollbar { display:none; }
-                .nsb { scrollbar-width:none; }
+                .sc-hudblink { animation:sc-huddim 3s ease-in-out infinite; }
+                .sc-ticker    { animation:sc-ticker 1.3s ease-in-out infinite alternate; }
+                .sc-fu        { animation:sc-faderise .48s cubic-bezier(.16,1,.3,1) both; }
+                .sc-fu1       { animation-delay:.06s; }
+                .sc-fu2       { animation-delay:.12s; }
+                .sc-barfill   { animation:sc-barfill 1.5s ease-out forwards; }
+                .sc-modalup   { animation:sc-modalrise .28s cubic-bezier(.16,1,.3,1) both; }
+                .sc-alertin   { animation:sc-slidein .28s ease both; }
+                .sc-nsb::-webkit-scrollbar { display:none; }
+                .sc-nsb { scrollbar-width:none; }
             `}</style>
 
-            {/* ── root shell: full viewport, no outer scroll ── */}
+            {/* ── full-viewport shell, NO outer page scroll ── */}
             <div className="sc-root flex h-screen flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-[#080B0F]">
-                {/* glows */}
-                <div className="pointer-events-none fixed top-[-150px] left-[-80px] z-0 h-[280px] w-[480px] rounded-full bg-emerald-400/[.045] blur-[90px]" />
-                <div className="pointer-events-none fixed top-[-100px] right-[-50px] z-0 h-[220px] w-[360px] rounded-full bg-cyan-400/[.03] blur-[90px]" />
-                <div className="dot-grid" />
+                {/* ambient glows */}
+                <div className="pointer-events-none fixed top-[-140px] left-[-70px] z-0 h-[260px] w-[460px] rounded-full bg-emerald-400/[.042] blur-[85px]" />
+                <div className="pointer-events-none fixed top-[-90px] right-[-40px] z-0 h-[210px] w-[340px] rounded-full bg-cyan-400/[.028] blur-[85px]" />
+                <div className="sc-dotgrid" />
 
-                {/* ── Header ── */}
+                {/* header — fixed height */}
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
@@ -454,48 +448,16 @@ export default function Scan() {
                     <AnalysisLoadingDialog isOpen={showLoading} />
                 </div>
 
-                {/* ── HUD strip ── */}
-                <div className="nsb relative z-10 flex flex-shrink-0 items-center overflow-x-auto border-b border-slate-200/70 bg-white/75 px-4 backdrop-blur-md dark:border-white/[.055] dark:bg-[#0B0E13]/80">
-                    {[
-                        { l: 'System', v: 'ONLINE', c: '#10b981' },
-                        { l: 'Model', v: 'v3.2.1', c: '#06b6d4' },
-                        { l: 'Accuracy', v: '98.4%', c: '#10b981' },
-                        { l: 'Breeds', v: '120+', c: '#06b6d4' },
-                        { l: 'Status', v: hudLabels[scanPhase], c: '#10b981' },
-                    ].map((x, i) => (
-                        <div
-                            key={i}
-                            className="jb flex items-center gap-1.5 border-r border-slate-200/60 px-3 py-2 text-[10px] font-medium tracking-[.11em] whitespace-nowrap text-slate-400 uppercase last:border-none dark:border-white/[.05] dark:text-slate-500"
-                        >
-                            <span
-                                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                                style={{
-                                    background: x.c,
-                                    boxShadow: `0 0 5px ${x.c}`,
-                                }}
-                            />
-                            <span>{x.l}</span>
-                            <span
-                                style={{ color: x.c }}
-                                className="font-semibold"
-                            >
-                                {x.v}
-                            </span>
-                        </div>
-                    ))}
-                    <span className="jb ticker ml-auto hidden pl-4 text-[10px] tracking-[.14em] whitespace-nowrap text-slate-300 sm:block dark:text-slate-700">
-                        ▶ DOGLENS AI
-                    </span>
-                </div>
+               
 
-                {/* ── QR Modal ── */}
+                {/* QR modal */}
                 {showQRModal && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-xl"
                         onClick={() => setShowQRModal(false)}
                     >
                         <div
-                            className="modal-up panel relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-7 shadow-2xl dark:border-white/[.08] dark:bg-[#131720]"
+                            className="sc-modalup sc-panel relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-7 shadow-2xl dark:border-white/[.08] dark:bg-[#131720]"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <button
@@ -563,23 +525,19 @@ export default function Scan() {
                     </div>
                 )}
 
-                {/* ── FAB ── */}
+                {/* FAB */}
                 <button
                     onClick={() => setShowQRModal(true)}
-                    className="fab fixed right-5 bottom-5 z-40 flex h-11 w-11 items-center justify-center rounded-[13px] bg-emerald-500 text-black shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 hover:bg-emerald-400 active:scale-95"
+                    className="sc-fab fixed right-5 bottom-5 z-40 flex h-11 w-11 items-center justify-center rounded-[13px] bg-emerald-500 text-black shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 hover:bg-emerald-400 active:scale-95"
                 >
                     <QrCode size={17} />
                 </button>
 
-                {/* ══════════════════════════════════════════════════════
-                    CONTENT AREA — 3-column grid, fills remaining height
-                ══════════════════════════════════════════════════════ */}
-                <div className="relative z-10 min-h-0 flex-1">
-                    {/* outer scroll container on mobile; grid otherwise */}
-                    <div className="nsb mx-auto flex h-full max-w-[1360px] flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-5 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:overflow-hidden xl:grid-cols-[224px_1fr_232px]">
-                        {/* ════════ LEFT ════════ */}
-                        <aside className="fu flex flex-col gap-3">
-                            {/* Navigation */}
+                {/* ── MAIN CONTENT — flex-1 fills remaining viewport exactly ── */}
+                <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
+                    <div className="sc-nsb mx-auto flex h-full max-w-[1360px] flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-5 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:overflow-hidden xl:grid-cols-[224px_1fr_232px]">
+                        {/* ── LEFT SIDEBAR ── */}
+                        <aside className="sc-fu sc-nsb flex flex-col gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
                             <Panel
                                 icon={<ScanIcon size={11} />}
                                 title="Navigation"
@@ -606,14 +564,13 @@ export default function Scan() {
                                 </div>
                             </Panel>
 
-                            {/* Top Breeds — dynamic */}
                             <Panel
                                 icon={<TrendingUp size={11} />}
                                 title="Top Breeds"
                             >
                                 <div className="flex flex-col gap-0.5 p-2.5">
                                     {topBreeds.length === 0 ? (
-                                        <p className="jb py-3 text-center text-[10px] text-slate-300 dark:text-slate-600">
+                                        <p className="sc-mono py-3 text-center text-[10px] text-slate-300 dark:text-slate-600">
                                             No scan data yet
                                         </p>
                                     ) : (
@@ -622,7 +579,7 @@ export default function Scan() {
                                                 key={i}
                                                 className="group flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/[.03]"
                                             >
-                                                <span className="jb w-4 flex-shrink-0 text-[9px] text-slate-300 transition-colors group-hover:text-emerald-500/50 dark:text-slate-600">
+                                                <span className="sc-mono w-4 flex-shrink-0 text-[9px] text-slate-300 transition-colors group-hover:text-emerald-500/50 dark:text-slate-600">
                                                     #{i + 1}
                                                 </span>
                                                 <span
@@ -633,7 +590,7 @@ export default function Scan() {
                                                 </span>
                                                 <div className="h-[3px] w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[.07]">
                                                     <div
-                                                        className="bg-fill h-full rounded-full bg-emerald-500/60"
+                                                        className="sc-barfill h-full rounded-full bg-emerald-500/60"
                                                         style={{
                                                             width: `${b.bar_width}%`,
                                                             animationDelay: `${i * 0.07}s`,
@@ -646,7 +603,6 @@ export default function Scan() {
                                 </div>
                             </Panel>
 
-                            {/* Global Stats — dynamic */}
                             <Panel
                                 icon={<Activity size={11} />}
                                 title="Global Stats"
@@ -682,11 +638,11 @@ export default function Scan() {
                                                 <span className="text-slate-300 dark:text-slate-600">
                                                     {s.icon}
                                                 </span>
-                                                <span className="jb text-[9px] font-medium tracking-[.1em] text-slate-400 uppercase dark:text-slate-500">
+                                                <span className="sc-mono text-[9px] font-medium tracking-[.1em] text-slate-400 uppercase dark:text-slate-500">
                                                     {s.l}
                                                 </span>
                                             </div>
-                                            <span className="jb text-[12px] font-bold text-slate-700 dark:text-slate-200">
+                                            <span className="sc-mono text-[12px] font-bold text-slate-700 dark:text-slate-200">
                                                 {s.v}
                                             </span>
                                         </div>
@@ -695,9 +651,9 @@ export default function Scan() {
                             </Panel>
                         </aside>
 
-                        {/* ════════ CENTER ════════ */}
-                        <main className="fu fu1 flex min-h-0 flex-col gap-3">
-                            {/* Page title row */}
+                        {/* ── CENTER ── */}
+                        <main className="sc-fu sc-fu1 flex min-h-0 flex-col gap-3">
+                            {/* title row */}
                             <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                 <div>
                                     <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.08] px-2.5 py-1">
@@ -705,10 +661,10 @@ export default function Scan() {
                                             className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"
                                             style={{
                                                 animation:
-                                                    'dot-pulse 2s ease-in-out infinite',
+                                                    'sc-dpulse 2s ease-in-out infinite',
                                             }}
                                         />
-                                        <span className="jb text-[10px] font-semibold tracking-[.12em] text-emerald-600 uppercase dark:text-emerald-400">
+                                        <span className="sc-mono text-[10px] font-semibold tracking-[.12em] text-emerald-600 uppercase dark:text-emerald-400">
                                             AI Breed Detection
                                         </span>
                                     </div>
@@ -720,7 +676,6 @@ export default function Scan() {
                                         identify your dog's breed.
                                     </p>
                                 </div>
-                                {/* Scan History button — only shown here, not duplicated in sidebars */}
                                 <Link
                                     href="/scanhistory"
                                     className="inline-flex flex-shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-500 no-underline transition-all hover:border-emerald-500/30 hover:bg-emerald-500/[.03] hover:text-emerald-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-emerald-400"
@@ -734,9 +689,9 @@ export default function Scan() {
                                 </Link>
                             </div>
 
-                            {/* Alerts */}
+                            {/* alerts */}
                             {localError && showLocalError && (
-                                <div className="alert-in flex-shrink-0 rounded-2xl border border-red-200 bg-red-50 p-3.5 dark:border-red-500/20 dark:bg-red-500/[.07]">
+                                <div className="sc-alertin flex-shrink-0 rounded-2xl border border-red-200 bg-red-50 p-3.5 dark:border-red-500/20 dark:bg-red-500/[.07]">
                                     <div className="flex items-start gap-3">
                                         <XCircle
                                             size={15}
@@ -782,24 +737,24 @@ export default function Scan() {
                                 </div>
                             )}
 
-                            {/* ── Scan card — grows to fill remaining height ── */}
-                            <div className="main-wrap relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720] dark:shadow-none">
-                                {/* macOS-style terminal bar */}
+                            {/* ── main scan card: flex-1 fills remaining height ── */}
+                            <div className="sc-maincard relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720] dark:shadow-none">
+                                {/* terminal bar */}
                                 <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
                                     <div className="flex gap-1.5">
                                         <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
                                         <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                                        <div className="hud-blink h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" />
+                                        <div className="sc-hudblink h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" />
                                     </div>
-                                    <span className="jb ml-1 text-[10px] text-slate-400 select-none dark:text-slate-500">
+                                    <span className="sc-mono ml-1 text-[10px] text-slate-400 select-none dark:text-slate-500">
                                         doglens://scan
                                     </span>
-                                    <div className="jb ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500 select-none dark:text-emerald-400">
+                                    <div className="sc-mono ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500 select-none dark:text-emerald-400">
                                         <span
                                             className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"
                                             style={{
                                                 animation:
-                                                    'dot-pulse 2s infinite',
+                                                    'sc-dpulse 2s infinite',
                                             }}
                                         />
                                         {processing
@@ -812,19 +767,19 @@ export default function Scan() {
                                     </div>
                                 </div>
 
-                                {/* form body */}
-                                <div className="nsb min-h-0 flex-1 overflow-y-auto">
+                                {/* scrollable form body — this is what scrolls, not the page */}
+                                <div className="sc-nsb min-h-0 flex-1 overflow-y-auto">
                                     <form
                                         onSubmit={handleSubmit}
-                                        className="flex flex-col gap-4 p-5"
+                                        className="flex flex-col gap-4 p-5 pb-8"
                                     >
-                                        {/* ── State A: empty drop zone ── */}
+                                        {/* STATE A: drop zone */}
                                         {!preview && !showCamera && (
                                             <>
                                                 <div
-                                                    className={`dz-wrap flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed px-6 py-10 transition-all ${
+                                                    className={`sc-dz flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed px-6 py-10 transition-all ${
                                                         isDragging
-                                                            ? 'active border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]'
+                                                            ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]'
                                                             : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'
                                                     }`}
                                                     onClick={() =>
@@ -846,13 +801,13 @@ export default function Scan() {
                                                         if (f) processFile(f);
                                                     }}
                                                 >
-                                                    <div className="dz-beam" />
+                                                    <div className="sc-dzbeam" />
                                                     <div
-                                                        className="dz-edge"
+                                                        className="sc-dzedge"
                                                         style={{ left: 0 }}
                                                     />
                                                     <div
-                                                        className="dz-edge"
+                                                        className="sc-dzedge"
                                                         style={{ right: 0 }}
                                                     />
                                                     <input
@@ -870,19 +825,16 @@ export default function Scan() {
                                                                 processFile(f);
                                                         }}
                                                     />
-
-                                                    {/* icon with rings */}
                                                     <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center">
-                                                        <div className="ring1" />
-                                                        <div className="ring2" />
-                                                        <div className="relative flex h-full w-full items-center justify-center rounded-full border-2 border-emerald-500/30 bg-emerald-500/[.09] transition-all">
+                                                        <div className="sc-ring1" />
+                                                        <div className="sc-ring2" />
+                                                        <div className="relative flex h-full w-full items-center justify-center rounded-full border-2 border-emerald-500/30 bg-emerald-500/[.09]">
                                                             <Upload
                                                                 size={22}
                                                                 className="text-emerald-500"
                                                             />
                                                         </div>
                                                     </div>
-
                                                     <div className="text-center select-none">
                                                         <p className="text-[15px] font-bold text-slate-800 dark:text-slate-100">
                                                             Drop your dog image
@@ -895,15 +847,14 @@ export default function Scan() {
                                                             </span>
                                                         </p>
                                                     </div>
-                                                    <p className="jb text-[9px] tracking-[.14em] text-slate-300 select-none dark:text-slate-600">
+                                                    <p className="sc-mono text-[9px] tracking-[.14em] text-slate-300 select-none dark:text-slate-600">
                                                         ALL FORMATS · MAX 10MB
                                                     </p>
                                                 </div>
 
-                                                {/* divider */}
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
-                                                    <span className="jb text-[9px] font-medium tracking-[.14em] text-slate-300 uppercase select-none dark:text-slate-600">
+                                                    <span className="sc-mono text-[9px] font-medium tracking-[.14em] text-slate-300 uppercase select-none dark:text-slate-600">
                                                         or use camera
                                                     </span>
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
@@ -917,7 +868,7 @@ export default function Scan() {
                                                     <Camera size={15} />{' '}
                                                     Activate Camera
                                                 </button>
-                                                <p className="jb text-center text-[9px] tracking-[.12em] text-slate-300 select-none dark:text-slate-600">
+                                                <p className="sc-mono text-center text-[9px] tracking-[.12em] text-slate-300 select-none dark:text-slate-600">
                                                     CHROME · EDGE · SAFARI ·
                                                     FIREFOX
                                                 </p>
@@ -929,7 +880,7 @@ export default function Scan() {
                                             </>
                                         )}
 
-                                        {/* ── State B: camera active ── */}
+                                        {/* STATE B: camera */}
                                         {showCamera && !preview && (
                                             <div className="flex flex-col gap-4">
                                                 <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 shadow-md shadow-emerald-500/5">
@@ -949,7 +900,7 @@ export default function Scan() {
                                                         className="hidden"
                                                     />
                                                     <div className="pointer-events-none absolute inset-0 z-[3]">
-                                                        <div className="cam-beam" />
+                                                        <div className="sc-cambeam" />
                                                         {[
                                                             'tl',
                                                             'tr',
@@ -958,15 +909,15 @@ export default function Scan() {
                                                         ].map((p) => (
                                                             <div
                                                                 key={p}
-                                                                className={`hm h${p}`}
+                                                                className={`sc-hc sc-h${p}`}
                                                             />
                                                         ))}
                                                         <div className="absolute top-1/2 left-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2">
-                                                            <div className="cam-h" />
-                                                            <div className="cam-v" />
-                                                            <div className="cam-dot" />
+                                                            <div className="sc-camh" />
+                                                            <div className="sc-camv" />
+                                                            <div className="sc-camdot" />
                                                         </div>
-                                                        <div className="jb ticker absolute bottom-3 left-3 rounded border border-emerald-500/20 bg-black/60 px-2 py-0.5 text-[9px] font-semibold tracking-[.14em] text-emerald-400 uppercase backdrop-blur-sm">
+                                                        <div className="sc-mono sc-ticker absolute bottom-3 left-3 rounded border border-emerald-500/20 bg-black/60 px-2 py-0.5 text-[9px] font-semibold tracking-[.14em] text-emerald-400 uppercase backdrop-blur-sm">
                                                             ● REC ·{' '}
                                                             {facingMode ===
                                                             'environment'
@@ -989,7 +940,7 @@ export default function Scan() {
                                                     <button
                                                         type="button"
                                                         onClick={capturePhoto}
-                                                        className="shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
                                                     >
                                                         <ScanIcon size={15} />{' '}
                                                         Capture & Scan
@@ -1005,7 +956,7 @@ export default function Scan() {
                                             </div>
                                         )}
 
-                                        {/* ── State C: image loaded ── */}
+                                        {/* STATE C: preview */}
                                         {preview && (
                                             <div className="flex flex-col gap-4">
                                                 <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 shadow-md shadow-emerald-500/[.06]">
@@ -1026,7 +977,7 @@ export default function Scan() {
                                                                             key={
                                                                                 i
                                                                             }
-                                                                            className="pt"
+                                                                            className="sc-pt"
                                                                             style={
                                                                                 {
                                                                                     '--dx': `${Math.cos((a * Math.PI) / 180) * d}px`,
@@ -1048,8 +999,8 @@ export default function Scan() {
                                                         }}
                                                     />
                                                     <div className="pointer-events-none absolute inset-0">
-                                                        <div className="img-lines" />
-                                                        <div className="img-sweep" />
+                                                        <div className="sc-imglines" />
+                                                        <div className="sc-imgsweep" />
                                                         {[
                                                             'tl',
                                                             'tr',
@@ -1058,18 +1009,18 @@ export default function Scan() {
                                                         ].map((p) => (
                                                             <div
                                                                 key={p}
-                                                                className={`hm h${p}`}
+                                                                className={`sc-hc sc-h${p}`}
                                                                 style={{
                                                                     opacity: 0.9,
                                                                 }}
                                                             />
                                                         ))}
                                                         <div className="absolute right-2.5 bottom-2.5 left-2.5 z-[5] flex items-center justify-between">
-                                                            <span className="jb rounded border border-emerald-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-emerald-400 backdrop-blur-sm">
+                                                            <span className="sc-mono rounded border border-emerald-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-emerald-400 backdrop-blur-sm">
                                                                 IMAGE LOADED
                                                             </span>
                                                             {fileInfo && (
-                                                                <span className="jb max-w-[180px] truncate rounded border border-emerald-500/15 bg-black/65 px-2 py-0.5 text-[8px] text-emerald-400 backdrop-blur-sm">
+                                                                <span className="sc-mono max-w-[180px] truncate rounded border border-emerald-500/15 bg-black/65 px-2 py-0.5 text-[8px] text-emerald-400 backdrop-blur-sm">
                                                                     {fileInfo
                                                                         .split(
                                                                             '·',
@@ -1087,7 +1038,7 @@ export default function Scan() {
                                                     </div>
                                                 </div>
                                                 {fileInfo && (
-                                                    <p className="jb truncate text-center text-[9px] tracking-wide text-slate-300 dark:text-slate-600">
+                                                    <p className="sc-mono truncate text-center text-[9px] tracking-wide text-slate-300 dark:text-slate-600">
                                                         {fileInfo}
                                                     </p>
                                                 )}
@@ -1095,7 +1046,7 @@ export default function Scan() {
                                                     <button
                                                         type="submit"
                                                         disabled={processing}
-                                                        className="shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                                                     >
                                                         <ScanIcon size={15} />{' '}
                                                         {processing
@@ -1118,9 +1069,8 @@ export default function Scan() {
                             </div>
                         </main>
 
-                        {/* ════════ RIGHT ════════ */}
-                        <aside className="fu fu2 flex flex-col gap-3">
-                            {/* How It Works */}
+                        {/* ── RIGHT SIDEBAR ── */}
+                        <aside className="sc-fu sc-fu2 sc-nsb flex flex-col gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
                             <Panel
                                 icon={<Eye size={11} />}
                                 title="How It Works"
@@ -1148,7 +1098,7 @@ export default function Scan() {
                                             key={i}
                                             className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-100 dark:border-white/[.05]' : ''}`}
                                         >
-                                            <span className="jb mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-500/65">
+                                            <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-500/65">
                                                 {s.n}
                                             </span>
                                             <p className="text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
@@ -1159,7 +1109,6 @@ export default function Scan() {
                                 </div>
                             </Panel>
 
-                            {/* Capture Tips — replaces "Best Results" callout */}
                             <Panel
                                 icon={<Zap size={11} />}
                                 title="Capture Tips"
@@ -1170,7 +1119,7 @@ export default function Scan() {
                                             key={i}
                                             className={`flex items-start gap-2.5 py-2 ${i < captureTips.length - 1 ? 'border-b border-slate-100 dark:border-white/[.05]' : ''}`}
                                         >
-                                            <span className="jb mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-500/55">
+                                            <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-500/55">
                                                 0{i + 1}
                                             </span>
                                             <p
