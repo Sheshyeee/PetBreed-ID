@@ -431,6 +431,28 @@ export default function Scan() {
                 .sc-alertin   { animation:sc-slidein .28s ease both; }
                 .sc-nsb::-webkit-scrollbar { display:none; }
                 .sc-nsb { scrollbar-width:none; }
+
+                /* ── FIX: desktop drop-zone fills the card, no gap ── */
+                .sc-form-fill {
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                    padding: 20px;
+                    gap: 16px;
+                }
+                /* The STATE A drop-zone wrapper stretches to fill remaining card height */
+                .sc-dropzone-stretch {
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                    min-height: 0;
+                    gap: 12px;
+                }
+                /* The actual dashed drop zone grows to fill */
+                .sc-dz-fill {
+                    flex: 1;
+                    min-height: 180px;
+                }
             `}</style>
 
             {/* ── full-viewport shell, NO outer page scroll ── */}
@@ -447,8 +469,6 @@ export default function Scan() {
                 <div className="relative z-30">
                     <AnalysisLoadingDialog isOpen={showLoading} />
                 </div>
-
-               
 
                 {/* QR modal */}
                 {showQRModal && (
@@ -533,126 +553,150 @@ export default function Scan() {
                     <QrCode size={17} />
                 </button>
 
-                {/* ── MAIN CONTENT — flex-1 fills remaining viewport exactly ── */}
+                {/* ── MAIN CONTENT ── */}
                 <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
+                    {/*
+                        LAYOUT STRATEGY:
+                        - Mobile (flex-col): We use `order-*` to control stacking:
+                            order-1 = Navigation panel (top)
+                            order-2 = Center scan card (right below nav on mobile)
+                            order-3 = Top Breeds, Global Stats (left sidebar rest)
+                            order-4 = How It Works, Capture Tips (right sidebar)
+                        - Desktop (lg:grid): order is irrelevant, grid columns control layout
+                    */}
                     <div className="sc-nsb mx-auto flex h-full max-w-[1360px] flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-5 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:overflow-hidden xl:grid-cols-[224px_1fr_232px]">
                         {/* ── LEFT SIDEBAR ── */}
-                        <aside className="sc-fu sc-nsb flex flex-col gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
-                            <Panel
-                                icon={<ScanIcon size={11} />}
-                                title="Navigation"
-                            >
-                                <div className="flex flex-col gap-1 p-2.5">
-                                    <Link
-                                        href="/scan"
-                                        className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-600 no-underline transition-all dark:bg-emerald-500/[.11] dark:text-emerald-400"
-                                    >
-                                        <ScanIcon size={13} />
-                                        <span>New Scan</span>
-                                        <ChevronRight
-                                            size={11}
-                                            className="ml-auto opacity-40"
-                                        />
-                                    </Link>
-                                    <Link
-                                        href="/scanhistory"
-                                        className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-500 no-underline transition-all hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
-                                    >
-                                        <History size={13} />
-                                        <span>Scan History</span>
-                                    </Link>
-                                </div>
-                            </Panel>
+                        {/*
+                            Mobile: split into two parts via order.
+                            - Navigation panel: order-1 (top of mobile stack)
+                            - Top Breeds + Global Stats: order-3 (below the scan card)
+                            Desktop: all in left column, bottom-aligned via justify-end
+                        */}
+                        <aside className="sc-fu contents lg:flex lg:flex-col lg:justify-end lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
+                            {/* Navigation — always on top on mobile */}
+                            <div className="order-1 lg:order-none">
+                                <Panel
+                                    icon={<ScanIcon size={11} />}
+                                    title="Navigation"
+                                >
+                                    <div className="flex flex-col gap-1 p-2.5">
+                                        <Link
+                                            href="/scan"
+                                            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-600 no-underline transition-all dark:bg-emerald-500/[.11] dark:text-emerald-400"
+                                        >
+                                            <ScanIcon size={13} />
+                                            <span>New Scan</span>
+                                            <ChevronRight
+                                                size={11}
+                                                className="ml-auto opacity-40"
+                                            />
+                                        </Link>
+                                        <Link
+                                            href="/scanhistory"
+                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-500 no-underline transition-all hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                        >
+                                            <History size={13} />
+                                            <span>Scan History</span>
+                                        </Link>
+                                    </div>
+                                </Panel>
+                            </div>
 
-                            <Panel
-                                icon={<TrendingUp size={11} />}
-                                title="Top Breeds"
-                            >
-                                <div className="flex flex-col gap-0.5 p-2.5">
-                                    {topBreeds.length === 0 ? (
-                                        <p className="sc-mono py-3 text-center text-[10px] text-slate-300 dark:text-slate-600">
-                                            No scan data yet
-                                        </p>
-                                    ) : (
-                                        topBreeds.map((b, i) => (
+                            {/* Top Breeds — below scan card on mobile (order-3) */}
+                            <div className="order-3 lg:order-none">
+                                <Panel
+                                    icon={<TrendingUp size={11} />}
+                                    title="Top Breeds"
+                                >
+                                    <div className="flex flex-col gap-0.5 p-2.5">
+                                        {topBreeds.length === 0 ? (
+                                            <p className="sc-mono py-3 text-center text-[10px] text-slate-300 dark:text-slate-600">
+                                                No scan data yet
+                                            </p>
+                                        ) : (
+                                            topBreeds.map((b, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="group flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/[.03]"
+                                                >
+                                                    <span className="sc-mono w-4 flex-shrink-0 text-[9px] text-slate-300 transition-colors group-hover:text-emerald-500/50 dark:text-slate-600">
+                                                        #{i + 1}
+                                                    </span>
+                                                    <span
+                                                        className="flex-1 truncate text-[12px] font-medium text-slate-600 dark:text-slate-300"
+                                                        title={b.breed}
+                                                    >
+                                                        {b.breed}
+                                                    </span>
+                                                    <div className="h-[3px] w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[.07]">
+                                                        <div
+                                                            className="sc-barfill h-full rounded-full bg-emerald-500/60"
+                                                            style={{
+                                                                width: `${b.bar_width}%`,
+                                                                animationDelay: `${i * 0.07}s`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </Panel>
+                            </div>
+
+                            {/* Global Stats — below Top Breeds on mobile (order-3 too, natural flow) */}
+                            <div className="order-3 lg:order-none">
+                                <Panel
+                                    icon={<Activity size={11} />}
+                                    title="Global Stats"
+                                >
+                                    <div className="flex flex-col gap-1.5 p-2.5">
+                                        {[
+                                            {
+                                                l: 'Total Scans',
+                                                v: globalStats.total_scans,
+                                                icon: <Target size={10} />,
+                                            },
+                                            {
+                                                l: 'Verified',
+                                                v: globalStats.verified,
+                                                icon: <Shield size={10} />,
+                                            },
+                                            {
+                                                l: 'Avg Score',
+                                                v: globalStats.avg_score,
+                                                icon: <Activity size={10} />,
+                                            },
+                                            {
+                                                l: 'Uptime',
+                                                v: globalStats.uptime,
+                                                icon: <Wifi size={10} />,
+                                            },
+                                        ].map((s, i) => (
                                             <div
                                                 key={i}
-                                                className="group flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/[.03]"
+                                                className="flex cursor-default items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
                                             >
-                                                <span className="sc-mono w-4 flex-shrink-0 text-[9px] text-slate-300 transition-colors group-hover:text-emerald-500/50 dark:text-slate-600">
-                                                    #{i + 1}
-                                                </span>
-                                                <span
-                                                    className="flex-1 truncate text-[12px] font-medium text-slate-600 dark:text-slate-300"
-                                                    title={b.breed}
-                                                >
-                                                    {b.breed}
-                                                </span>
-                                                <div className="h-[3px] w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[.07]">
-                                                    <div
-                                                        className="sc-barfill h-full rounded-full bg-emerald-500/60"
-                                                        style={{
-                                                            width: `${b.bar_width}%`,
-                                                            animationDelay: `${i * 0.07}s`,
-                                                        }}
-                                                    />
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-300 dark:text-slate-600">
+                                                        {s.icon}
+                                                    </span>
+                                                    <span className="sc-mono text-[9px] font-medium tracking-[.1em] text-slate-400 uppercase dark:text-slate-500">
+                                                        {s.l}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </Panel>
-
-                            <Panel
-                                icon={<Activity size={11} />}
-                                title="Global Stats"
-                            >
-                                <div className="flex flex-col gap-1.5 p-2.5">
-                                    {[
-                                        {
-                                            l: 'Total Scans',
-                                            v: globalStats.total_scans,
-                                            icon: <Target size={10} />,
-                                        },
-                                        {
-                                            l: 'Verified',
-                                            v: globalStats.verified,
-                                            icon: <Shield size={10} />,
-                                        },
-                                        {
-                                            l: 'Avg Score',
-                                            v: globalStats.avg_score,
-                                            icon: <Activity size={10} />,
-                                        },
-                                        {
-                                            l: 'Uptime',
-                                            v: globalStats.uptime,
-                                            icon: <Wifi size={10} />,
-                                        },
-                                    ].map((s, i) => (
-                                        <div
-                                            key={i}
-                                            className="flex cursor-default items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-slate-300 dark:text-slate-600">
-                                                    {s.icon}
-                                                </span>
-                                                <span className="sc-mono text-[9px] font-medium tracking-[.1em] text-slate-400 uppercase dark:text-slate-500">
-                                                    {s.l}
+                                                <span className="sc-mono text-[12px] font-bold text-slate-700 dark:text-slate-200">
+                                                    {s.v}
                                                 </span>
                                             </div>
-                                            <span className="sc-mono text-[12px] font-bold text-slate-700 dark:text-slate-200">
-                                                {s.v}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </Panel>
+                                        ))}
+                                    </div>
+                                </Panel>
+                            </div>
                         </aside>
 
-                        {/* ── CENTER ── */}
-                        <main className="sc-fu sc-fu1 flex min-h-0 flex-col gap-3">
+                        {/* ── CENTER — order-2 on mobile so it sits right below Navigation ── */}
+                        <main className="sc-fu sc-fu1 order-2 flex min-h-0 flex-col gap-3 lg:order-none">
                             {/* title row */}
                             <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                 <div>
@@ -737,7 +781,7 @@ export default function Scan() {
                                 </div>
                             )}
 
-                            {/* ── main scan card: flex-1 fills remaining height ── */}
+                            {/* ── MAIN SCAN CARD ── */}
                             <div className="sc-maincard relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720] dark:shadow-none">
                                 {/* terminal bar */}
                                 <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
@@ -767,17 +811,18 @@ export default function Scan() {
                                     </div>
                                 </div>
 
-                                {/* scrollable form body — this is what scrolls, not the page */}
+                                {/* ── Form body: flex-1, fills the card, no gap ── */}
                                 <div className="sc-nsb min-h-0 flex-1 overflow-y-auto">
                                     <form
                                         onSubmit={handleSubmit}
-                                        className="flex flex-col gap-4 p-5 pb-8"
+                                        className="sc-form-fill h-full"
                                     >
-                                        {/* STATE A: drop zone */}
+                                        {/* STATE A: drop zone — stretched to fill card height */}
                                         {!preview && !showCamera && (
-                                            <>
+                                            <div className="sc-dropzone-stretch">
+                                                {/* Dashed drop zone — grows to fill remaining height */}
                                                 <div
-                                                    className={`sc-dz flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed px-6 py-10 transition-all ${
+                                                    className={`sc-dz sc-dz-fill flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed px-6 py-8 transition-all ${
                                                         isDragging
                                                             ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]'
                                                             : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'
@@ -852,6 +897,7 @@ export default function Scan() {
                                                     </p>
                                                 </div>
 
+                                                {/* Divider + Camera button — pinned below dropzone, no extra gap */}
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
                                                     <span className="sc-mono text-[9px] font-medium tracking-[.14em] text-slate-300 uppercase select-none dark:text-slate-600">
@@ -863,21 +909,23 @@ export default function Scan() {
                                                 <button
                                                     type="button"
                                                     onClick={startCamera}
-                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-bold text-emerald-600 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/[.05] dark:border-emerald-500/25 dark:bg-white/[.03] dark:text-emerald-400"
+                                                    className="flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-bold text-emerald-600 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/[.05] dark:border-emerald-500/25 dark:bg-white/[.03] dark:text-emerald-400"
                                                 >
                                                     <Camera size={15} />{' '}
                                                     Activate Camera
                                                 </button>
-                                                <p className="sc-mono text-center text-[9px] tracking-[.12em] text-slate-300 select-none dark:text-slate-600">
+
+                                                <p className="sc-mono flex-shrink-0 text-center text-[9px] tracking-[.12em] text-slate-300 select-none dark:text-slate-600">
                                                     CHROME · EDGE · SAFARI ·
                                                     FIREFOX
                                                 </p>
+
                                                 {errors.image && (
-                                                    <p className="text-center text-xs text-red-500">
+                                                    <p className="flex-shrink-0 text-center text-xs text-red-500">
                                                         {errors.image}
                                                     </p>
                                                 )}
-                                            </>
+                                            </div>
                                         )}
 
                                         {/* STATE B: camera */}
@@ -1069,8 +1117,8 @@ export default function Scan() {
                             </div>
                         </main>
 
-                        {/* ── RIGHT SIDEBAR ── */}
-                        <aside className="sc-fu sc-fu2 sc-nsb flex flex-col gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
+                        {/* ── RIGHT SIDEBAR — order-4 on mobile (below left sidebar panels) ── */}
+                        <aside className="sc-fu sc-fu2 order-4 flex flex-col gap-3 lg:order-none lg:justify-end lg:overflow-x-hidden lg:overflow-y-auto">
                             <Panel
                                 icon={<Eye size={11} />}
                                 title="How It Works"
