@@ -1,33 +1,91 @@
 import Header from '@/components/header';
 import { Link } from '@inertiajs/react';
-import { ArrowLeft, ChevronRight, Globe, History, MapPin, Scan as ScanIcon } from 'lucide-react';
+import {
+    ArrowLeft,
+    ChevronRight,
+    Globe,
+    History,
+    MapPin,
+    Scan as ScanIcon,
+} from 'lucide-react';
 import { FC, useState } from 'react';
 
-interface TimelineItem { year: string; event: string; }
-interface HistoryDetail { title: string; content: string; }
-interface OriginData {
-    country: string; country_code: string; region: string;
-    description: string; timeline: TimelineItem[]; details: HistoryDetail[];
+interface TimelineItem {
+    year: string;
+    event: string;
 }
-interface ScanResult { scan_id: string; breed: string; origin_history: string | OriginData; }
-interface Props { results: ScanResult; }
+interface HistoryDetail {
+    title: string;
+    content: string;
+}
+interface OriginData {
+    country: string;
+    country_code: string;
+    region: string;
+    description: string;
+    timeline: TimelineItem[];
+    details: HistoryDetail[];
+}
+interface ScanResult {
+    scan_id: string;
+    breed: string;
+    origin_history: string | OriginData;
+}
+interface Props {
+    results: ScanResult;
+}
 
 const ViewOrigin: FC<Props> = ({ results }) => {
-    let originData: OriginData = { country: 'Unknown', country_code: '', region: 'Unknown Region', description: 'Origin details unavailable.', timeline: [], details: [] };
+    let originData: OriginData = {
+        country: 'Unknown',
+        country_code: '',
+        region: 'Unknown Region',
+        description: 'Origin details unavailable.',
+        timeline: [],
+        details: [],
+    };
     try {
-        if (typeof results?.origin_history === 'string') originData = JSON.parse(results.origin_history);
-        else if (typeof results?.origin_history === 'object' && results?.origin_history !== null) originData = results.origin_history as OriginData;
-    } catch (e) { console.error('Failed to parse origin history', e); }
+        if (typeof results?.origin_history === 'string')
+            originData = JSON.parse(results.origin_history);
+        else if (
+            typeof results?.origin_history === 'object' &&
+            results?.origin_history !== null
+        )
+            originData = results.origin_history as OriginData;
+    } catch (e) {
+        console.error('Failed to parse origin history', e);
+    }
 
-    const { country, country_code, region, description, timeline, details } = originData;
-    const flagUrl = country_code ? `https://flagcdn.com/w160/${country_code.toLowerCase()}.png` : null;
+    const { country, country_code, region, description, timeline, details } =
+        originData;
+    const flagUrl = country_code
+        ? `https://flagcdn.com/w160/${country_code.toLowerCase()}.png`
+        : null;
     const [openDetail, setOpenDetail] = useState<number | null>(null);
 
-    const Panel = ({ icon, title, children, accent = 'emerald' }: { icon: React.ReactNode; title: string; children: React.ReactNode; accent?: 'emerald' | 'cyan' }) => (
+    const Panel = ({
+        icon,
+        title,
+        children,
+        accent = 'emerald',
+    }: {
+        icon: React.ReactNode;
+        title: string;
+        children: React.ReactNode;
+        accent?: 'emerald' | 'cyan';
+    }) => (
         <div className="vo-panel relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
-            <div className={`flex flex-shrink-0 items-center gap-2 border-b px-4 py-2.5 ${accent === 'cyan' ? 'border-cyan-100 bg-cyan-50/60 dark:border-cyan-500/10 dark:bg-cyan-500/[.04]' : 'border-slate-200 bg-slate-50/80 dark:border-white/[.06] dark:bg-white/[.025]'}`}>
-                <div className={`flex h-5 w-5 items-center justify-center rounded-md border ${accent === 'cyan' ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>{icon}</div>
-                <span className="vo-mono text-[10px] font-bold tracking-[.12em] text-slate-600 uppercase dark:text-slate-400">{title}</span>
+            <div
+                className={`flex flex-shrink-0 items-center gap-2 border-b px-4 py-2.5 ${accent === 'cyan' ? 'border-cyan-100 bg-cyan-50/60 dark:border-cyan-500/10 dark:bg-cyan-500/[.04]' : 'border-slate-200 bg-slate-50/80 dark:border-white/[.06] dark:bg-white/[.025]'}`}
+            >
+                <div
+                    className={`flex h-5 w-5 items-center justify-center rounded-md border ${accent === 'cyan' ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}
+                >
+                    {icon}
+                </div>
+                <span className="vo-mono text-[10px] font-bold tracking-[.12em] text-slate-600 uppercase dark:text-slate-400">
+                    {title}
+                </span>
             </div>
             {children}
         </div>
@@ -64,36 +122,64 @@ const ViewOrigin: FC<Props> = ({ results }) => {
 
             <div className="vo-root flex min-h-screen flex-col bg-slate-50 dark:bg-[#080B0F]">
                 <div className="pointer-events-none fixed top-[-120px] left-[-60px] z-0 h-[260px] w-[440px] rounded-full bg-cyan-400/[.035] blur-[85px]" />
-                <div className="pointer-events-none fixed bottom-0 right-0 z-0 h-[220px] w-[360px] rounded-full bg-emerald-400/[.025] blur-[90px]" />
+                <div className="pointer-events-none fixed right-0 bottom-0 z-0 h-[220px] w-[360px] rounded-full bg-emerald-400/[.025] blur-[90px]" />
                 <div className="vo-dotgrid" />
-                <div className="relative z-20 flex-shrink-0"><Header /></div>
+                <div className="relative z-20 flex-shrink-0">
+                    <Header />
+                </div>
 
                 <div className="vo-nsb relative z-10 mt-[-10px] flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-8">
-
+                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-6">
                         {/* ── PAGE HEADER ── */}
                         <div className="vo-fu mb-6 flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <Link href="/scan-results" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-cyan-500/30 hover:text-cyan-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-cyan-400">
+                                <Link
+                                    href="/scan-results"
+                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-cyan-500/30 hover:text-cyan-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-cyan-400"
+                                >
                                     <ArrowLeft size={15} />
                                 </Link>
                                 <div>
                                     <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/[.08] px-2.5 py-0.5">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 shadow-[0_0_6px_#06b6d4]" style={{animation:'vo-dpulse 2s ease-in-out infinite'}} />
-                                        <span className="vo-mono text-[9px] font-semibold tracking-[.12em] text-cyan-700 uppercase dark:text-cyan-400">Origin &amp; Heritage</span>
+                                        <span
+                                            className="h-1.5 w-1.5 rounded-full bg-cyan-500 shadow-[0_0_6px_#06b6d4]"
+                                            style={{
+                                                animation:
+                                                    'vo-dpulse 2s ease-in-out infinite',
+                                            }}
+                                        />
+                                        <span className="vo-mono text-[9px] font-semibold tracking-[.12em] text-cyan-700 uppercase dark:text-cyan-400">
+                                            Origin &amp; Heritage
+                                        </span>
                                     </div>
                                     <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                                        {results?.breed || 'Breed'} <span className="bg-gradient-to-r from-cyan-500 to-emerald-500 bg-clip-text text-transparent">Origin History</span>
+                                        {results?.breed || 'Breed'}{' '}
+                                        <span className="bg-gradient-to-r from-cyan-500 to-emerald-500 bg-clip-text text-transparent">
+                                            Origin History
+                                        </span>
                                     </h1>
-                                    <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">Explore the heritage and evolution of this breed</p>
+                                    <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                                        Explore the heritage and evolution of
+                                        this breed
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Link href="/scanhistory" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:border-emerald-500/30 hover:text-emerald-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-emerald-400">
+                                <Link
+                                    href="/scanhistory"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:border-emerald-500/30 hover:text-emerald-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-emerald-400"
+                                >
                                     <History size={13} /> History
                                 </Link>
-                                <Link href="/scan" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3.5 py-2 text-[13px] font-bold text-black no-underline shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400">
-                                    <ScanIcon size={13} /> New Scan <ChevronRight size={11} className="opacity-60" />
+                                <Link
+                                    href="/scan"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3.5 py-2 text-[13px] font-bold text-black no-underline shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400"
+                                >
+                                    <ScanIcon size={13} /> New Scan{' '}
+                                    <ChevronRight
+                                        size={11}
+                                        className="opacity-60"
+                                    />
                                 </Link>
                             </div>
                         </div>
@@ -108,9 +194,18 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                         <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
                                         <div className="vo-hudblink h-2.5 w-2.5 rounded-full bg-cyan-500 shadow-[0_0_5px_#06b6d4]" />
                                     </div>
-                                    <span className="vo-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">doglens://origin/{results?.scan_id?.slice(0,8)}</span>
+                                    <span className="vo-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">
+                                        doglens://origin/
+                                        {results?.scan_id?.slice(0, 8)}
+                                    </span>
                                     <div className="vo-mono ml-auto flex items-center gap-1.5 text-[10px] text-cyan-600 select-none dark:text-cyan-400">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_#06b6d4]" style={{animation:'vo-dpulse 2s infinite'}} />
+                                        <span
+                                            className="h-1.5 w-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_#06b6d4]"
+                                            style={{
+                                                animation:
+                                                    'vo-dpulse 2s infinite',
+                                            }}
+                                        />
                                         GEO DATA LOADED
                                     </div>
                                 </div>
@@ -120,21 +215,37 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                     <div className="relative flex flex-col items-center justify-center gap-5 border-b border-slate-100 bg-gradient-to-br from-cyan-50/60 to-slate-50 p-8 md:w-[280px] md:flex-shrink-0 md:border-r md:border-b-0 dark:border-white/[.05] dark:from-cyan-500/[.04] dark:to-transparent">
                                         <div className="relative overflow-hidden rounded-2xl shadow-xl ring-2 ring-cyan-500/20">
                                             {flagUrl ? (
-                                                <img src={flagUrl} alt={`${country} flag`} className="h-auto w-36 object-cover" />
+                                                <img
+                                                    src={flagUrl}
+                                                    alt={`${country} flag`}
+                                                    className="h-auto w-36 object-cover"
+                                                />
                                             ) : (
                                                 <div className="flex h-24 w-36 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/[.05]">
-                                                    <Globe size={28} className="text-slate-400" />
+                                                    <Globe
+                                                        size={28}
+                                                        className="text-slate-400"
+                                                    />
                                                 </div>
                                             )}
                                             <div className="vo-sweep" />
-                                            <div className="vo-hc vo-htl" /><div className="vo-hc vo-htr" /><div className="vo-hc vo-hbl" /><div className="vo-hc vo-hbr" />
-                                            <div className="absolute bottom-2 left-2 right-2 z-[5]">
-                                                <span className="vo-mono rounded border border-cyan-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-cyan-400 backdrop-blur-sm">ORIGIN FLAG</span>
+                                            <div className="vo-hc vo-htl" />
+                                            <div className="vo-hc vo-htr" />
+                                            <div className="vo-hc vo-hbl" />
+                                            <div className="vo-hc vo-hbr" />
+                                            <div className="absolute right-2 bottom-2 left-2 z-[5]">
+                                                <span className="vo-mono rounded border border-cyan-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-cyan-400 backdrop-blur-sm">
+                                                    ORIGIN FLAG
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="text-center">
-                                            <p className="text-lg font-extrabold text-slate-900 dark:text-white">{country}</p>
-                                            <p className="vo-mono mt-0.5 text-[10px] tracking-[.08em] text-cyan-600 dark:text-cyan-400">{region}</p>
+                                            <p className="text-lg font-extrabold text-slate-900 dark:text-white">
+                                                {country}
+                                            </p>
+                                            <p className="vo-mono mt-0.5 text-[10px] tracking-[.08em] text-cyan-600 dark:text-cyan-400">
+                                                {region}
+                                            </p>
                                         </div>
                                     </div>
 
@@ -142,31 +253,55 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                     <div className="flex-1 p-6 sm:p-8">
                                         <div className="mb-5 flex items-start gap-3">
                                             <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10">
-                                                <MapPin size={16} className="text-cyan-600 dark:text-cyan-400" />
+                                                <MapPin
+                                                    size={16}
+                                                    className="text-cyan-600 dark:text-cyan-400"
+                                                />
                                             </div>
                                             <div>
-                                                <p className="vo-mono mb-1 text-[9px] tracking-[.12em] text-slate-500 uppercase dark:text-slate-500">Country of Origin</p>
-                                                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{country}</h2>
-                                                <p className="mt-0.5 text-sm font-semibold text-cyan-600 dark:text-cyan-400">{region}</p>
+                                                <p className="vo-mono mb-1 text-[9px] tracking-[.12em] text-slate-500 uppercase dark:text-slate-500">
+                                                    Country of Origin
+                                                </p>
+                                                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                                                    {country}
+                                                </h2>
+                                                <p className="mt-0.5 text-sm font-semibold text-cyan-600 dark:text-cyan-400">
+                                                    {region}
+                                                </p>
                                             </div>
                                         </div>
 
                                         <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-white/[.05] dark:bg-white/[.03]">
-                                            <p className="vo-mono mb-2 text-[9px] tracking-[.12em] text-slate-500 uppercase dark:text-slate-500">Breed Overview</p>
-                                            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{description}</p>
+                                            <p className="vo-mono mb-2 text-[9px] tracking-[.12em] text-slate-500 uppercase dark:text-slate-500">
+                                                Breed Overview
+                                            </p>
+                                            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                                                {description}
+                                            </p>
                                         </div>
 
                                         {/* Quick stats */}
                                         <div className="mt-4 grid grid-cols-2 gap-3">
                                             {[
-                                                { label: 'Country', value: country },
-                                                { label: 'Region', value: region },
-                                                { label: 'Timeline Events', value: `${timeline.length} recorded` },
-                                                { label: 'History Sections', value: `${details.length} chapters` },
+                                                {
+                                                    label: 'Country',
+                                                    value: country,
+                                                },
+                                                {
+                                                    label: 'Region',
+                                                    value: region,
+                                                },
                                             ].map((stat, i) => (
-                                                <div key={i} className="flex flex-col gap-0.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-white/[.04] dark:bg-white/[.025]">
-                                                    <span className="vo-mono text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">{stat.label}</span>
-                                                    <span className="text-[13px] font-bold text-slate-800 dark:text-slate-200">{stat.value}</span>
+                                                <div
+                                                    key={i}
+                                                    className="flex flex-col gap-0.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-white/[.04] dark:bg-white/[.025]"
+                                                >
+                                                    <span className="vo-mono text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">
+                                                        {stat.label}
+                                                    </span>
+                                                    <span className="text-[13px] font-bold text-slate-800 dark:text-slate-200">
+                                                        {stat.value}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -179,22 +314,37 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
                             {/* Timeline */}
                             <div className="vo-fu vo-fu2">
-                                <Panel icon={<span className="text-[11px]">📅</span>} title="History Timeline" accent="cyan">
+                                <Panel
+                                    icon={
+                                        <span className="text-[11px]">📅</span>
+                                    }
+                                    title="History Timeline"
+                                    accent="cyan"
+                                >
                                     <div className="p-6 sm:p-7">
                                         {timeline.length > 0 ? (
-                                            <div className="vo-timeline-line border-cyan-200 dark:border-cyan-500/20 pl-6 space-y-7">
+                                            <div className="vo-timeline-line space-y-7 border-cyan-200 pl-6 dark:border-cyan-500/20">
                                                 {timeline.map((item, i) => (
-                                                    <div key={i} className="relative">
+                                                    <div
+                                                        key={i}
+                                                        className="relative"
+                                                    >
                                                         <div className="vo-dot" />
                                                         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-5">
-                                                            <span className="vo-mono min-w-[90px] flex-shrink-0 text-[11px] font-bold text-cyan-700 dark:text-cyan-400">{item.year}</span>
-                                                            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{item.event}</p>
+                                                            <span className="vo-mono min-w-[90px] flex-shrink-0 text-[11px] font-bold text-cyan-700 dark:text-cyan-400">
+                                                                {item.year}
+                                                            </span>
+                                                            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                                                                {item.event}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="flex items-center justify-center py-10 text-sm text-slate-500 italic dark:text-slate-500">No timeline data available.</div>
+                                            <div className="flex items-center justify-center py-10 text-sm text-slate-500 italic dark:text-slate-500">
+                                                No timeline data available.
+                                            </div>
                                         )}
                                     </div>
                                 </Panel>
@@ -202,31 +352,55 @@ const ViewOrigin: FC<Props> = ({ results }) => {
 
                             {/* Detailed history accordion */}
                             <div className="vo-fu vo-fu3">
-                                <Panel icon={<Globe size={11} />} title="Detailed History" accent="emerald">
+                                <Panel
+                                    icon={<Globe size={11} />}
+                                    title="Detailed History"
+                                    accent="emerald"
+                                >
                                     <div className="flex flex-col">
-                                        {details.length > 0 ? details.map((d, i) => (
-                                            <div key={i} className={`border-b border-slate-100 last:border-0 dark:border-white/[.05]`}>
-                                                <button
-                                                    onClick={() => setOpenDetail(openDetail === i ? null : i)}
-                                                    className="vo-accord-btn flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                                        {details.length > 0 ? (
+                                            details.map((d, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`border-b border-slate-100 last:border-0 dark:border-white/[.05]`}
                                                 >
-                                                    <span className="text-[13px] font-bold text-slate-800 dark:text-white">{d.title}</span>
-                                                    <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-all ${openDetail === i ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rotate-45' : 'border-slate-200 text-slate-500 dark:border-white/[.1] dark:text-slate-400'}`}>+</span>
-                                                </button>
-                                                {openDetail === i && (
-                                                    <div className="px-5 pb-4">
-                                                        <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">{d.content}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )) : (
-                                            <p className="p-5 text-sm text-slate-500 italic dark:text-slate-500">Detailed history unavailable.</p>
+                                                    <button
+                                                        onClick={() =>
+                                                            setOpenDetail(
+                                                                openDetail === i
+                                                                    ? null
+                                                                    : i,
+                                                            )
+                                                        }
+                                                        className="vo-accord-btn flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                                                    >
+                                                        <span className="text-[13px] font-bold text-slate-800 dark:text-white">
+                                                            {d.title}
+                                                        </span>
+                                                        <span
+                                                            className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-all ${openDetail === i ? 'rotate-45 border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-slate-200 text-slate-500 dark:border-white/[.1] dark:text-slate-400'}`}
+                                                        >
+                                                            +
+                                                        </span>
+                                                    </button>
+                                                    {openDetail === i && (
+                                                        <div className="px-5 pb-4">
+                                                            <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                                {d.content}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="p-5 text-sm text-slate-500 italic dark:text-slate-500">
+                                                Detailed history unavailable.
+                                            </p>
                                         )}
                                     </div>
                                 </Panel>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
