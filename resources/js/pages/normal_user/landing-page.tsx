@@ -206,7 +206,7 @@ function LandingPage() {
                                         }}
                                     />
                                     <span className="lp-mono text-[10px] font-semibold tracking-[.12em] text-emerald-300 uppercase">
-                                        AI Breed Detection
+                                        Breed Detection
                                     </span>
                                 </div>
 
@@ -373,7 +373,7 @@ function LandingPage() {
                             <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-black/60 px-2.5 py-1.5 backdrop-blur-sm">
                                 <span className="lp-blink h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
                                 <span className="lp-mono text-[9px] font-semibold tracking-[.1em] text-emerald-400 uppercase">
-                                    AI Ready
+                                    Ready
                                 </span>
                             </div>
                         </div>
