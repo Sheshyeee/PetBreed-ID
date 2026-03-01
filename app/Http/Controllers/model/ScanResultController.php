@@ -2145,7 +2145,7 @@ FB;
      * FIXED: Generate AI descriptions with better error handling
      * ==========================================
      */
-   private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
+  private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
 {
     $aiData = [
         'description'    => "Identified as $detectedBreed.",
@@ -2161,61 +2161,65 @@ FB;
     try {
         Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
-        $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
+        $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
+
+CRITICAL JSON RULES — you MUST follow these or the output will be unusable:
+- ALL string values must be on a single line. Never use a literal newline inside a string value.
+- Use a space instead of newline when you want a line break inside text.
+- Do not use tab characters inside string values.
+- Do not use backslash-n (\\n) inside string values.
+- Output raw JSON only — no markdown, no code fences, no backticks.
 
 1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
 
 2. 'health_risks': {
      'concerns': [
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
+       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'High Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' },
+       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' },
+       { 'name': 'Condition Name (2-3 words only)', 'risk_level': 'Low Risk', 'description': 'Detailed description in one continuous line.', 'prevention': 'Practical prevention advice in one continuous line.' }
      ],
      'screenings': [
-       { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
-       { 'name': 'Exam Name', 'description': 'Detailed explanation.' }
+       { 'name': 'Exam Name', 'description': 'Detailed explanation in one continuous line.' },
+       { 'name': 'Exam Name', 'description': 'Detailed explanation in one continuous line.' }
      ],
-     'lifespan': 'e.g. 10-12',
+     'lifespan': '10-12',
      'care_tips': [
-        '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
-        '(generate only 8-10 words only) tip about diet or weight management.',
-        '(generate only 8-10 words only) tip about grooming or coat care.',
-        '(generate only 8-10 words only) tip about training or temperament management.'
+       'One tip about exercise in 8-10 words.',
+       'One tip about diet in 8-10 words.',
+       'One tip about grooming in 8-10 words.',
+       'One tip about training in 8-10 words.'
      ]
-},
+   },
 
 3. 'origin_data': {
-    'country': 'Country Name (e.g. United Kingdom)',
-    'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
-    'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
-    'description': 'Write a rich, descriptive paragraph (2 sentences) about the geography and climate of the origin region and how it influenced the breed.',
+    'country': 'Country Name',
+    'country_code': 'ISO 2-letter lowercase code',
+    'region': 'Specific Region',
+    'description': 'Two sentence description of geography and climate in one continuous line.',
     'timeline': [
-        { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' }
+        { 'year': '1860s', 'event': '2-3 sentences about this milestone all on one line.' },
+        { 'year': 'Year', 'event': 'One sentence on one line.' },
+        { 'year': 'Year', 'event': 'One sentence on one line.' },
+        { 'year': 'Year', 'event': 'One sentence on one line.' },
+        { 'year': 'Year', 'event': 'One sentence on one line.' }
     ],
     'details': [
-        { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 70-80 words) tracing the breed\\'s genetic ancestors and early development.' },
-        { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 70-80 words) describing exactly what work the dog was bred to do, including specific tasks.' },
-        { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 70-80 words) about the breed\\'s current status as pets, service dogs, or working dogs.' }
+        { 'title': 'Ancestry & Lineage', 'content': '70-80 word paragraph all on one continuous line.' },
+        { 'title': 'Original Purpose', 'content': '70-80 word paragraph all on one continuous line.' },
+        { 'title': 'Modern Roles', 'content': '70-80 word paragraph all on one continuous line.' }
     ]
-}
-
-Be verbose and detailed. Output ONLY the JSON. Do NOT include any control characters, newlines inside string values, or special characters that would break JSON parsing.";
+}";
 
         $apiKey = config('services.gemini.api_key');
         if (empty($apiKey)) {
-            Log::error('❌ Gemini API key not configured in services.gemini.api_key');
+            Log::error('❌ Gemini API key not configured');
             return $aiData;
         }
 
         Log::info("📤 Sending request to Gemini API...");
 
-        $client = new \GuzzleHttp\Client(['timeout' => 60, 'connect_timeout' => 10]);
-
+        $client    = new \GuzzleHttp\Client(['timeout' => 60, 'connect_timeout' => 10]);
         $startTime = microtime(true);
 
         $response = $client->post(
@@ -2224,13 +2228,13 @@ Be verbose and detailed. Output ONLY the JSON. Do NOT include any control charac
                 'json' => [
                     'contents' => [[
                         'parts' => [[
-                            'text' => "You are a veterinary historian. Output only valid JSON. No markdown. No code blocks. No control characters inside strings.\n\n" . $combinedPrompt
+                            'text' => "You are a veterinary historian. Output ONLY raw valid JSON. No markdown. No code fences. No literal newlines inside string values — use spaces instead.\n\n" . $combinedPrompt
                         ]]
                     ]],
                     'generationConfig' => [
                         'temperature'     => 0.3,
                         'maxOutputTokens' => 3000,
-                        // NO responseMimeType — causes issues with thinking models
+                        // NO responseMimeType — breaks thinking models
                     ],
                 ],
             ]
@@ -2247,7 +2251,7 @@ Be verbose and detailed. Output ONLY the JSON. Do NOT include any control charac
             return $aiData;
         }
 
-        // Handle thinking model — skip thought blocks
+        // ── THINKING-AWARE TEXT EXTRACTION — skip thought blocks ────────────
         $content = '';
         $parts   = $result['candidates'][0]['content']['parts'] ?? [];
         foreach ($parts as $p) {
@@ -2266,56 +2270,75 @@ Be verbose and detailed. Output ONLY the JSON. Do NOT include any control charac
         }
 
         if (empty($content)) {
-            Log::error('❌ Gemini returned empty content');
-            if (isset($result['candidates'][0]['finishReason'])) {
-                Log::error('Finish reason: ' . $result['candidates'][0]['finishReason']);
-            }
+            Log::error('❌ Gemini returned empty content. FinishReason: ' . ($result['candidates'][0]['finishReason'] ?? 'unknown'));
             return $aiData;
         }
 
         Log::info("✅ Gemini content received (length: " . strlen($content) . ")");
 
-        // ── CLEAN BEFORE PARSE ──────────────────────────────────────────────
-        // Strip markdown code fences
+        // ── AGGRESSIVE CLEANING BEFORE json_decode ──────────────────────────
+        // Step 1: Strip markdown code fences
         $content = preg_replace('/^```json\s*/i', '', $content);
-        $content = preg_replace('/^```\s*/i', '', $content);
-        $content = preg_replace('/\s*```$/i', '', $content);
+        $content = preg_replace('/^```\s*/i',     '', $content);
+        $content = preg_replace('/\s*```$/i',     '', $content);
         $content = trim($content);
 
-        // Remove control characters (0x00–0x1F) EXCEPT valid JSON whitespace
-        // Valid JSON whitespace: 0x09 (tab), 0x0A (newline), 0x0D (CR), 0x20 (space)
+        // Step 2: Remove all ASCII control characters except:
+        //   0x09 = tab, 0x0A = newline, 0x0D = carriage return (valid JSON whitespace)
         $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+
+        // Step 3: THE KEY FIX — replace literal newlines/tabs INSIDE JSON string values
+        // JSON strings cannot contain unescaped newlines. We replace them with a space.
+        // This regex finds content between quotes and replaces control chars inside.
+        $content = $this->cleanJsonStringValues($content);
 
         // ── PARSE ────────────────────────────────────────────────────────────
         $parsed = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error('❌ Failed to parse Gemini content as JSON: ' . json_last_error_msg());
-            Log::error('Content preview: ' . substr($content, 0, 500));
-            return $aiData;
+            Log::error('❌ JSON parse failed after cleaning: ' . json_last_error_msg());
+            Log::error('Content preview: ' . substr($content, 0, 800));
+
+            // Last resort: try to extract partial data with regex
+            $parsed = $this->extractPartialAiData($content);
+            if (empty($parsed)) {
+                return $aiData;
+            }
+            Log::info('⚠️ Using partial regex extraction as fallback');
         }
 
         if (!$parsed) {
-            Log::error('❌ Gemini content parsed to null/false');
+            Log::error('❌ Parsed result is null/false');
             return $aiData;
         }
 
-        if (isset($parsed['description'])) {
+        if (isset($parsed['description']) && !empty($parsed['description'])) {
             $aiData['description'] = $parsed['description'];
             Log::info("✓ Description extracted: " . strlen($parsed['description']) . " chars");
+        } else {
+            Log::warning('⚠️ No description in parsed data');
         }
 
-        if (isset($parsed['health_risks'])) {
+        if (isset($parsed['health_risks']) && !empty($parsed['health_risks'])) {
             $aiData['health_risks'] = $parsed['health_risks'];
             Log::info("✓ Health risks extracted: " . count($parsed['health_risks']['concerns'] ?? []) . " concerns");
+        } else {
+            Log::warning('⚠️ No health_risks in parsed data');
         }
 
-        if (isset($parsed['origin_data'])) {
+        if (isset($parsed['origin_data']) && !empty($parsed['origin_data'])) {
             $aiData['origin_history'] = $parsed['origin_data'];
             Log::info("✓ Origin data extracted: " . ($parsed['origin_data']['country'] ?? 'Unknown'));
+        } else {
+            Log::warning('⚠️ No origin_data in parsed data');
         }
 
-        Log::info('✅ AI descriptions generated successfully', ['breed' => $detectedBreed]);
+        Log::info('✅ AI descriptions generated successfully', [
+            'breed'           => $detectedBreed,
+            'has_description' => !empty($aiData['description']),
+            'has_health'      => !empty($aiData['health_risks']),
+            'has_origin'      => !empty($aiData['origin_history']),
+        ]);
 
         return $aiData;
 
@@ -2329,6 +2352,66 @@ Be verbose and detailed. Output ONLY the JSON. Do NOT include any control charac
         Log::error("❌ AI generation failed: " . $e->getMessage());
         return $aiData;
     }
+}
+
+/**
+ * Replace literal newlines and tabs inside JSON string values with spaces.
+ * This is the fix for Gemini inserting \n inside string content.
+ */
+private function cleanJsonStringValues(string $json): string
+{
+    $result  = '';
+    $inStr   = false;
+    $escaped = false;
+    $len     = strlen($json);
+
+    for ($i = 0; $i < $len; $i++) {
+        $char = $json[$i];
+
+        if ($escaped) {
+            $result  .= $char;
+            $escaped  = false;
+            continue;
+        }
+
+        if ($char === '\\' && $inStr) {
+            $result  .= $char;
+            $escaped  = true;
+            continue;
+        }
+
+        if ($char === '"') {
+            $inStr  = !$inStr;
+            $result .= $char;
+            continue;
+        }
+
+        // Inside a string: replace bare newlines/carriage returns/tabs with space
+        if ($inStr && ($char === "\n" || $char === "\r" || $char === "\t")) {
+            $result .= ' ';
+            continue;
+        }
+
+        $result .= $char;
+    }
+
+    return $result;
+}
+
+/**
+ * Last-resort regex extraction when JSON is too broken to parse.
+ * Pulls out just the description field so at least something displays.
+ */
+private function extractPartialAiData(string $content): array
+{
+    $data = [];
+
+    // Try to grab description
+    if (preg_match('/"description"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/s', $content, $m)) {
+        $data['description'] = stripslashes($m[1]);
+    }
+
+    return $data;
 }
     /**
      * ==========================================
