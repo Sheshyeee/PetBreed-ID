@@ -132,7 +132,7 @@ const ViewSimulation: React.FC<Props> = ({ breed, originalImage, simulations: in
                 <div className="relative z-20 flex-shrink-0"><Header /></div>
 
                 <div className="vs-nsb relative z-10 mt-[-10px] flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-4">
 
                         {/* ── PAGE HEADER ── */}
                         <div className="vs-fu mb-5 flex flex-wrap items-center justify-between gap-4">

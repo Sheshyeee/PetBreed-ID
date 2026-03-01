@@ -129,7 +129,7 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                 </div>
 
                 <div className="vo-nsb relative z-10 mt-[-10px] flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-6">
+                    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-6 lg:px-4">
                         {/* ── PAGE HEADER ── */}
                         <div className="vo-fu mb-6 flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
