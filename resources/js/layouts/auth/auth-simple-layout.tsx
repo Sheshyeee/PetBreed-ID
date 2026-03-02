@@ -1,6 +1,5 @@
 import { home } from '@/routes';
 import { Link } from '@inertiajs/react';
-import { PawPrint } from 'lucide-react';
 import { type PropsWithChildren } from 'react';
 
 interface AuthLayoutProps {
@@ -23,9 +22,6 @@ export default function AuthSimpleLayout({
                             href={home()}
                             className="flex flex-col items-center gap-2 font-medium"
                         >
-                            <div className="flex aspect-square size-11 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                                <PawPrint className="size-7 fill-current text-white dark:text-black" />
-                            </div>
                             <span className="sr-only">{title}</span>
                         </Link>
 
