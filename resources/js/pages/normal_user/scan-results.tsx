@@ -21,6 +21,7 @@ type PredictionResult = {
 };
 
 type Result = {
+    id?: number;
     scan_id: string;
     image: string;
     breed: string;
@@ -173,7 +174,7 @@ const ScanResults = () => {
             cta: 'View Risks',
         },
         {
-            href: '/simulation',
+            href: `/simulation?scan_id=${results?.scan_id}`,
             icon: (
                 <Clock className="h-7 w-7 text-violet-500 dark:text-violet-400" />
             ),

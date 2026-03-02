@@ -27,6 +27,7 @@ interface OriginData {
     details: HistoryDetail[];
 }
 interface ScanResult {
+    id?: number;
     scan_id: string;
     breed: string;
     origin_history: string | OriginData;
@@ -134,7 +135,11 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                         <div className="vo-fu mb-6 flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <Link
-                                    href="/scan-results"
+                                    href={
+                                        results?.id
+                                            ? `/scan-results/${results.id}`
+                                            : '/scan-results'
+                                    }
                                     className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-cyan-500/30 hover:text-cyan-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-cyan-400"
                                 >
                                     <ArrowLeft size={15} />

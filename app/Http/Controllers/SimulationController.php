@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\Cache;
 
 class SimulationController extends Controller
 {
-    public function index()
+    // ✅ FIXED: accepts Request so we can read scan_id from query string
+    public function index(Request $request)
     {
         try {
-            $scanId = session('last_scan_id');
+            // ✅ FIXED: query string first, session fallback
+            $scanId = $request->query('scan_id') ?? session('last_scan_id');
 
             if (!$scanId) {
                 return redirect('/')->with('error', 'No scan found. Please scan a dog first.');
@@ -39,9 +41,7 @@ class SimulationController extends Controller
 
         if (!in_array($status, ['generating', 'complete'])) {
             Log::info("🚀 Dispatching transformation for {$result->scan_id}");
-
             GenerateAgeSimulations::dispatch($result->id, $result->breed, $result->image)->onQueue('simulations');
-
             $result->update(['simulation_data' => json_encode(['status' => 'queued', '1_years' => null, '3_years' => null])]);
         }
     }
@@ -51,37 +51,35 @@ class SimulationController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? [];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        // ✅ FIX: Build complete URL for original image
         $originalImageUrl = null;
         if ($result->image) {
-            // Check if image already has full URL
             if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
                 $originalImageUrl = $result->image;
             } else {
-                // Build full URL
                 $originalImageUrl = $baseUrl . '/' . $result->image;
             }
         }
 
         Log::info('🖼️ View Data', [
-            'scan_id' => $result->scan_id,
-            'image_db' => $result->image,
-            'base_url' => $baseUrl,
+            'scan_id'           => $result->scan_id,
+            'image_db'          => $result->image,
+            'base_url'          => $baseUrl,
             'original_image_url' => $originalImageUrl,
-            'url_null' => $originalImageUrl === null ? 'YES!' : 'NO'
+            'url_null'          => $originalImageUrl === null ? 'YES!' : 'NO'
         ]);
 
         return [
-            'scan_id' => $result->scan_id,
-            'breed' => $result->breed,
-            'originalImage' => $originalImageUrl,  // ✅ Changed from 'original_image' to match React prop
-            'simulations' => [
+            'id'                => $result->id,           // ✅ FIXED: added so back button → /scan-results/{id}
+            'scan_id'           => $result->scan_id,
+            'breed'             => $result->breed,
+            'originalImage'     => $originalImageUrl,
+            'simulations'       => [
                 '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                 '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
             ],
             'simulation_status' => $simulationData['status'] ?? 'pending',
-            'breed_profile' => $simulationData['breed_profile'] ?? null,
-            'error' => $simulationData['error'] ?? null,
+            'breed_profile'     => $simulationData['breed_profile'] ?? null,
+            'error'             => $simulationData['error'] ?? null,
         ];
     }
 
@@ -120,7 +118,6 @@ class SimulationController extends Controller
             $simulationData = json_decode($result->simulation_data, true) ?? [];
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // ✅ FIX: Build complete URL for original image
             $originalImageUrl = null;
             if ($result->image) {
                 if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
@@ -131,14 +128,14 @@ class SimulationController extends Controller
             }
 
             return response()->json([
-            'success' => true,
-                'status' => $simulationData['status'] ?? 'pending',
-                'original_image' => $originalImageUrl,  // ✅ Now has full URL
-                'simulations' => [
+                'success'        => true,
+                'status'         => $simulationData['status'] ?? 'pending',
+                'original_image' => $originalImageUrl,
+                'simulations'    => [
                     '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                     '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
                 ],
-                'timestamp' => now()->timestamp
+                'timestamp'      => now()->timestamp
             ]);
         } catch (\Exception $e) {
             Log::error('Status error', ['error' => $e->getMessage()]);

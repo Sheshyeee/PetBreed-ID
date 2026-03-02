@@ -38,6 +38,7 @@ interface HealthRisksData {
     care_tips: string[];
 }
 interface ScanResult {
+    id?: number;
     scan_id: string;
     breed: string;
     health_risks: string | HealthRisksData;
@@ -181,7 +182,11 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
                         <div className="vhr-fu mb-5 flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <Link
-                                    href="/scan-results"
+                                    href={
+                                        results?.id
+                                            ? `/scan-results/${results.id}`
+                                            : '/scan-results'
+                                    }
                                     className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-pink-500/30 hover:text-pink-600 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-pink-400"
                                 >
                                     <ArrowLeft size={15} />
