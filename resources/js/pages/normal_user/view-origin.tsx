@@ -224,15 +224,6 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                                 </div>
                                             )}
                                             <div className="vo-sweep" />
-                                            <div className="vo-hc vo-htl" />
-                                            <div className="vo-hc vo-htr" />
-                                            <div className="vo-hc vo-hbl" />
-                                            <div className="vo-hc vo-hbr" />
-                                            <div className="absolute right-2 bottom-2 left-2 z-[5]">
-                                                <span className="vo-mono rounded border border-cyan-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-cyan-400 backdrop-blur-sm">
-                                                    ORIGIN FLAG
-                                                </span>
-                                            </div>
                                         </div>
                                         <div className="text-center">
                                             <p className="text-lg font-extrabold text-slate-900 dark:text-white">

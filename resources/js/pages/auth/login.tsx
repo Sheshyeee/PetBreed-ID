@@ -1,5 +1,7 @@
 import AuthLayout from '@/layouts/auth-layout';
+
 import { usePage } from '@inertiajs/react';
+
 import { CheckCircle2, PawPrint, XCircle } from 'lucide-react';
 
 interface LoginProps {
@@ -21,7 +23,6 @@ export default function Login({ status }: LoginProps) {
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
                 /* ── HIDE AUTH LAYOUT'S TOP LOGO BLOCK ── */
-                /* Targets the icon + title + description header rendered by AuthLayout */
                 .lv-kill-header {
                     display: none !important;
                     visibility: hidden !important;
@@ -32,13 +33,8 @@ export default function Login({ status }: LoginProps) {
                 }
 
                 @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.5)} }
-                @keyframes lv-ring  { 0%{transform:scale(.8);opacity:.6} 70%,100%{transform:scale(1.3);opacity:0} }
-                @keyframes lv-paw   { 0%,100%{transform:rotate(0deg)} 30%{transform:rotate(-10deg)} 70%{transform:rotate(10deg)} }
-                @keyframes lv-orb   { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
-                @keyframes lv-orb2  { from{transform:rotate(180deg) translateX(20px) rotate(-180deg)} to{transform:rotate(540deg) translateX(20px) rotate(-540deg)} }
                 @keyframes lv-sweep { 0%{left:-80%} 100%{left:160%} }
                 @keyframes lv-fade  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes lv-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
 
                 .lv-f1 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .05s both; }
                 .lv-f2 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .14s both; }
@@ -56,7 +52,7 @@ export default function Login({ status }: LoginProps) {
                     box-shadow: 0 16px 48px rgba(0,0,0,.1);
                     background: #fff;
                     width: 100%;
-                    max-width: 580px;
+                    max-width: 660px;
                     margin: 0 auto;
                 }
                 :is(.dark) .lv-card {
@@ -94,16 +90,15 @@ export default function Login({ status }: LoginProps) {
                 .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.05); filter:blur(48px); pointer-events:none; }
                 .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.04); filter:blur(42px); pointer-events:none; }
 
-                /* icon */
+                /* icon — NO float animation */
                 .lv-icon-wrap {
                     position:relative; width:76px; height:76px;
                     display:flex; align-items:center; justify-content:center;
-                    animation:lv-float 4s ease-in-out infinite;
                 }
-                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.18); animation:lv-ring 2.8s ease-out infinite; }
-                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.06); animation:lv-ring 2.8s ease-out infinite .9s; }
-                .lv-orb  { position:absolute; width:6px; height:6px; border-radius:50%; top:50%; left:50%; margin:-3px 0 0 -3px; background:#10b981; animation:lv-orb 3.4s linear infinite; }
-                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; animation:lv-orb2 4s linear infinite; }
+                /* static rings — no animation */
+                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.18); }
+                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.06); }
+                /* orbiting dots removed */
                 .lv-icon-bg {
                     width:76px; height:76px; border-radius:22px;
                     display:flex; align-items:center; justify-content:center;
@@ -128,11 +123,11 @@ export default function Login({ status }: LoginProps) {
                 .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
                 .lv-dot.on { width:16px; background:#10b981; }
 
-                /* ── RIGHT ── */
+                /* ── RIGHT — wider, less padding ── */
                 .lv-right {
                     flex:1;
                     min-width:0;
-                    padding:32px 34px;
+                    padding:32px 28px;
                     display:flex;
                     flex-direction:column;
                     justify-content:center;
@@ -165,6 +160,7 @@ export default function Login({ status }: LoginProps) {
                     color:#1e293b; font-size:13px; font-weight:600;
                     font-family:'Plus Jakarta Sans',sans-serif;
                     cursor:pointer;
+                    white-space:nowrap;
                     transition:transform .17s, box-shadow .17s, border-color .17s;
                     box-shadow:0 1px 3px rgba(0,0,0,.05);
                 }
@@ -197,7 +193,6 @@ export default function Login({ status }: LoginProps) {
                 @media (max-width:540px) {
                     .lv-card { flex-direction:column; }
                     .lv-left { width:100%; flex-direction:row; padding:20px 18px; gap:14px; justify-content:flex-start; min-height:auto; }
-                    .lv-icon-wrap { animation:none; flex-shrink:0; }
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
@@ -205,10 +200,6 @@ export default function Login({ status }: LoginProps) {
                 }
             `}</style>
 
-            {/*
-              This hidden ref-div walks up to AuthLayout's wrapper and hides
-              any sibling elements injected before our card (the logo header block).
-            */}
             <div
                 style={{ display: 'none' }}
                 ref={(el) => {
@@ -219,7 +210,6 @@ export default function Login({ status }: LoginProps) {
                     if (!parent) return;
                     Array.from(parent.children).forEach((child) => {
                         const el2 = child as HTMLElement;
-                        // Hide any block that is NOT our lv-root div
                         if (
                             !el2.classList.contains('lv-root') &&
                             !el2.querySelector('.lv-root') &&
@@ -261,16 +251,10 @@ export default function Login({ status }: LoginProps) {
                         <div className="lv-icon-wrap">
                             <div className="lv-ring1" />
                             <div className="lv-ring2" />
-                            <div className="lv-orb" />
-                            <div className="lv-orb2" />
                             <div className="lv-icon-bg">
                                 <PawPrint
                                     size={30}
-                                    style={{
-                                        animation:
-                                            'lv-paw 3s ease-in-out infinite',
-                                        color: '#10b981',
-                                    }}
+                                    style={{ color: '#10b981' }}
                                 />
                             </div>
                         </div>

@@ -599,10 +599,15 @@ class GenerateAgeSimulations implements ShouldQueue
     if ($targetYears === 1) {
       $L[] = '── TRANSFORMATION TARGET: +1 YEAR ─────────────────────────';
       $L[] = '';
+      $L[] = '⚠️  CRITICAL RULE: The output MUST look VISIBLY DIFFERENT from the input.';
+      $L[] = '    A viewer looking at the two images side-by-side must immediately notice';
+      $L[] = '    the dog looks older. If the result looks nearly identical to the input,';
+      $L[] = '    you have FAILED this task. Apply ALL changes listed for the age stage.';
+      $L[] = '';
       $L[] = 'Apply changes based on the detected current age:';
       $L[] = '';
       $L[] = '  IF puppy → apply MAJOR transformation to early young adult:';
-      $L[] = '    REMOVE: ';
+      $L[] = '    REMOVE:';
       $L[] = '      • Oversized round puppy head';
       $L[] = '      • Disproportionately large paws';
       $L[] = '      • Short stubby legs (if large/giant breed — elongate them)';
@@ -617,20 +622,34 @@ class GenerateAgeSimulations implements ShouldQueue
       $L[] = '      • Proportionate paws and legs';
       $L[] = '';
       $L[] = '  IF teenager → apply MODERATE transformation to young adult:';
-      $L[] = '    • Reduce gangly proportions, fill out body slightly';
+      $L[] = '    • Reduce gangly proportions, fill out body noticeably';
       $L[] = '    • Erect ears if breed has them (fully upright now)';
       $L[] = '    • Coat becomes more uniform and developed';
-      $L[] = '    • Face gains more adult definition';
+      $L[] = '    • Face gains clear adult definition';
       $L[] = '';
-      $L[] = '  IF young_adult → apply SUBTLE transformation to full adult:';
-      $L[] = '    • Slightly more filled-out chest and shoulders';
-      $L[] = '    • Coat reaches full adult density';
-      $L[] = '    • Marginally more defined facial structure';
+      $L[] = '  IF young_adult → apply CLEAR transformation to full adult:';
+      $L[] = '    • Visibly more filled-out chest, shoulders, and hindquarters';
+      $L[] = '    • Coat reaches full adult density and peak condition';
+      $L[] = '    • Face gains clearly more defined bone structure and stronger expression';
+      $L[] = '    • Body is notably more muscular and balanced';
       $L[] = '';
-      $L[] = '  IF adult or senior → apply MINIMAL changes:';
-      $L[] = '    • Very subtle settling of the body';
-      $L[] = '    • Slightly more mature expression';
-      $L[] = '    • If senior: slight additional gray on muzzle tip only';
+      $L[] = '  IF adult → apply CLEARLY VISIBLE transformation to mature prime adult:';
+      $L[] = '    ✦ These changes MUST be noticeable — not subtle. Make them clear:';
+      $L[] = '    • MUSCLES: Noticeably more defined, denser musculature — chest, shoulders,';
+      $L[] = '      hindquarters are clearly more powerful and filled-out than the input';
+      $L[] = '    • FACE: Stronger, more chiseled facial bone structure; more defined stop;';
+      $L[] = '      stronger, more prominent cheekbones; slightly heavier jaw; more mature';
+      $L[] = '      and confident expression in the eyes';
+      $L[] = '    • COAT: Noticeably richer, denser, more lustrous — coat quality at peak';
+      $L[] = '    • BODY: Slightly heavier and broader overall — a dog at its physical peak';
+      $L[] = '    • EXPRESSION: Calm, settled, confident — the look of a dog in its prime';
+      $L[] = '    • This dog should look MEANINGFULLY older — prime of life vs. young adult';
+      $L[] = '';
+      $L[] = '  IF senior → apply VISIBLE transformation toward older senior:';
+      $L[] = '    • More pronounced graying on muzzle, chin, and around eyes';
+      $L[] = '    • Slightly reduced muscle tone and softer overall body';
+      $L[] = '    • More gentle, wise, relaxed expression';
+      $L[] = '    • Coat may be slightly less vibrant/lustrous';
       $L[] = '';
       $L[] = '── ADULT BODY TARGET ─────────────────────────────────────';
       $L[] = $adultBody;
@@ -650,30 +669,47 @@ class GenerateAgeSimulations implements ShouldQueue
       // +3 years
       $L[] = '── TRANSFORMATION TARGET: +3 YEARS ────────────────────────';
       $L[] = '';
+      $L[] = '⚠️  CRITICAL RULE: +3 years MUST produce a CLEARLY and OBVIOUSLY different dog.';
+      $L[] = '    Anyone looking at the before/after must immediately say "yes, that dog looks';
+      $L[] = '    older." The changes must be SUBSTANTIAL and UNMISTAKABLE. If the result looks';
+      $L[] = '    similar to the input, you have FAILED. Apply all changes listed below.';
+      $L[] = '';
       $L[] = 'Apply changes based on the detected current age:';
       $L[] = '';
       $L[] = '  IF puppy OR teenager → apply FULL transformation to prime adult:';
       $L[] = '    • Complete adult body — absolutely no puppy/teen features remain';
-      $L[] = '    • Full breed-characteristic skeletal structure achieved';
-      $L[] = '    • Peak muscle development appropriate to breed';
+      $L[] = '    • Full breed-characteristic skeletal structure at MAXIMUM size';
+      $L[] = '    • Peak muscle development — noticeably powerful and filled-out';
       $L[] = '    • Complete adult coat at maximum beauty (' . $this->coatChange3Years($coat) . ')';
-      $L[] = '    • Strong, confident, fully defined adult face';
+      $L[] = '    • Strong, confident, fully defined adult face — no softness remaining';
       $L[] = '';
       $L[] = '  IF young_adult → apply MAJOR transformation to prime adult:';
-      $L[] = '    • Fully filled-out chest, shoulders, hindquarters';
-      $L[] = '    • Maximum breed muscle definition';
-      $L[] = '    • Full coat density and texture at peak';
-      $L[] = '    • Settled, confident mature expression';
+      $L[] = '    • Fully and visibly filled-out chest, shoulders, hindquarters';
+      $L[] = '    • Clearly maximum breed muscle definition — powerfully built';
+      $L[] = '    • Full coat density and texture at peak condition';
+      $L[] = '    • Settled, confident mature expression — notably calmer and wiser';
       $L[] = '';
-      $L[] = '  IF adult → apply MODERATE transformation toward mature adult:';
-      $L[] = '    • Slightly heavier/more settled body';
-      $L[] = '    • Natural muzzle graying begins: ' . $this->grayChange3Years($profile);
-      $L[] = '    • More dignified, calm expression';
+      $L[] = '  IF adult → apply SUBSTANTIAL and VISIBLE aging toward mature/senior adult:';
+      $L[] = '    ✦ These changes MUST be clearly noticeable — substantial, not subtle:';
+      $L[] = '    • MUZZLE GRAYING (MANDATORY — must be clearly visible):';
+      $L[] = '      ' . $this->grayChange3Years($profile);
+      $L[] = '      The graying must be OBVIOUS — a clear visual difference from the input.';
+      $L[] = '    • FACE: More weathered, experienced look; slightly deeper facial lines;';
+      $L[] = '      eyes carry more depth and wisdom; expression is calmer and more dignified;';
+      $L[] = '      facial muscles slightly more relaxed than the prime adult look';
+      $L[] = '    • BODY: Slightly less taut muscle — body is full and powerful but';
+      $L[] = '      beginning the gradual transition from peak to settled maturity';
+      $L[] = '    • COAT: Slightly richer, more settled texture — peak of coat development';
+      $L[] = '    • EYES: Slightly more experienced, calm depth in the gaze';
+      $L[] = '    • OVERALL: A dog that has lived life — distinguished, experienced, settled';
+      $L[] = '    ✦ The result MUST be unmistakably different from the input photo.';
       $L[] = '';
-      $L[] = '  IF senior → apply MODERATE additional aging:';
-      $L[] = '    • More pronounced graying on muzzle, chin, eye area';
-      $L[] = '    • Slightly reduced muscle mass';
-      $L[] = '    • More gentle, wise expression';
+      $L[] = '  IF senior → apply MEANINGFUL additional aging:';
+      $L[] = '    • Clearly more pronounced graying covering muzzle, chin, around eyes';
+      $L[] = '    • Visibly reduced muscle mass — softer body contours';
+      $L[] = '    • More gentle, slower, tired expression';
+      $L[] = '    • Coat noticeably less lustrous; possibly slightly thinner';
+      $L[] = '    • Overall an obviously older, more veteran dog';
       $L[] = '';
       $L[] = '── ADULT BODY TARGET ─────────────────────────────────────';
       $L[] = $adultBody;
@@ -734,12 +770,19 @@ class GenerateAgeSimulations implements ShouldQueue
     $L[] = '  □ Nothing added or removed from scene?';
     $L[] = '';
     $L[] = 'AGING CHECK:';
-    $L[] = "  □ Dog clearly looks +{$targetYears} year(s) older?";
+    $L[] = "  □ Would a person seeing these two photos side-by-side IMMEDIATELY notice";
+    $L[] = "    the dog looks +{$targetYears} year(s) older? (If NO → you must make the changes MORE visible)";
+    $L[] = '  □ If dog was adult in input: are muscle definition, coat richness, facial';
+    $L[] = '    maturity, and expression CLEARLY and NOTICEABLY different? (not subtle)';
+    $L[] = '  □ If +3 years on adult: is muzzle graying CLEARLY VISIBLE?';
     $L[] = '  □ Breed-specific body shape preserved (not a generic dog)?';
-    $L[] = '  □ Coat type preserved (' . $coat . ' — not changed to different texture)?';
+    $L[] = '  □ Coat TYPE preserved (' . $coat . ' — not changed to different texture)?';
     $L[] = '  □ Coat color and markings preserved?';
     $L[] = '  □ Dog looks healthy and well-groomed?';
     $L[] = '';
+    $L[] = '🚨 MOST IMPORTANT CHECK: Is the transformation VISIBLY OBVIOUS?';
+    $L[] = '   If the output looks nearly the same as the input — REGENERATE with';
+    $L[] = '   stronger, more dramatic aging effects before outputting.';
     $L[] = '⚠️  If ANY item is NO — you must fix it before outputting.';
     $L[] = '';
     $L[] = '╔══════════════════════════════════════════════════════╗';
@@ -782,10 +825,10 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     return match ($profile['gray_pattern'] ?? 'moderate') {
       'none'      => 'No gray hairs — this breed does not gray noticeably at 3 years. Coat color stays vivid.',
-      'minimal'   => 'A few very light silver hairs on the muzzle tip only — barely noticeable. Everything else unchanged.',
-      'moderate'  => 'Light dusting of gray/silver on muzzle tip and faint around the eyes — natural and distinguished. Base coat color fully preserved.',
-      'prominent' => 'Noticeable silver/gray on muzzle, chin, and around the eyes — natural, handsome sign of maturity. Coat color otherwise preserved.',
-      default     => 'Subtle muzzle-tip graying only — very natural and minimal.',
+      'minimal'   => 'A few noticeable silver/gray hairs scattered on the muzzle tip — clearly visible on close inspection. Everything else unchanged.',
+      'moderate'  => 'CLEARLY VISIBLE gray/silver graying on the muzzle tip, around the nostrils, and faint silver around the eyes — this must be obvious enough that a viewer immediately notices it. This is a distinguishing sign of age that MUST appear. Base coat color fully preserved everywhere else.',
+      'prominent' => 'STRONGLY VISIBLE silver/gray graying covering the muzzle, chin, and around the eyes — unmistakable, handsome sign of maturity that any viewer would notice immediately. Coat color otherwise fully preserved.',
+      default     => 'Visible muzzle-tip graying — clearly noticeable, not subtle.',
     };
   }
 
@@ -1185,14 +1228,14 @@ class GenerateAgeSimulations implements ShouldQueue
     }
     if ($this->mb($b, ['dalmatian'])) {
       return array_merge($default, [
-        'size_category' => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
+        'size_category'       => 'large',
+        'body_shape'          => 'athletic',
+        'coat_type'           => 'short',
         'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note' => 'Dalmatians grow into a large, lean, muscular spotted dog.',
-        'adult_body_note' => 'Large, lean, muscular, elegant. Long legs, deep chest. Weight 23–27 kg. Spots fully developed.',
-        'adult_face_note' => 'Long, strong, clean-cut head. Alert eyes, moderately large drop ears. Distinguished, athletic.',
+        'gray_pattern'        => 'moderate',
+        'size_note'           => 'Dalmatians grow into a large, lean, muscular spotted dog — 23–27 kg. As adults they age visibly: coat becomes glossier and richer, muscles more defined, and muzzle gradually grays with age.',
+        'adult_body_note'     => 'Large, lean, muscular, elegant athletic body. Long well-muscled legs, deep chest, well-defined musculature especially in shoulders, back, and hindquarters. Spots are crisp and clearly defined. Weight 23–27 kg.',
+        'adult_face_note'     => 'Long, strong, refined head with well-defined stop and cheekbones. Alert brown or blue eyes with a confident expression. Moderately large spotted drop ears. At 3+ years: natural silver/gray graying clearly visible on muzzle tip and around the nose bridge.',
       ]);
     }
     if ($this->mb($b, ['standard poodle'])) {

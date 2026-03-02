@@ -516,14 +516,6 @@ export default function Dashboard() {
                                     <p className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">
                                         {resultCount}
                                     </p>
-                                    <div
-                                        className={`flex items-center gap-0.5 text-xs font-semibold ${tClr(totalScansWeeklyTrend)}`}
-                                    >
-                                        {tIcon(totalScansWeeklyTrend)}
-                                        <span>
-                                            {fmt(totalScansWeeklyTrend)}
-                                        </span>
-                                    </div>
                                 </div>
                                 <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
                                     vs last week
@@ -698,7 +690,7 @@ export default function Dashboard() {
                             </div>
                             <div>
                                 <h2 className="font-bold text-neutral-900 dark:text-white">
-                                    AI Training Activity
+                                    Training Activity
                                 </h2>
                                 <p className="text-xs text-neutral-400 dark:text-white/35">
                                     12-week correction history &amp; breed
@@ -852,7 +844,7 @@ export default function Dashboard() {
                                 Recent Scans
                             </h2>
                             <p className="text-xs text-neutral-400 dark:text-white/35">
-                                Latest AI predictions
+                                Latest predictions
                             </p>
                         </div>
                         <Button

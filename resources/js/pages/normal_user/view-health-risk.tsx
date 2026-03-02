@@ -106,12 +106,10 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
     const radarData = useMemo(() => {
         if (!concerns || concerns.length === 0)
             return [{ category: 'No Data', value: 0 }];
-        return concerns
-            .slice(0, 8)
-            .map((c) => ({
-                category: c.name,
-                value: getRisk(c.risk_level).score,
-            }));
+        return concerns.slice(0, 8).map((c) => ({
+            category: c.name,
+            value: getRisk(c.risk_level).score,
+        }));
     }, [concerns]);
 
     const Panel = ({
@@ -377,135 +375,127 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
                             </div>
                         </div>
 
-                        {/* ── HEALTH CONCERNS ── */}
-                        <div className="vhr-fu vhr-fu3 mb-5">
-                            <div className="mb-3 flex items-center gap-2">
-                                <div className="flex h-5 w-5 items-center justify-center rounded-md border border-pink-500/20 bg-pink-500/10 text-pink-600 dark:text-pink-400">
-                                    <TriangleAlert size={10} />
+                        {/* ── BOTTOM ROW: Health Concerns (left) + Screenings (right) ── */}
+                        <div className="vhr-fu vhr-fu3 mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                            {/* ── HEALTH CONCERNS ── */}
+                            <div>
+                                <div className="mb-3 flex items-center gap-2">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-md border border-pink-500/20 bg-pink-500/10 text-pink-600 dark:text-pink-400">
+                                        <TriangleAlert size={10} />
+                                    </div>
+                                    <span className="vhr-mono text-[10px] font-bold tracking-[.12em] text-slate-600 uppercase dark:text-slate-400">
+                                        Common Health Concerns
+                                    </span>
+                                    <span className="vhr-mono ml-auto rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[9px] text-slate-600 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-400">
+                                        {concerns.length} identified
+                                    </span>
                                 </div>
-                                <span className="vhr-mono text-[10px] font-bold tracking-[.12em] text-slate-600 uppercase dark:text-slate-400">
-                                    Common Health Concerns
-                                </span>
-                                <span className="vhr-mono ml-auto rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[9px] text-slate-600 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-400">
-                                    {concerns.length} identified
-                                </span>
-                            </div>
-                            {concerns.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    {concerns.map((c, i) => {
-                                        const rc = getRisk(c.risk_level);
-                                        return (
-                                            <div
-                                                key={i}
-                                                className="vhr-card vhr-panel relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]"
-                                                style={
-                                                    {
-                                                        '--tw-shadow-color':
-                                                            'transparent',
-                                                    } as any
-                                                }
-                                            >
-                                                {/* Colored top strip */}
+                                {concerns.length > 0 ? (
+                                    <div className="flex flex-col gap-4">
+                                        {concerns.map((c, i) => {
+                                            const rc = getRisk(c.risk_level);
+                                            return (
                                                 <div
-                                                    className="absolute top-0 right-0 left-0 h-[2.5px]"
-                                                    style={{
-                                                        background: `linear-gradient(90deg,transparent,${rc.bar} 30%,${rc.bar} 70%,transparent)`,
-                                                        opacity: 0.55,
-                                                    }}
-                                                />
-                                                <div className="p-5">
-                                                    <div className="mb-3 flex items-start justify-between gap-2.5">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div
-                                                                className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${rc.dot}`}
-                                                            />
-                                                            <h3 className="text-[14px] font-bold text-slate-900 dark:text-white">
-                                                                {c.name}
-                                                            </h3>
-                                                        </div>
-                                                        <span
-                                                            className={`vhr-mono flex-shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[.06em] uppercase ${rc.badge}`}
-                                                        >
-                                                            {c.risk_level}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Risk bar */}
+                                                    key={i}
+                                                    className="vhr-card vhr-panel relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]"
+                                                >
                                                     <div
-                                                        className="mb-4 h-1.5 w-full overflow-hidden rounded-full"
+                                                        className="absolute top-0 right-0 left-0 h-[2.5px]"
                                                         style={{
-                                                            background:
-                                                                rc.barBg,
+                                                            background: `linear-gradient(90deg,transparent,${rc.bar} 30%,${rc.bar} 70%,transparent)`,
+                                                            opacity: 0.55,
                                                         }}
-                                                    >
+                                                    />
+                                                    <div className="p-5">
+                                                        <div className="mb-3 flex items-start justify-between gap-2.5">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div
+                                                                    className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${rc.dot}`}
+                                                                />
+                                                                <h3 className="text-[14px] font-bold text-slate-900 dark:text-white">
+                                                                    {c.name}
+                                                                </h3>
+                                                            </div>
+                                                            <span
+                                                                className={`vhr-mono flex-shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[.06em] uppercase ${rc.badge}`}
+                                                            >
+                                                                {c.risk_level}
+                                                            </span>
+                                                        </div>
                                                         <div
-                                                            className="vhr-barfill h-full rounded-full"
+                                                            className="mb-4 h-1.5 w-full overflow-hidden rounded-full"
                                                             style={{
-                                                                width: `${rc.score}%`,
                                                                 background:
-                                                                    rc.bar,
-                                                                animationDelay: `${i * 0.1}s`,
+                                                                    rc.barBg,
                                                             }}
-                                                        />
-                                                    </div>
-
-                                                    <div className="mb-3 space-y-1">
-                                                        <p className="vhr-mono text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">
-                                                            Description
-                                                        </p>
-                                                        <p className="text-[12px] leading-relaxed text-slate-700 dark:text-slate-300">
-                                                            {c.description}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-white/[.05] dark:bg-white/[.03]">
-                                                        <p className="vhr-mono mb-1 text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">
-                                                            Prevention &
-                                                            Management
-                                                        </p>
-                                                        <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                            {c.prevention}
-                                                        </p>
+                                                        >
+                                                            <div
+                                                                className="vhr-barfill h-full rounded-full"
+                                                                style={{
+                                                                    width: `${rc.score}%`,
+                                                                    background:
+                                                                        rc.bar,
+                                                                    animationDelay: `${i * 0.1}s`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="mb-3 space-y-1">
+                                                            <p className="vhr-mono text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">
+                                                                Description
+                                                            </p>
+                                                            <p className="text-[12px] leading-relaxed text-slate-700 dark:text-slate-300">
+                                                                {c.description}
+                                                            </p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-white/[.05] dark:bg-white/[.03]">
+                                                            <p className="vhr-mono mb-1 text-[9px] tracking-[.1em] text-slate-500 uppercase dark:text-slate-500">
+                                                                Prevention &
+                                                                Management
+                                                            </p>
+                                                            <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                                {c.prevention}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-500 italic dark:text-slate-500">
+                                        No specific health concerns generated
+                                        for this scan.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* ── SCREENINGS ── */}
+                            {screenings.length > 0 && (
+                                <div className="vhr-fu vhr-fu4">
+                                    <Panel
+                                        icon={<Shield size={11} />}
+                                        title="Recommended Screenings"
+                                        accent="cyan"
+                                    >
+                                        <div className="flex flex-col gap-4 p-5">
+                                            {screenings.map((s, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-white/[.05] dark:bg-white/[.03]"
+                                                >
+                                                    <p className="mb-1 text-[13px] font-bold text-slate-800 dark:text-white">
+                                                        {s.name}
+                                                    </p>
+                                                    <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                        {s.description}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Panel>
                                 </div>
-                            ) : (
-                                <p className="text-sm text-slate-500 italic dark:text-slate-500">
-                                    No specific health concerns generated for
-                                    this scan.
-                                </p>
                             )}
                         </div>
-
-                        {/* ── SCREENINGS ── */}
-                        {screenings.length > 0 && (
-                            <div className="vhr-fu vhr-fu4">
-                                <Panel
-                                    icon={<Shield size={11} />}
-                                    title="Recommended Screenings"
-                                    accent="cyan"
-                                >
-                                    <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-                                        {screenings.map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-white/[.05] dark:bg-white/[.03]"
-                                            >
-                                                <p className="mb-1 text-[13px] font-bold text-slate-800 dark:text-white">
-                                                    {s.name}
-                                                </p>
-                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                    {s.description}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

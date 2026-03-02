@@ -44,7 +44,9 @@ export default function ScanHistory({ mockScans, user }: Props) {
     const [filter, setFilter] = useState<'all' | 'verified' | 'pending'>('all');
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
-    const handleDelete = (id: number) => {
+    // ✅ Now accepts event to stop propagation
+    const handleDelete = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
         setDeletingId(id);
         router.delete(`/scanhistory/${id}`, {
             preserveScroll: true,
@@ -54,6 +56,11 @@ export default function ScanHistory({ mockScans, user }: Props) {
                 alert('Failed to delete. Please try again.');
             },
         });
+    };
+
+    // ✅ New: navigate to scan results page for this scan
+    const handleCardClick = (id: number) => {
+        router.visit(`/scan-results/${id}`);
     };
 
     const filtered = mockScans.filter(
@@ -100,7 +107,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     background-size: 48px 48px;
                     mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent);
                 }
-
                 .sh-orb-1 {
                     position:fixed; border-radius:50%; filter:blur(80px); pointer-events:none; z-index:0;
                     width:500px; height:500px; background:rgba(16,185,129,.04);
@@ -126,83 +132,58 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     border:1.5px solid rgba(16,185,129,.25);
                     animation: sh-fab-ring 2.5s ease-out infinite;
                 }
-                .sh-scan-line-anim { animation: sh-scan-line 1.4s linear infinite; }
 
+                .sh-card { cursor: pointer; }
                 .sh-card:hover .sh-scan-line-el { opacity:1; animation: sh-scan-line 1.4s linear infinite; }
                 .sh-scan-line-el { opacity: 0; transition: opacity .1s; }
-
                 .sh-card:hover .sh-hud-corner { opacity: 1; }
                 .sh-hud-corner { opacity: 0; transition: opacity .25s; }
-
                 .sh-card:hover .sh-del-overlay { opacity: 1; }
                 .sh-del-overlay { opacity: 0; transition: opacity .2s; }
 
                 .sh-nsb::-webkit-scrollbar { display:none; }
                 .sh-nsb { scrollbar-width: none; }
 
-                /* Stats strip */
                 .sh-stat-card {
-                    position: relative;
-                    padding: 20px 22px 18px;
-                    border-right: 1px solid;
-                    border-bottom: 1px solid;
+                    position: relative; padding: 20px 22px 18px;
+                    border-right: 1px solid; border-bottom: 1px solid;
                     transition: background .15s;
                 }
                 .sh-stat-card:hover { background: rgba(16,185,129,.025); }
                 .sh-stat-num {
-                    font-family: 'IBM Plex Sans', sans-serif;
-                    font-weight: 600;
-                    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
-                    line-height: 1;
-                    letter-spacing: -0.02em;
-                    color: #0f172a;
+                    font-family: 'IBM Plex Sans', sans-serif; font-weight: 600;
+                    font-size: clamp(1.75rem, 3.5vw, 2.25rem); line-height: 1;
+                    letter-spacing: -0.02em; color: #0f172a;
                 }
                 :is(.dark) .sh-stat-num { color: #f1f5f9; }
                 .sh-stat-label {
-                    font-family: 'IBM Plex Sans', sans-serif;
-                    font-size: 10px;
-                    font-weight: 500;
-                    letter-spacing: .08em;
-                    text-transform: uppercase;
-                    color: #94a3b8;
-                    margin-bottom: 10px;
+                    font-family: 'IBM Plex Sans', sans-serif; font-size: 10px;
+                    font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+                    color: #94a3b8; margin-bottom: 10px;
                 }
                 .sh-stat-sub {
-                    font-family: 'IBM Plex Sans', sans-serif;
-                    font-size: 11px;
-                    font-weight: 400;
-                    color: #94a3b8;
-                    margin-top: 4px;
+                    font-family: 'IBM Plex Sans', sans-serif; font-size: 11px;
+                    font-weight: 400; color: #94a3b8; margin-top: 4px;
                 }
                 :is(.dark) .sh-stat-sub { color: #475569; }
                 .sh-stat-bar-track {
-                    position: absolute;
-                    bottom: 0; left: 0; right: 0;
-                    height: 2px;
-                    background: #f1f5f9;
+                    position: absolute; bottom: 0; left: 0; right: 0;
+                    height: 2px; background: #f1f5f9;
                 }
                 :is(.dark) .sh-stat-bar-track { background: rgba(255,255,255,.05); }
                 .sh-stat-bar-fill {
-                    height: 100%;
-                    background: #10b981;
+                    height: 100%; background: #10b981;
                     animation: sh-bar-fill 1.6s cubic-bezier(.16,1,.3,1) forwards;
                 }
                 .sh-stat-icon {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 28px;
-                    height: 28px;
-                    border-radius: 7px;
-                    border: 1px solid rgba(16,185,129,.18);
-                    background: rgba(16,185,129,.07);
-                    color: #10b981;
-                    margin-bottom: 14px;
+                    display: flex; align-items: center; justify-content: center;
+                    width: 28px; height: 28px; border-radius: 7px;
+                    border: 1px solid rgba(16,185,129,.18); background: rgba(16,185,129,.07);
+                    color: #10b981; margin-bottom: 14px;
                 }
             `}</style>
 
             <div className="sh-font-dm relative min-h-screen overflow-x-hidden bg-slate-50 text-slate-700 dark:bg-[#070A0E] dark:text-slate-200">
-                {/* Background elements */}
                 <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_60%_40%_at_20%_10%,rgba(16,185,129,.07)_0%,transparent_70%),radial-gradient(ellipse_50%_35%_at_80%_85%,rgba(6,182,212,.05)_0%,transparent_70%)]" />
                 <div className="sh-grid-bg hidden dark:block" />
                 <div className="sh-orb-1 hidden dark:block" />
@@ -223,14 +204,12 @@ export default function ScanHistory({ mockScans, user }: Props) {
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
-
                             <button
                                 onClick={() => setShowQRModal(false)}
                                 className="absolute top-2.5 right-2.5 flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 dark:bg-white/[.06] dark:hover:bg-white/10"
                             >
                                 <X size={12} />
                             </button>
-
                             <div className="mb-[18px] text-center">
                                 <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[11px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
                                     <Smartphone size={18} />
@@ -242,7 +221,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     Scan to download the Android app
                                 </div>
                             </div>
-
                             <div className="mb-[18px] flex justify-center">
                                 <div className="rounded-xl bg-white p-2 shadow-lg">
                                     <img
@@ -252,7 +230,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     />
                                 </div>
                             </div>
-
                             <div className="mb-4 overflow-hidden rounded-[10px] border border-slate-200 dark:border-white/[.07]">
                                 {[
                                     {
@@ -279,7 +256,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     </div>
                                 ))}
                             </div>
-
                             <button
                                 onClick={() => setShowQRModal(false)}
                                 className="sh-font-syne w-full rounded-[10px] bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-xs font-extrabold text-black"
@@ -477,6 +453,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     key={scan.id}
                                     className="sh-card sh-fade-up group mb-[18px] inline-block w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/[.07] dark:border-white/[.07] dark:bg-white/[.025] dark:shadow-none"
                                     style={{ animationDelay: `${idx * 0.04}s` }}
+                                    onClick={() => handleCardClick(scan.id)}
                                 >
                                     {/* Image */}
                                     <div className="relative h-[200px] overflow-hidden sm:h-[220px]">
@@ -485,14 +462,11 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                             alt={scan.breed}
                                             className="h-full w-full object-cover transition-transform duration-[600ms] group-hover:scale-[1.07]"
                                         />
-
                                         <div
                                             className="sh-scan-line-el pointer-events-none absolute top-0 right-0 left-0 z-[4] h-[2px] bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent"
                                             style={{ position: 'absolute' }}
                                         />
-
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-
                                         {[
                                             'top-[7px] left-[7px] border-t-2 border-l-2',
                                             'top-[7px] right-[7px] border-t-2 border-r-2',
@@ -504,7 +478,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                                 className={`sh-hud-corner pointer-events-none absolute z-[3] h-[13px] w-[13px] border-emerald-500/60 ${cls}`}
                                             />
                                         ))}
-
                                         <div
                                             className={`sh-font-mono absolute top-[9px] left-[9px] z-[4] rounded-[5px] px-2 py-[3px] text-[8px] font-bold tracking-[.08em] uppercase backdrop-blur-sm ${
                                                 scan.status === 'verified'
@@ -516,11 +489,10 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                                 ? '✓ Verified'
                                                 : '⏳ Pending'}
                                         </div>
-
                                         <div className="sh-del-overlay absolute top-[9px] right-[9px] z-[5]">
                                             <button
-                                                onClick={() =>
-                                                    handleDelete(scan.id)
+                                                onClick={(e) =>
+                                                    handleDelete(e, scan.id)
                                                 }
                                                 disabled={
                                                     deletingId === scan.id
@@ -530,7 +502,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                                 <Trash2 size={11} />
                                             </button>
                                         </div>
-
                                         <div className="sh-font-mono absolute right-[9px] bottom-[9px] z-[4] rounded-[5px] bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-black">
                                             {scan.confidence}%
                                         </div>
@@ -571,8 +542,8 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() =>
-                                                handleDelete(scan.id)
+                                            onClick={(e) =>
+                                                handleDelete(e, scan.id)
                                             }
                                             disabled={deletingId === scan.id}
                                             className="sh-font-mono flex items-center gap-1 rounded-[7px] border border-red-500/15 bg-transparent px-[10px] py-[5px] text-[9px] font-bold tracking-[.04em] text-red-400/55 transition-all hover:border-red-500/35 hover:bg-red-500/[.05] hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35"

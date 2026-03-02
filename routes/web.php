@@ -41,14 +41,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
     Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    
+
 
     Route::get('/model/scan-results', [ScanResultController::class, "index"]);
     Route::get('/scanhistory', [PageController::class, "scanhistory"]);
     Route::delete('/scanhistory/{id}', [PageController::class, "deleteScan"])->name('scanhistory.delete');
 
     Route::get('/scan', [ScanController::class, "index"])->name('scan');
-Route::get('/scan-results', [ResultController::class, "index"]);
+    Route::get('/scan-results', [ResultController::class, "index"]);
 
     // POST route for actual analysis
     Route::post('/analyze', [ScanResultController::class, "analyze"])->name('analyze');
@@ -59,6 +59,8 @@ Route::get('/scan-results', [ResultController::class, "index"]);
     Route::get('/origin', [HistoryController::class, "index"]);
     Route::post('/simulation/generate', [SimulationController::class, 'generate'])->name('simulation.generate');
     Route::get('/health-risk', [HealthRiskController::class, "index"]);
+
+    Route::get('/scan-results/{id}', [ResultController::class, 'show']);
 
     Route::get('/model/training-queue', [TrainingQueueController::class, "index"]);
     Route::get('/model/review-dog', [ScanResultController::class, "review"]);
