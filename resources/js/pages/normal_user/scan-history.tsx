@@ -309,14 +309,14 @@ export default function ScanHistory({ mockScans, user }: Props) {
                             </div>
                             <h1 className="sh-font-syne m-0 text-xl leading-none font-extrabold tracking-tight text-slate-900 sm:text-2xl dark:text-white">
                                 Scan{' '}
-                                <span className="bg-gradient-to-br from-emerald-500 to-cyan-500 bg-clip-text text-transparent">
+                                <span className="bg-cyan-500 bg-clip-text text-transparent">
                                     History
                                 </span>
                             </h1>
                         </div>
                         <Link
                             href="/scan"
-                            className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-[12px] font-bold whitespace-nowrap text-black no-underline shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                            className="sh-font-syne inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-[12px] font-bold whitespace-nowrap text-black no-underline shadow-md transition-all hover:-translate-y-0.5"
                         >
                             <Zap size={12} />
                             New Scan
