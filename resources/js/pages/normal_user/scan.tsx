@@ -292,7 +292,7 @@ export default function Scan() {
         { text: 'Good lighting, avoid harsh shadows' },
         { text: 'Front or side angles work best' },
         { text: 'Plain or simple backgrounds preferred' },
-        { text: 'Only dog images are accepted', bold: true },
+        { text: 'Only dog images are accepted' },
     ];
 
     const Panel = ({
@@ -870,11 +870,7 @@ export default function Scan() {
                                                                 className={`sc-hc sc-h${p}`}
                                                             />
                                                         ))}
-                                                        <div className="absolute top-1/2 left-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2">
-                                                            <div className="sc-camh" />
-                                                            <div className="sc-camv" />
-                                                            <div className="sc-camdot" />
-                                                        </div>
+
                                                         <div className="sc-mono sc-ticker absolute bottom-3 left-3 rounded border border-emerald-500/20 bg-black/60 px-2 py-0.5 text-[9px] font-semibold tracking-[.14em] text-emerald-400 uppercase backdrop-blur-sm">
                                                             ● REC ·{' '}
                                                             {facingMode ===
@@ -1100,7 +1096,7 @@ export default function Scan() {
                                                 </span>
                                                 {/* FIXED: regular text was text-slate-500 → text-slate-600 */}
                                                 <p
-                                                    className={`text-[12px] leading-relaxed ${tip.bold ? 'font-bold text-slate-800 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}
+                                                    className={`text-[12px] leading-relaxed text-slate-600 dark:text-slate-400`}
                                                 >
                                                     {tip.text}
                                                 </p>

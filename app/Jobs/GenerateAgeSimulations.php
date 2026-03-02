@@ -18,9 +18,21 @@ class GenerateAgeSimulations implements ShouldQueue
 {
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-  public $timeout    = 300;
+  public $timeout    = 360;
   public $tries      = 3;
-  public $backoff    = [15, 45, 90];
+  public $backoff    = [20, 60, 120];
+
+  // ─── Model priority list (best to fallback) ───────────────────────────────
+  // Nano Banana Pro = gemini-3-pro-image-preview  (best image editing + thinking)
+  // Nano Banana 2   = gemini-3.1-flash-image-preview (fast, good quality)
+  // Nano Banana     = gemini-2.5-flash-image         (stable fallback)
+  // Legacy fallback = gemini-2.0-flash-exp-image-generation
+  private const MODEL_PRIORITY = [
+    'gemini-3-pro-image-preview',            // Nano Banana Pro  — best quality
+    'gemini-3.1-flash-image-preview',         // Nano Banana 2    — fast + quality
+    'gemini-2.5-flash-image',                 // Nano Banana      — stable
+    'gemini-2.0-flash-exp-image-generation',  // Legacy fallback
+  ];
 
   protected $resultId;
   protected $breed;
@@ -41,6 +53,7 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     $startTime = microtime(true);
 
+    $result = null;
     try {
       Log::info('🐕 AGE SIMULATION STARTED', [
         'result_id' => $this->resultId,
@@ -61,12 +74,26 @@ class GenerateAgeSimulations implements ShouldQueue
         throw new \Exception('Failed to prepare image from path: ' . $this->imagePath);
       }
 
+      // ── Detect current age stage ───────────────────────────────────
+      $currentAgeStage = $this->detectAgeStage($imageData);
+      Log::info("🔍 Detected age stage: {$currentAgeStage}");
+
       // ── Build breed profile ────────────────────────────────────────
       $breedProfile = $this->getBreedProfile($this->breed);
-      Log::info('📊 Breed Profile', ['breed' => $breedProfile['breed'], 'size' => $breedProfile['size_category']]);
+      $breedProfile['detected_age_stage'] = $currentAgeStage;
+      Log::info('📊 Breed Profile', [
+        'breed'      => $breedProfile['breed'],
+        'size'       => $breedProfile['size_category'],
+        'coat'       => $breedProfile['coat_type'],
+        'age_stage'  => $currentAgeStage,
+      ]);
 
-      // ── Run Gemini in parallel for 1yr + 3yr ──────────────────────
-      $simulations = $this->generateTransformations($imageData, $breedProfile);
+      // ── Select best available model ────────────────────────────────
+      $selectedModel = $this->selectBestModel();
+      Log::info("🤖 Using model: {$selectedModel}");
+
+      // ── Run generation in parallel ─────────────────────────────────
+      $simulations = $this->generateTransformations($imageData, $breedProfile, $selectedModel);
 
       $savedPaths = ['1_years' => null, '3_years' => null];
 
@@ -74,87 +101,159 @@ class GenerateAgeSimulations implements ShouldQueue
         $savedPaths['1_years'] = $this->saveImage($simulations['1_year'], '1_year', $this->resultId, $imageData);
         Log::info("✅ 1-year saved: {$savedPaths['1_years']}");
       } else {
-        Log::warning('⚠️ 1-year simulation returned no image data');
+        Log::warning('⚠️ No image data for 1-year simulation');
       }
 
       if (!empty($simulations['3_years'])) {
         $savedPaths['3_years'] = $this->saveImage($simulations['3_years'], '3_years', $this->resultId, $imageData);
         Log::info("✅ 3-years saved: {$savedPaths['3_years']}");
       } else {
-        Log::warning('⚠️ 3-year simulation returned no image data');
+        Log::warning('⚠️ No image data for 3-year simulation');
       }
 
-      // Consider complete even if only one image succeeded
       $finalStatus = ($savedPaths['1_years'] || $savedPaths['3_years']) ? 'complete' : 'failed';
       $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
       $elapsed = round(microtime(true) - $startTime, 2);
-      Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s");
+      Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s | model: {$selectedModel}");
     } catch (\Exception $e) {
       Log::error('❌ SIMULATION FAILED', [
         'result_id' => $this->resultId,
         'error'     => $e->getMessage(),
         'line'      => $e->getLine(),
-        'file'      => $e->getFile(),
+        'file'      => basename($e->getFile()),
       ]);
-      if (isset($result) && $result) {
-        $this->updateStatus($result, 'failed', [], [], $e->getMessage());
-      } else {
-        // Attempt to mark failed even if $result wasn't loaded
-        $r = Results::find($this->resultId);
-        if ($r) $this->updateStatus($r, 'failed', [], [], $e->getMessage());
-      }
+      $r = $result ?? Results::find($this->resultId);
+      if ($r) $this->updateStatus($r, 'failed', [], [], $e->getMessage());
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  GENERATION: parallel Gemini calls with retry
+  //  MODEL SELECTION — try best model first, fall back on error
   // ─────────────────────────────────────────────────────────────────────────
 
-  private function generateTransformations(array $imageData, array $breedProfile): array
+  private function selectBestModel(): string
   {
-    $client  = new Client(['timeout' => 150, 'connect_timeout' => 15]);
+    // Check if a preferred model is configured
+    $configured = config('services.gemini.image_model') ?? env('GEMINI_IMAGE_MODEL');
+    if ($configured) return $configured;
+
+    // Otherwise return the top priority model; fallback happens at call time
+    return self::MODEL_PRIORITY[0];
+  }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  AGE STAGE DETECTION (pre-pass to Gemini)
+    // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Ask Gemini (text-only, cheap call) to classify the dog's current age stage.
+   * Returns: 'puppy' | 'teenager' | 'young_adult' | 'adult' | 'senior'
+   */
+  private function detectAgeStage(array $imageData): string
+  {
+    try {
+      $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+      $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+
+      $payload = [
+        'contents' => [[
+          'parts' => [
+            [
+              'text' => 'Look at this dog photo carefully. Classify the dog\'s current approximate age stage. '
+                . 'Reply with ONLY one of these exact words: puppy | teenager | young_adult | adult | senior. '
+                . 'Definitions: '
+                . 'puppy = clearly a baby (0-6 months, very small, oversized paws/head, baby face, soft thin coat). '
+                . 'teenager = adolescent (6-18 months, lanky/gangly, partially developed, still growing). '
+                . 'young_adult = 1-2 years, mostly adult proportions but still filling out. '
+                . 'adult = fully mature 2-6 years, peak condition. '
+                . 'senior = visibly aging 7+ years, gray muzzle, less muscle, slower look. '
+                . 'Reply with exactly one word only.',
+            ],
+            [
+              'inlineData' => [
+                'mimeType' => $imageData['mimeType'],
+                'data'     => $imageData['base64'],
+              ],
+            ],
+          ],
+        ]],
+        'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 10],
+      ];
+
+      $client   = new Client(['timeout' => 20]);
+      $response = $client->post($endpoint, ['json' => $payload, 'headers' => ['Content-Type' => 'application/json']]);
+      $data     = json_decode($response->getBody()->getContents(), true);
+      $text     = trim(strtolower($data['candidates'][0]['content']['parts'][0]['text'] ?? 'adult'));
+
+      $valid = ['puppy', 'teenager', 'young_adult', 'adult', 'senior'];
+      foreach ($valid as $v) {
+        if (str_contains($text, $v)) return $v;
+      }
+      return 'adult';
+    } catch (\Exception $e) {
+      Log::warning('Age detection failed, defaulting to adult: ' . $e->getMessage());
+      return 'adult';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  PARALLEL GENERATION WITH MODEL FALLBACK
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private function generateTransformations(array $imageData, array $breedProfile, string $primaryModel): array
+  {
     $results = ['1_year' => null, '3_years' => null];
 
     $prompt1Year  = $this->buildAgingPrompt($breedProfile, 1);
     $prompt3Years = $this->buildAgingPrompt($breedProfile, 3);
 
-    $maxAttempts = 3;
+    // Try each model in priority order if previous fails
+    $modelsToTry = array_unique(array_merge([$primaryModel], self::MODEL_PRIORITY));
 
-    for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-      try {
-        Log::info('🔄 Generation attempt ' . ($attempt + 1) . "/{$maxAttempts}");
+    foreach ($modelsToTry as $modelName) {
+      if ($results['1_year'] && $results['3_years']) break;
 
-        $promises = [];
-        if (!$results['1_year'])  $promises['1_year']  = $this->createGenerationPromise($client, $prompt1Year,  $imageData);
-        if (!$results['3_years']) $promises['3_years'] = $this->createGenerationPromise($client, $prompt3Years, $imageData);
+      Log::info("🔄 Attempting generation with: {$modelName}");
 
-        if (empty($promises)) break;
+      $client  = new Client(['timeout' => 180, 'connect_timeout' => 15]);
+      $maxAttempts = 2;
 
-        $settled = Promise\Utils::settle($promises)->wait();
-
-        foreach ($settled as $key => $result) {
-          if ($result['state'] === 'fulfilled' && !empty($result['value'])) {
-            $results[$key] = $result['value'];
-            Log::info("✅ {$key} generation succeeded");
-          } else {
-            $reason = $result['reason'] ?? null;
-            Log::warning("⚠️ {$key} failed on attempt " . ($attempt + 1), [
-              'reason' => $reason ? $reason->getMessage() : 'no value returned',
-            ]);
+      for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+        try {
+          $promises = [];
+          if (!$results['1_year']) {
+            $promises['1_year']  = $this->createGenerationPromise($client, $prompt1Year, $imageData, $modelName);
           }
-        }
+          if (!$results['3_years']) {
+            $promises['3_years'] = $this->createGenerationPromise($client, $prompt3Years, $imageData, $modelName);
+          }
 
-        if ($results['1_year'] && $results['3_years']) break;
+          if (empty($promises)) break;
 
-        if ($attempt < $maxAttempts - 1) {
-          $delay = (int) pow(2, $attempt + 1);
-          Log::info("⏳ Backing off {$delay}s before retry");
-          sleep($delay);
+          $settled = Promise\Utils::settle($promises)->wait();
+
+          foreach ($settled as $key => $result) {
+            if ($result['state'] === 'fulfilled' && !empty($result['value'])) {
+              $results[$key] = $result['value'];
+              Log::info("✅ {$key} succeeded with {$modelName}");
+            } else {
+              $reason = $result['reason'] ?? null;
+              Log::warning("⚠️ {$key} failed with {$modelName} attempt " . ($attempt + 1), [
+                'reason' => $reason ? $reason->getMessage() : 'null value',
+              ]);
+            }
+          }
+
+          if ($results['1_year'] && $results['3_years']) break 2;
+
+          if ($attempt < $maxAttempts - 1) {
+            sleep((int) pow(2, $attempt + 1));
+          }
+        } catch (\Exception $e) {
+          Log::error("Model {$modelName} attempt {$attempt} exception: " . $e->getMessage());
+          if ($attempt < $maxAttempts - 1) sleep(5);
         }
-      } catch (\Exception $e) {
-        Log::error("Generation attempt {$attempt} threw exception: " . $e->getMessage());
-        if ($attempt < $maxAttempts - 1) sleep(5 * ($attempt + 1));
       }
     }
 
@@ -162,14 +261,29 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  GEMINI ASYNC PROMISE
+  //  GEMINI API CALL (async promise)
   // ─────────────────────────────────────────────────────────────────────────
 
-  private function createGenerationPromise(Client $client, string $prompt, array $imageData)
+  private function createGenerationPromise(Client $client, string $prompt, array $imageData, string $modelName)
   {
-    $apiKey    = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-    $modelName = 'gemini-2.0-flash-exp-image-generation';
-    $endpoint  = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
+    $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
+
+    // Nano Banana / Gemini 3 models support thinking — lower temperature for fidelity
+    $isThinkingModel = in_array($modelName, [
+      'gemini-3-pro-image-preview',
+      'gemini-3.1-flash-image-preview',
+      'gemini-2.5-flash-image',
+      'nano-banana-pro-preview',
+    ]);
+
+    $generationConfig = [
+      'temperature'        => $isThinkingModel ? 0.1 : 0.2,
+      'topK'               => $isThinkingModel ? 32 : 40,
+      'topP'               => $isThinkingModel ? 0.75 : 0.80,
+      'maxOutputTokens'    => 32768,
+      'responseModalities' => ['IMAGE', 'TEXT'],
+    ];
 
     $payload = [
       'contents' => [[
@@ -181,14 +295,8 @@ class GenerateAgeSimulations implements ShouldQueue
           ]],
         ],
       ]],
-      'generationConfig' => [
-        'temperature'        => 0.2,   // lower = more faithful to source
-        'topK'               => 32,
-        'topP'               => 0.80,
-        'maxOutputTokens'    => 8192,
-        'responseModalities' => ['IMAGE', 'TEXT'],
-      ],
-      'safetySettings' => [
+      'generationConfig' => $generationConfig,
+      'safetySettings'   => [
         ['category' => 'HARM_CATEGORY_HARASSMENT',        'threshold' => 'BLOCK_NONE'],
         ['category' => 'HARM_CATEGORY_HATE_SPEECH',       'threshold' => 'BLOCK_NONE'],
         ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_NONE'],
@@ -199,377 +307,447 @@ class GenerateAgeSimulations implements ShouldQueue
     return $client->postAsync($endpoint, [
       'json'    => $payload,
       'headers' => ['Content-Type' => 'application/json'],
-    ])->then(function ($response) {
-      return $this->extractImage($response);
+    ])->then(function ($response) use ($modelName) {
+      return $this->extractImage($response, $modelName);
     });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  EXTRACT IMAGE BYTES FROM API RESPONSE
+  //  EXTRACT IMAGE FROM RESPONSE
   // ─────────────────────────────────────────────────────────────────────────
 
-  private function extractImage($response): ?string
+  private function extractImage($response, string $modelName = ''): ?string
   {
-    $body = $response->getBody()->getContents();
+    $body         = $response->getBody()->getContents();
     $responseData = json_decode($body, true);
 
     if (json_last_error() !== JSON_ERROR_NONE) {
-      throw new \Exception('Invalid JSON from Gemini API');
+      throw new \Exception("Invalid JSON from Gemini API ({$modelName})");
     }
 
     if (isset($responseData['error'])) {
-      $errMsg = $responseData['error']['message'] ?? 'Unknown API error';
-      throw new \Exception("Gemini API error: {$errMsg}");
+      $errMsg  = $responseData['error']['message'] ?? 'Unknown API error';
+      $errCode = $responseData['error']['code']    ?? 0;
+      throw new \Exception("Gemini API error [{$errCode}] ({$modelName}): {$errMsg}");
     }
 
     if (!isset($responseData['candidates'][0])) {
-      // Log full response for debugging (truncated)
-      Log::error('No candidates in Gemini response', [
-        'response_preview' => substr($body, 0, 500),
+      Log::error('No candidates from Gemini', [
+        'model'    => $modelName,
+        'preview'  => substr($body, 0, 800),
       ]);
-      throw new \Exception('No candidates returned by Gemini API');
+      throw new \Exception("No candidates returned by {$modelName}");
     }
 
-    $candidate = $responseData['candidates'][0];
-
-    // Check finish reason
+    $candidate    = $responseData['candidates'][0];
     $finishReason = $candidate['finishReason'] ?? '';
-    if (in_array($finishReason, ['SAFETY', 'RECITATION', 'OTHER'])) {
-      throw new \Exception("Gemini blocked response: finishReason={$finishReason}");
+
+    if (in_array($finishReason, ['SAFETY', 'RECITATION', 'OTHER', 'PROHIBITED_CONTENT'])) {
+      throw new \Exception("Generation blocked by {$modelName}: finishReason={$finishReason}");
     }
 
     $parts = $candidate['content']['parts'] ?? [];
 
-    // Primary: inlineData image
+    // Primary: inlineData image block
     foreach ($parts as $part) {
-      if (isset($part['inlineData']['data']) && strlen($part['inlineData']['data']) > 100) {
+      if (isset($part['inlineData']['data']) && strlen($part['inlineData']['data']) > 200) {
         $decoded = base64_decode($part['inlineData']['data'], true);
-        if ($decoded && strlen($decoded) > 1000) {
-          Log::info('✅ Image extracted from inlineData (' . round(strlen($decoded) / 1024, 1) . ' KB)');
+        if ($decoded && strlen($decoded) > 2000) {
+          Log::info("✅ Image from inlineData ({$modelName}) " . round(strlen($decoded) / 1024, 1) . ' KB');
           return $decoded;
         }
       }
     }
 
-    // Fallback: base64 in text block
+    // Fallback: base64 string in text block
     foreach ($parts as $part) {
       if (isset($part['text'])) {
         $text    = preg_replace('/```[\w]*\n?/', '', $part['text']);
         $text    = trim($text);
         $decoded = base64_decode($text, true);
         if ($decoded && strlen($decoded) > 5000) {
-          Log::info('✅ Image extracted from text block (' . round(strlen($decoded) / 1024, 1) . ' KB)');
+          Log::info("✅ Image from text block ({$modelName}) " . round(strlen($decoded) / 1024, 1) . ' KB');
           return $decoded;
         }
       }
     }
 
-    throw new \Exception('No usable image data found in Gemini response parts');
+    throw new \Exception("No usable image data in response from {$modelName}");
   }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  MASTER PROMPT BUILDER  — posture-locked, breed-accurate aging
-    // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  MASTER PROMPT BUILDER
+  //  — Four-phase approach:
+  //    1. ANCHOR: lock every pixel of background/pose
+  //    2. ASSESS: determine current age stage
+  //    3. TRANSFORM: apply breed+age-accurate biological changes ONLY
+  //    4. VERIFY: self-check checklist before outputting
+  // ─────────────────────────────────────────────────────────────────────────
 
-  /**
-   * Build a precise aging prompt that:
-   *  1. Locks all posture/pose/background elements first
-   *  2. Detects current age of the dog in the photo
-   *  3. Applies breed-accurate biological aging
-   *  4. Enforces healthy, well-groomed result
-   */
-  private function buildAgingPrompt(array $profile, int $years): string
+  private function buildAgingPrompt(array $profile, int $targetYears): string
   {
-    $breed       = $profile['breed'];
-    $size        = $profile['size_category'];
-    $coat        = $profile['coat_type'];
-    $isBrachy    = $profile['brachycephalic'];
-    $grows       = $profile['grows_significantly'];
-    $bodyShape   = $profile['body_shape'] ?? 'standard';
-    $sizeNote    = $profile['size_note'] ?? '';
-    $adultBody   = $profile['adult_body_note'] ?? '';
-    $adultFace   = $profile['adult_face_note'] ?? '';
+    $breed        = $profile['breed'];
+    $size         = $profile['size_category'];
+    $coat         = $profile['coat_type'];
+    $isBrachy     = $profile['brachycephalic'];
+    $bodyShape    = $profile['body_shape'] ?? 'standard';
+    $sizeNote     = $profile['size_note'] ?? '';
+    $adultBody    = $profile['adult_body_note'] ?? '';
+    $adultFace    = $profile['adult_face_note'] ?? '';
+    $detectedAge  = $profile['detected_age_stage'] ?? 'unknown';
 
-    $lines = [];
+    $L = [];   // lines array
 
-    // ══════════════════════════════════════════════════════════════════
-    // PREAMBLE — frame this as a PHOTO EDIT, not a generation
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '════════════════════════════════════════════';
-    $lines[] = 'TASK TYPE: PHOTO EDITING — NOT NEW IMAGE GENERATION';
-    $lines[] = '════════════════════════════════════════════';
-    $lines[] = 'You are editing an existing photograph.';
-    $lines[] = 'Your ONLY job is to make the dog in this photo look biologically older.';
-    $lines[] = 'Everything else in the image stays EXACTLY as it is.';
-    $lines[] = '';
+    // ══════════════════════════════════════════════════
+    // HEADER
+    // ══════════════════════════════════════════════════
+    $L[] = '╔══════════════════════════════════════════════════════╗';
+    $L[] = '║  TASK: DOG AGE PROGRESSION PHOTO EDIT               ║';
+    $L[] = '╚══════════════════════════════════════════════════════╝';
+    $L[] = '';
+    $L[] = 'You are a professional photo retouching AI specializing in';
+    $L[] = 'realistic canine age progression. This is a PHOTO EDIT, not';
+    $L[] = 'a new image generation. You must edit the ATTACHED photograph.';
+    $L[] = '';
+    $L[] = "BREED DETECTED BY SYSTEM: {$breed}";
+    $L[] = "CURRENT AGE STAGE IN PHOTO: {$detectedAge}";
+    $L[] = "AGE ADVANCEMENT REQUESTED: +{$targetYears} year(s)";
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 1 — POSTURE & SCENE LOCK (most important section)
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'STEP 1 ▸ POSTURE LOCK — READ THIS FIRST, MEMORIZE, NEVER DEVIATE';
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'Before doing ANYTHING, scan and memorize these elements from the input photo:';
-    $lines[] = '';
-    $lines[] = '  POSTURE (FROZEN — must be identical in output):';
-    $lines[] = '    • Exact position of all four legs (where each paw touches the ground/surface)';
-    $lines[] = '    • Body orientation (facing direction, angle of torso)';
-    $lines[] = '    • Head angle and tilt (left/right/up/down — copy exactly)';
-    $lines[] = '    • Ear position (up, down, folded, alert — copy exactly)';
-    $lines[] = '    • Tail position (up, down, tucked, wagging angle — copy exactly)';
-    $lines[] = '    • Sitting / standing / lying pose type (do NOT change this)';
-    $lines[] = '';
-    $lines[] = '  ENVIRONMENT (FROZEN — must be identical in output):';
-    $lines[] = '    • Background (wall, floor, grass, room, outdoor — every detail)';
-    $lines[] = '    • Camera angle and distance (do not zoom in or out)';
-    $lines[] = '    • Lighting direction and quality (shadows stay where they are)';
-    $lines[] = '    • Any objects, furniture, or people visible in frame';
-    $lines[] = '    • Image crop/framing (do not reframe or resize the composition)';
-    $lines[] = '';
-    $lines[] = '  ❌ YOU ARE FORBIDDEN FROM:';
-    $lines[] = '    • Moving or repositioning any leg, paw, or limb';
-    $lines[] = '    • Changing the head angle or ear position';
-    $lines[] = '    • Changing body orientation or rotation';
-    $lines[] = '    • Changing the background in any way';
-    $lines[] = '    • Adding or removing anything from the environment';
-    $lines[] = '    • Changing camera angle, zoom, or crop';
-    $lines[] = '    • Replacing the background with a studio/plain backdrop';
-    $lines[] = '    • Making the dog appear to grow "taller" by stretching legs (growth = natural skeletal development, not scaling)';
-    $lines[] = '';
+    // ══════════════════════════════════════════════════
+    // PHASE 1 — PIXEL-PERFECT SCENE ANCHOR
+    // ══════════════════════════════════════════════════
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = 'PHASE 1 ▶ SCENE ANCHOR (do this FIRST before anything else)';
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = '';
+    $L[] = 'Scan and memorize EVERY detail of the input photo:';
+    $L[] = '';
+    $L[] = '  📌 BACKGROUND — memorize and reproduce exactly:';
+    $L[] = '     • Every element: grass, floor, wall, furniture, sky, trees, objects';
+    $L[] = '     • Color tones, texture, blur level (depth of field)';
+    $L[] = '     • Any shadows cast by the dog onto the background';
+    $L[] = '';
+    $L[] = '  📌 CAMERA — memorize and reproduce exactly:';
+    $L[] = '     • Viewing angle (eye level, above, below)';
+    $L[] = '     • Distance from subject (do not zoom in or out)';
+    $L[] = '     • Crop and framing (do not recompose)';
+    $L[] = '     • Focal length / perspective distortion';
+    $L[] = '';
+    $L[] = '  📌 LIGHTING — memorize and reproduce exactly:';
+    $L[] = '     • Direction of main light source';
+    $L[] = '     • Hard/soft quality of light';
+    $L[] = '     • Position of all shadows on the dog and ground';
+    $L[] = '     • Highlight placement on the coat';
+    $L[] = '';
+    $L[] = '  📌 DOG POSE — memorize and reproduce exactly:';
+    $L[] = '     • ALL four leg positions and paw placements on the ground';
+    $L[] = '     • Body orientation and rotation (which way dog faces)';
+    $L[] = '     • Head angle: yaw (left/right), pitch (up/down), roll (tilt)';
+    $L[] = '     • Ear position (pricked, folded, alert, relaxed)';
+    $L[] = '     • Tail position (up, down, curled, tucked, wagging angle)';
+    $L[] = '     • Whether sitting, standing, lying, crouching, running, jumping';
+    $L[] = '     • Weight distribution (leaning left/right/forward/back)';
+    $L[] = '';
+    $L[] = '  🚫 ABSOLUTE PROHIBITIONS — these will make the result WRONG:';
+    $L[] = '     ✗ Do NOT move, reposition, or adjust any limb or paw';
+    $L[] = '     ✗ Do NOT change head angle or ear position';
+    $L[] = '     ✗ Do NOT change body orientation or rotation';
+    $L[] = '     ✗ Do NOT change the background (even slightly)';
+    $L[] = '     ✗ Do NOT zoom in, zoom out, or reframe';
+    $L[] = '     ✗ Do NOT add or remove any element from the scene';
+    $L[] = '     ✗ Do NOT replace background with solid color/studio backdrop';
+    $L[] = '     ✗ Do NOT resize the dog relative to the frame';
+    $L[] = '     ✗ Do NOT change lighting direction or shadow positions';
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 2 — CURRENT AGE ASSESSMENT
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'STEP 2 ▸ ASSESS CURRENT DOG AGE IN PHOTO';
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'Determine the approximate current age of the dog:';
-    $lines[] = '';
-    $lines[] = '  PUPPY indicators (if visible):';
-    $lines[] = '    • Head appears oversized relative to body';
-    $lines[] = '    • Legs are short and stubby relative to body length';
-    $lines[] = '    • Face is round and soft, large innocent eyes, chubby cheeks';
-    $lines[] = '    • Coat is thin, underdeveloped, or sparse';
-    $lines[] = '    • Belly appears round and pudgy';
-    $lines[] = '    • Paws look too large for the body';
-    $lines[] = '';
-    $lines[] = '  YOUNG ADULT indicators (if visible):';
-    $lines[] = '    • Body proportions are mostly adult but may not be fully filled out';
-    $lines[] = '    • Coat is developing but not at peak density';
-    $lines[] = '    • Face is defined but slightly softer than fully mature';
-    $lines[] = '';
-    $lines[] = '  MATURE ADULT indicators (if visible):';
-    $lines[] = '    • Fully proportionate adult body';
-    $lines[] = '    • Dense, full coat';
-    $lines[] = '    • Defined, strong facial structure';
-    $lines[] = '    • No puppy softness remaining';
-    $lines[] = '';
-    $lines[] = '  ⚠️ DO NOT ASSUME THE DOG IS A PUPPY. Read the photo carefully.';
-    $lines[] = '  If the dog already appears fully adult, apply only SUBTLE maturity changes.';
-    $lines[] = '';
+    // ══════════════════════════════════════════════════
+    // PHASE 2 — CURRENT AGE CONFIRMATION
+    // ══════════════════════════════════════════════════
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = 'PHASE 2 ▶ CURRENT AGE CONFIRMATION';
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = '';
+    $L[] = "The system pre-classified this dog as: [{$detectedAge}]";
+    $L[] = '';
+    $L[] = 'Use the following visual cues to confirm or override this classification:';
+    $L[] = '';
+    $L[] = '  PUPPY (0–6 months):';
+    $L[] = '    • Head disproportionately large for body';
+    $L[] = '    • Paws disproportionately large (classic puppy sign)';
+    $L[] = '    • Very short, stubby legs relative to body';
+    $L[] = '    • Round, soft facial features, chubby cheeks';
+    $L[] = '    • Thin, underdeveloped, sparse coat';
+    $L[] = '    • Round potbelly';
+    $L[] = '    • Large, innocent, wide-open eyes';
+    $L[] = '';
+    $L[] = '  TEENAGER (6–18 months):';
+    $L[] = '    • Gangly/lanky appearance — legs too long for body';
+    $L[] = '    • Ears not yet fully upright (if an erect-ear breed)';
+    $L[] = '    • Coat partially developed, still patchy or uneven';
+    $L[] = '    • Face transitioning from puppy to adult proportions';
+    $L[] = '    • Some puppy softness remains in features';
+    $L[] = '';
+    $L[] = '  YOUNG ADULT (1–2 years):';
+    $L[] = '    • Mostly adult proportions but not fully filled out';
+    $L[] = '    • Coat is developing but not at maximum density';
+    $L[] = '    • Face defined but slightly softer than fully mature';
+    $L[] = '';
+    $L[] = '  ADULT (2–6 years):';
+    $L[] = '    • Fully proportionate, filled-out adult body';
+    $L[] = '    • Dense, full, healthy coat at peak condition';
+    $L[] = '    • Strong, defined facial bone structure';
+    $L[] = '    • No puppy softness at all';
+    $L[] = '';
+    $L[] = '  SENIOR (7+ years):';
+    $L[] = '    • Visible gray on muzzle and around eyes';
+    $L[] = '    • Slightly less muscle mass, softer body';
+    $L[] = '    • Cloudier or slower-looking eyes';
+    $L[] = '    • Coat may be slightly less lustrous';
+    $L[] = '';
+    $L[] = '  ⚠️  IMPORTANT: Do NOT assume the dog is a puppy.';
+    $L[] = '  Apply ONLY the transformation appropriate to the actual age you see.';
+    $L[] = '  If already adult, apply only subtle maturity changes — not a full puppy-to-adult transform.';
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 3 — BREED IDENTIFICATION & GROWTH RULES
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = "STEP 3 ▸ BREED: {$breed} | SIZE: " . strtoupper($size);
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = $sizeNote;
-    $lines[] = '';
+    // ══════════════════════════════════════════════════
+    // PHASE 3 — BREED-ACCURATE BIOLOGICAL TRANSFORMATION
+    // ══════════════════════════════════════════════════
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = "PHASE 3 ▶ BIOLOGICAL TRANSFORMATION: +{$targetYears} YEAR(S)";
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = '';
+    $L[] = "BREED: {$breed}";
+    $L[] = "SIZE CLASS: " . strtoupper($size);
+    $L[] = '';
+    $L[] = '── SIZE & GROWTH RULE ──────────────────────────────────';
+    $L[] = $sizeNote;
+    $L[] = '';
 
-    // Size-category growth guidance
-    switch ($size) {
-      case 'toy':
-      case 'small':
-        $lines[] = "SIZE RULE: {$breed} is a " . ($size === 'toy' ? 'TOY' : 'SMALL') . " breed.";
-        $lines[] = '  • Do NOT dramatically increase body size or leg length.';
-        $lines[] = '  • Growth is mostly in coat development, facial definition, and proportion refinement.';
-        $lines[] = '  • Adult weight will be similar to puppy weight — no "big dog" transformation.';
-        break;
-      case 'medium':
-        $lines[] = "SIZE RULE: {$breed} is a MEDIUM breed.";
-        $lines[] = '  • Moderate skeletal growth if currently a puppy — taller legs, deeper chest.';
-        $lines[] = '  • Do not over-scale. Changes should be natural and proportionate.';
-        break;
-      case 'large':
-        $lines[] = "SIZE RULE: {$breed} is a LARGE breed.";
-        $lines[] = '  • Significant skeletal development if currently a puppy.';
-        $lines[] = '  • Broader chest, longer legs, more muscular build.';
-        $lines[] = '  • Changes must look like natural canine development, not artificial scaling.';
-        break;
-      case 'giant':
-        $lines[] = "SIZE RULE: {$breed} is a GIANT breed.";
-        $lines[] = '  • Dramatic physical growth if currently a puppy — one of the most visually impactful changes.';
-        $lines[] = '  • Massive chest, very long legs, heavy bone density.';
-        $lines[] = '  • Still must look natural and proportionate — not a cartoon or exaggeration.';
-        break;
-    }
-
+    // Body shape special rules
     if ($bodyShape === 'long_low') {
-      $lines[] = '';
-      $lines[] = "BODY SHAPE RULE: {$breed} has a LONG-AND-LOW body shape.";
-      $lines[] = '  • This breed does NOT grow tall. Legs stay short.';
-      $lines[] = '  • Body grows longer and heavier, but height from ground stays minimal.';
-      $lines[] = '  • DO NOT increase leg length or make the dog taller.';
+      $L[] = '🔴 LONG-AND-LOW BREED RULE (critical):';
+      $L[] = "   {$breed} has genetically short legs (chondrodystrophy).";
+      $L[] = '   • Leg LENGTH must NEVER increase — legs stay very short.';
+      $L[] = '   • Body grows LONGER and HEAVIER, not TALLER.';
+      $L[] = '   • Height from ground stays minimal — this is not a build error.';
+      $L[] = '   • Do NOT make this dog look taller. Do NOT elongate legs.';
+      $L[] = '';
     } elseif ($bodyShape === 'sighthound') {
-      $lines[] = '';
-      $lines[] = "BODY SHAPE RULE: {$breed} has a SIGHTHOUND body shape.";
-      $lines[] = '  • Stays lean and slender — do NOT bulk up or add heavy muscle.';
-      $lines[] = '  • Prominent arched back, tucked waist, very long thin legs.';
+      $L[] = '🔴 SIGHTHOUND BREED RULE (critical):';
+      $L[] = "   {$breed} is built for speed, not bulk.";
+      $L[] = '   • DO NOT add heavy muscle or bulk.';
+      $L[] = '   • Adult body is slender, elegant, lean — like a racing athlete.';
+      $L[] = '   • Prominent arched back (roach back), very tucked waist, long thin legs.';
+      $L[] = '';
     } elseif ($bodyShape === 'stocky') {
-      $lines[] = '';
-      $lines[] = "BODY SHAPE RULE: {$breed} has a STOCKY body shape.";
-      $lines[] = '  • Grows wider, heavier, and more powerful — not necessarily taller.';
+      $L[] = '── STOCKY BREED: grows wider/heavier, not necessarily taller.';
+      $L[] = '';
     }
 
     if ($isBrachy) {
-      $lines[] = '';
-      $lines[] = "BRACHYCEPHALIC RULE: {$breed} has a flat, pushed-in face.";
-      $lines[] = '  • The flat face structure is a permanent breed characteristic — preserve it.';
-      $lines[] = '  • Aging adds definition to wrinkles/folds, not muzzle elongation.';
+      $L[] = '🔴 BRACHYCEPHALIC BREED RULE (critical):';
+      $L[] = "   {$breed} has a flat, shortened muzzle — this is permanent.";
+      $L[] = '   • DO NOT elongate the muzzle or nose.';
+      $L[] = '   • Flat face, pushed-in nose, prominent folds/wrinkles are permanent breed traits.';
+      $L[] = '   • Aging adds depth/definition to wrinkles, NOT muzzle length.';
+      $L[] = '';
     }
 
-    $lines[] = '';
+    // ── Coat rule (critical for breeds like Mudi, Pomeranian) ──────────
+    $L[] = '── COAT PRESERVATION RULE (🔴 critical — read carefully) ──';
+    $L[] = "   Current coat type for {$breed}: {$coat}";
+    $L[] = '';
+    switch ($coat) {
+      case 'curly/fluffy':
+        $L[] = '   This breed has a CURLY or FLUFFY coat.';
+        $L[] = '   • The curls/fluffiness MUST be preserved in the aged version.';
+        $L[] = '   • Aging makes the coat DENSER and MORE DEFINED — NOT straighter.';
+        $L[] = '   • Do NOT change curly coat to straight, wavy, or flat coat.';
+        $L[] = '   • The coat texture (curl pattern, puff shape) is a breed characteristic.';
+        break;
+      case 'double_coat':
+        $L[] = '   This breed has a DOUBLE COAT (dense undercoat + guard hairs).';
+        $L[] = '   • Aging makes the double coat THICKER and FULLER.';
+        $L[] = '   • Do NOT change the coat to single-layer, short, or flat.';
+        $L[] = '   • The coat becomes denser and more weather-resistant with age.';
+        break;
+      case 'long_silky':
+        $L[] = '   This breed has a LONG SILKY coat.';
+        $L[] = '   • Aging grows the coat LONGER and SILKIER.';
+        $L[] = '   • Do NOT make the coat shorter, curlier, or wiry.';
+        $L[] = '   • Feathering on ears, legs, belly, and tail becomes more pronounced.';
+        break;
+      case 'wire':
+        $L[] = '   This breed has a WIRE/HARSH coat.';
+        $L[] = '   • Aging makes the wiry texture MORE pronounced and DENSER.';
+        $L[] = '   • Do NOT soften or smooth the coat — it should look rough and bristly.';
+        $L[] = '   • Beard and eyebrow furnishings become more prominent.';
+        break;
+      case 'short':
+        $L[] = '   This breed has a SHORT coat.';
+        $L[] = '   • Aging makes the coat GLOSSIER, DENSER, and more defined.';
+        $L[] = '   • Do NOT grow the coat longer or add texture that is not there.';
+        break;
+      default:
+        $L[] = "   Preserve the existing coat texture and length accurately.";
+        break;
+    }
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 4 — TARGET AGE TRANSFORMATION
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = "STEP 4 ▸ AGE TARGET: +{$years} YEAR(S) FROM CURRENT AGE IN PHOTO";
-    $lines[] = '────────────────────────────────────────────';
-
-    if ($years === 1) {
-      $lines[] = 'TARGET: Show the dog as it would appear approximately 1 year older than it looks right now.';
-      $lines[] = '';
-      $lines[] = '  IF currently a puppy → transform to young adult:';
-      $lines[] = '    • Remove puppy softness: reduce rounded baby face, shrink proportionally oversized head';
-      $lines[] = '    • Define muzzle structure and adult facial bone structure';
-      $lines[] = '    • Develop adult coat (thicker, fuller, more textured)';
-      $lines[] = '    • Apply breed-appropriate skeletal growth (see size rules above)';
-      $lines[] = '    • Lean adolescent build — not yet fully muscled';
-      $lines[] = '    • Eyes become more defined and focused';
-      $lines[] = '';
-      $lines[] = '  IF currently a young adult → transition to mature adult:';
-      $lines[] = '    • Slightly more filled-out chest and shoulders';
-      $lines[] = '    • Coat reaches fuller adult density';
-      $lines[] = '    • Face gains slightly more defined structure';
-      $lines[] = '    • Subtle maturity in expression';
-      $lines[] = '';
-      $lines[] = '  IF currently a mature adult → subtle maturity:';
-      $lines[] = '    • Minor changes only — slightly more settled expression';
-      $lines[] = '    • Very subtle coat texture shifts if breed-appropriate';
-      $lines[] = '    • No dramatic changes';
-      $lines[] = '';
-      $lines[] = '  ADULT BODY TARGET:';
-      $lines[] = $adultBody;
-      $lines[] = '';
-      $lines[] = '  ADULT FACE TARGET:';
-      $lines[] = $adultFace;
-      $lines[] = '';
-      $lines[] = '  COAT AT 1 YEAR: ' . $this->coatChange1Year($coat);
-      $lines[] = '  GRAYING: NONE — this dog is young. No gray hairs anywhere.';
-      $lines[] = '  EXPRESSION: Energetic, alert, curious. Full of life.';
+    // ── Age-specific transformation ─────────────────────────────────────
+    if ($targetYears === 1) {
+      $L[] = '── TRANSFORMATION TARGET: +1 YEAR ─────────────────────────';
+      $L[] = '';
+      $L[] = 'Apply changes based on the detected current age:';
+      $L[] = '';
+      $L[] = '  IF puppy → apply MAJOR transformation to early young adult:';
+      $L[] = '    REMOVE: ';
+      $L[] = '      • Oversized round puppy head';
+      $L[] = '      • Disproportionately large paws';
+      $L[] = '      • Short stubby legs (if large/giant breed — elongate them)';
+      $L[] = '      • Round soft baby face, chubby cheeks';
+      $L[] = '      • Thin underdeveloped coat';
+      $L[] = '      • Round potbelly';
+      $L[] = '    ADD:';
+      $L[] = '      • Head proportionate to adult body';
+      $L[] = '      • Lean adolescent muscle definition (not yet fully built)';
+      $L[] = '      • Developing adult coat texture (' . $this->coatChange1Year($coat) . ')';
+      $L[] = '      • More angular, defined facial structure';
+      $L[] = '      • Proportionate paws and legs';
+      $L[] = '';
+      $L[] = '  IF teenager → apply MODERATE transformation to young adult:';
+      $L[] = '    • Reduce gangly proportions, fill out body slightly';
+      $L[] = '    • Erect ears if breed has them (fully upright now)';
+      $L[] = '    • Coat becomes more uniform and developed';
+      $L[] = '    • Face gains more adult definition';
+      $L[] = '';
+      $L[] = '  IF young_adult → apply SUBTLE transformation to full adult:';
+      $L[] = '    • Slightly more filled-out chest and shoulders';
+      $L[] = '    • Coat reaches full adult density';
+      $L[] = '    • Marginally more defined facial structure';
+      $L[] = '';
+      $L[] = '  IF adult or senior → apply MINIMAL changes:';
+      $L[] = '    • Very subtle settling of the body';
+      $L[] = '    • Slightly more mature expression';
+      $L[] = '    • If senior: slight additional gray on muzzle tip only';
+      $L[] = '';
+      $L[] = '── ADULT BODY TARGET ─────────────────────────────────────';
+      $L[] = $adultBody;
+      $L[] = '';
+      $L[] = '── ADULT FACE TARGET ─────────────────────────────────────';
+      $L[] = $adultFace;
+      $L[] = '';
+      $L[] = '── COAT AT 1 YEAR ────────────────────────────────────────';
+      $L[] = $this->coatChange1Year($coat);
+      $L[] = '';
+      $L[] = '── GRAYING ────────────────────────────────────────────────';
+      $L[] = 'NO gray hairs at this stage. This dog is young and vibrant.';
+      $L[] = '';
+      $L[] = '── EXPRESSION ─────────────────────────────────────────────';
+      $L[] = 'Energetic, alert, curious young adult. Bright eyes, full of life.';
     } else {
-      // 3 years
-      $lines[] = 'TARGET: Show the dog as it would appear approximately 3 years older than it looks right now.';
-      $lines[] = '';
-      $lines[] = '  IF currently a puppy → transform to fully mature adult:';
-      $lines[] = '    • Complete adult body — no puppy features remain';
-      $lines[] = '    • Full breed-characteristic skeletal structure';
-      $lines[] = '    • Peak muscle development appropriate to breed';
-      $lines[] = '    • Complete adult coat at its best condition';
-      $lines[] = '    • Strong, defined adult face';
-      $lines[] = '';
-      $lines[] = '  IF currently a young adult → fully mature peak adult:';
-      $lines[] = '    • Fully filled-out chest and shoulders';
-      $lines[] = '    • Maximum adult muscle definition for this breed';
-      $lines[] = '    • Full coat density and texture';
-      $lines[] = '    • Confident, settled mature expression';
-      $lines[] = '';
-      $lines[] = '  IF currently a mature adult → senior-approaching adult:';
-      $lines[] = '    • Slightly heavier or more settled body';
-      $lines[] = '    • Natural muzzle graying (breed-appropriate)';
-      $lines[] = '    • More dignified, calm expression';
-      $lines[] = '';
-      $lines[] = '  ADULT BODY TARGET:';
-      $lines[] = $adultBody;
-      $lines[] = '';
-      $lines[] = '  ADULT FACE TARGET:';
-      $lines[] = $adultFace;
-      $lines[] = '';
-      $lines[] = '  COAT AT 3 YEARS: ' . $this->coatChange3Years($coat);
-      $lines[] = '  GRAYING: ' . $this->grayChange3Years($profile);
-      $lines[] = '  EXPRESSION: Calm, confident, settled, mature dignity.';
+      // +3 years
+      $L[] = '── TRANSFORMATION TARGET: +3 YEARS ────────────────────────';
+      $L[] = '';
+      $L[] = 'Apply changes based on the detected current age:';
+      $L[] = '';
+      $L[] = '  IF puppy OR teenager → apply FULL transformation to prime adult:';
+      $L[] = '    • Complete adult body — absolutely no puppy/teen features remain';
+      $L[] = '    • Full breed-characteristic skeletal structure achieved';
+      $L[] = '    • Peak muscle development appropriate to breed';
+      $L[] = '    • Complete adult coat at maximum beauty (' . $this->coatChange3Years($coat) . ')';
+      $L[] = '    • Strong, confident, fully defined adult face';
+      $L[] = '';
+      $L[] = '  IF young_adult → apply MAJOR transformation to prime adult:';
+      $L[] = '    • Fully filled-out chest, shoulders, hindquarters';
+      $L[] = '    • Maximum breed muscle definition';
+      $L[] = '    • Full coat density and texture at peak';
+      $L[] = '    • Settled, confident mature expression';
+      $L[] = '';
+      $L[] = '  IF adult → apply MODERATE transformation toward mature adult:';
+      $L[] = '    • Slightly heavier/more settled body';
+      $L[] = '    • Natural muzzle graying begins: ' . $this->grayChange3Years($profile);
+      $L[] = '    • More dignified, calm expression';
+      $L[] = '';
+      $L[] = '  IF senior → apply MODERATE additional aging:';
+      $L[] = '    • More pronounced graying on muzzle, chin, eye area';
+      $L[] = '    • Slightly reduced muscle mass';
+      $L[] = '    • More gentle, wise expression';
+      $L[] = '';
+      $L[] = '── ADULT BODY TARGET ─────────────────────────────────────';
+      $L[] = $adultBody;
+      $L[] = '';
+      $L[] = '── ADULT FACE TARGET ─────────────────────────────────────';
+      $L[] = $adultFace;
+      $L[] = '';
+      $L[] = '── COAT AT 3 YEARS ────────────────────────────────────────';
+      $L[] = $this->coatChange3Years($coat);
+      $L[] = '';
+      $L[] = '── GRAYING ────────────────────────────────────────────────';
+      $L[] = $this->grayChange3Years($profile);
+      $L[] = '';
+      $L[] = '── EXPRESSION ─────────────────────────────────────────────';
+      $L[] = 'Calm, confident, settled, wise. The dignity of a dog in its prime.';
     }
 
-    $lines[] = '';
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 5 — BIOLOGICAL REALISM RULES
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'STEP 5 ▸ BIOLOGICAL REALISM REQUIREMENTS';
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = '  • Growth must follow real canine development curves — not artificial scaling';
-    $lines[] = '  • Fur direction must remain consistent with the original image';
-    $lines[] = '  • Preserve the lighting interaction with the fur (same light source, same shadow placement)';
-    $lines[] = '  • Natural weight distribution must be respected given the locked posture';
-    $lines[] = '  • Skin tension and natural muscle distribution must look real and proportionate';
-    $lines[] = '  • Colors must be preserved — coat color, eye color, nose color, markings';
-    $lines[] = '  • No artificial effects, filters, or stylization — this must look like a real photograph';
-    $lines[] = '';
+    // ── Biological realism rules ────────────────────────────────────────
+    $L[] = '── BIOLOGICAL REALISM (apply to all transformations) ──────────';
+    $L[] = '   • Growth follows real canine development — no artificial scaling or stretching';
+    $L[] = '   • Fur direction stays consistent with original photo';
+    $L[] = '   • Light falls on the coat the same way as in the original';
+    $L[] = '   • Shadow positions on the dog match the original';
+    $L[] = '   • Coat COLOR must be preserved — same hue, saturation, markings';
+    $L[] = '   • Eye color preserved exactly';
+    $L[] = '   • Nose color preserved exactly';
+    $L[] = '   • Any distinctive markings (spots, patches, saddle, mask) preserved';
+    $L[] = '   • Result must look like a REAL PHOTOGRAPH — no illustration/cartoon/art style';
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 6 — HEALTH MANDATE
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'STEP 6 ▸ HEALTH MANDATE — NON-NEGOTIABLE';
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'The dog MUST look:';
-    $lines[] = '  ✓ Healthy and well-fed (appropriate weight for breed)';
-    $lines[] = '  ✓ Clean and well-groomed';
-    $lines[] = '  ✓ Happy or calm — bright eyes, not sad or suffering';
-    $lines[] = '  ✓ This is a thriving, loved pet dog';
-    $lines[] = '';
-    $lines[] = 'The dog MUST NOT look:';
-    $lines[] = '  ✗ Sick, underweight, or lethargic';
-    $lines[] = '  ✗ Matted, dirty, or neglected';
-    $lines[] = '  ✗ Sad, frightened, or in pain';
-    $lines[] = '';
+    // ── Health mandate ──────────────────────────────────────────────────
+    $L[] = '── HEALTH MANDATE ─────────────────────────────────────────────';
+    $L[] = '   ✅ Dog looks: healthy, well-fed, clean, well-groomed, happy or calm';
+    $L[] = '   ❌ Dog must NOT look: sick, underweight, matted, sad, neglected, abused';
+    $L[] = '   This is a well-loved, thriving pet dog.';
+    $L[] = '';
 
-    // ══════════════════════════════════════════════════════════════════
-    // STEP 7 — FINAL VERIFICATION CHECKLIST
-    // ══════════════════════════════════════════════════════════════════
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'STEP 7 ▸ FINAL SELF-VERIFICATION BEFORE OUTPUT';
-    $lines[] = '────────────────────────────────────────────';
-    $lines[] = 'Before outputting the image, verify EVERY item:';
-    $lines[] = '';
-    $lines[] = '  POSTURE CHECK:';
-    $lines[] = '    □ All four leg/paw positions identical to input? YES';
-    $lines[] = '    □ Head angle and tilt identical to input? YES';
-    $lines[] = '    □ Body orientation identical to input? YES';
-    $lines[] = '    □ Ear and tail position identical to input? YES';
-    $lines[] = '';
-    $lines[] = '  ENVIRONMENT CHECK:';
-    $lines[] = '    □ Background identical to input (same room/outdoors/surface)? YES';
-    $lines[] = '    □ Camera angle and zoom identical? YES';
-    $lines[] = '    □ Lighting and shadows consistent? YES';
-    $lines[] = '    □ Nothing added or removed from scene? YES';
-    $lines[] = '';
-    $lines[] = '  AGING CHECK:';
-    $lines[] = "    □ Dog looks clearly +{$years} year(s) older than input? YES";
-    $lines[] = '    □ Changes are breed-accurate and biologically realistic? YES';
-    $lines[] = '    □ Dog looks healthy and well-groomed? YES';
-    $lines[] = '    □ Coat color and markings preserved? YES';
-    $lines[] = '';
-    $lines[] = 'If ANY item is NO — regenerate before outputting.';
-    $lines[] = '';
-    $lines[] = '════════════════════════════════════════════';
-    $lines[] = 'OUTPUT: The edited photograph — same dog, same pose, same scene, biologically older.';
-    $lines[] = '════════════════════════════════════════════';
+    // ══════════════════════════════════════════════════
+    // PHASE 4 — SELF-VERIFICATION CHECKLIST
+    // ══════════════════════════════════════════════════
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = 'PHASE 4 ▶ SELF-VERIFICATION (check ALL before outputting)';
+    $L[] = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    $L[] = '';
+    $L[] = 'POSE CHECK:';
+    $L[] = '  □ All four paw positions match the original exactly?';
+    $L[] = '  □ Body orientation (facing direction) unchanged?';
+    $L[] = '  □ Head angle (yaw, pitch, roll) unchanged?';
+    $L[] = '  □ Ear position unchanged?';
+    $L[] = '  □ Tail position unchanged?';
+    $L[] = '';
+    $L[] = 'SCENE CHECK:';
+    $L[] = '  □ Background looks exactly like the input?';
+    $L[] = '  □ Camera angle and zoom unchanged?';
+    $L[] = '  □ Lighting direction and shadows unchanged?';
+    $L[] = '  □ Nothing added or removed from scene?';
+    $L[] = '';
+    $L[] = 'AGING CHECK:';
+    $L[] = "  □ Dog clearly looks +{$targetYears} year(s) older?";
+    $L[] = '  □ Breed-specific body shape preserved (not a generic dog)?';
+    $L[] = '  □ Coat type preserved (' . $coat . ' — not changed to different texture)?';
+    $L[] = '  □ Coat color and markings preserved?';
+    $L[] = '  □ Dog looks healthy and well-groomed?';
+    $L[] = '';
+    $L[] = '⚠️  If ANY item is NO — you must fix it before outputting.';
+    $L[] = '';
+    $L[] = '╔══════════════════════════════════════════════════════╗';
+    $L[] = '║  OUTPUT: The edited photograph.                      ║';
+    $L[] = '║  Same dog. Same pose. Same scene. Biologically older.║';
+    $L[] = '╚══════════════════════════════════════════════════════╝';
 
-    return implode("\n", $lines);
+    return implode("\n", $L);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -579,23 +757,23 @@ class GenerateAgeSimulations implements ShouldQueue
   private function coatChange1Year(string $coat): string
   {
     return match ($coat) {
-      'curly/fluffy'  => 'Fuller, more settled adult coat — puppy fuzz replaced by characteristic adult plush double coat. Clean, well-groomed, fluffy.',
-      'double_coat'   => 'Adult double coat developing — thicker undercoat, denser guard hairs. Healthy, lush coat.',
-      'long_silky'    => 'Coat reaching adult length — silky, flowing, well-groomed. Slightly longer than puppy coat.',
-      'wire'          => 'Wiry adult texture defined — characteristic rough, dense texture of the breed. Tidy and well-kept.',
+      'curly/fluffy'  => 'Curls more defined and denser — puppy fuzz replaced by characteristic adult curly/fluffy double coat. COAT REMAINS CURLY/FLUFFY.',
+      'double_coat'   => 'Adult double coat developing — thicker undercoat, denser guard hairs forming. Healthy and lush.',
+      'long_silky'    => 'Coat growing toward adult length — silky, flowing, well-groomed. Longer than puppy coat.',
+      'wire'          => 'Wiry texture becoming defined — characteristic rough, dense, bristly texture of the breed. Beard and eyebrows more prominent.',
       'short'         => 'Short adult coat fully developed — smooth, glossy, healthy sheen. Dense and close-lying.',
-      default         => 'Adult coat fully developed — healthy, clean, well-groomed.',
+      default         => 'Adult coat developing — becoming healthier, denser, and more defined.',
     };
   }
 
   private function coatChange3Years(string $coat): string
   {
     return match ($coat) {
-      'curly/fluffy'  => 'Coat at full adult glory — dense, well-formed, plush at peak condition. Clean and well-groomed.',
-      'double_coat'   => 'Dense, full double coat at peak — rich in color and texture, thick undercoat and lustrous guard hairs.',
-      'long_silky'    => 'Coat at full adult length — flowing, silky, well-maintained. Beautiful and healthy.',
-      'wire'          => 'Wiry coat fully expressed — characteristic dense, rough texture of mature breed. Tidy.',
-      'short'         => 'Short coat glossy and healthy — fits the mature muscular body well. Dense and sleek.',
+      'curly/fluffy'  => 'Coat at full adult glory — dense, richly textured curls/fluff at peak condition. COAT REMAINS CURLY/FLUFFY. Well-groomed.',
+      'double_coat'   => 'Dense, full double coat at peak — rich color and texture, thick undercoat, lustrous guard hairs.',
+      'long_silky'    => 'Coat at full adult length — flowing, silky, beautiful and healthy. Feathering fully developed.',
+      'wire'          => 'Wiry coat fully expressed — characteristically rough and dense at its best. Beard and eyebrows very prominent.',
+      'short'         => 'Short coat glossy, dense, and sleek — fits the mature muscular body perfectly.',
       default         => 'Mature adult coat — full, healthy, clean, well-maintained.',
     };
   }
@@ -603,23 +781,23 @@ class GenerateAgeSimulations implements ShouldQueue
   private function grayChange3Years(array $profile): string
   {
     return match ($profile['gray_pattern'] ?? 'moderate') {
-      'none'      => 'No gray hairs — this breed does not gray noticeably at 3 years. Coat color remains vivid.',
-      'minimal'   => 'Possibly a very few light hairs on the muzzle tip — subtle and barely noticeable. Color otherwise unchanged.',
-      'moderate'  => 'Light dusting of gray/silver hairs on the muzzle tip and around the eyes — natural and distinguished. Base coat color fully preserved.',
-      'prominent' => 'Noticeable silver/gray hairs on muzzle, chin, and around the eyes — natural, handsome sign of maturity. Underlying coat color preserved.',
-      default     => 'Subtle, natural graying only on muzzle tip — breed-appropriate minimal graying.',
+      'none'      => 'No gray hairs — this breed does not gray noticeably at 3 years. Coat color stays vivid.',
+      'minimal'   => 'A few very light silver hairs on the muzzle tip only — barely noticeable. Everything else unchanged.',
+      'moderate'  => 'Light dusting of gray/silver on muzzle tip and faint around the eyes — natural and distinguished. Base coat color fully preserved.',
+      'prominent' => 'Noticeable silver/gray on muzzle, chin, and around the eyes — natural, handsome sign of maturity. Coat color otherwise preserved.',
+      default     => 'Subtle muzzle-tip graying only — very natural and minimal.',
     };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  BREED PROFILE DATABASE
+  //  BREED PROFILE DATABASE (comprehensive)
   // ─────────────────────────────────────────────────────────────────────────
 
   private function getBreedProfile(string $breed): array
   {
     $b = strtolower(trim($breed));
 
-    $profile = [
+    $default = [
       'breed'               => $breed,
       'size_category'       => 'medium',
       'body_shape'          => 'standard',
@@ -627,623 +805,700 @@ class GenerateAgeSimulations implements ShouldQueue
       'gray_pattern'        => 'moderate',
       'brachycephalic'      => false,
       'grows_significantly' => false,
-      'adult_body_note'     => 'Well-proportioned adult body, deeper chest, longer legs than puppy, healthy muscle development.',
+      'adult_body_note'     => 'Well-proportioned adult body. Deeper chest than puppy, longer legs, healthy muscle.',
       'adult_face_note'     => 'Defined adult muzzle, proportionate head, alert and healthy expression.',
-      'size_note'           => 'This breed grows into a well-proportioned adult dog. Expect moderate size increase from puppy.',
+      'size_note'           => 'Expect moderate size increase from puppy to adult.',
     ];
 
-    // ── TOY ──────────────────────────────────────────────────────────────
-    if ($this->mb($b, ['chihuahua'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'compact',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'size_note'           => 'Chihuahuas are tiny. Adult size is nearly identical to puppy — no dramatic size change.',
-        'adult_body_note'     => 'Compact, fine-boned tiny body. Short delicate legs. Weight 2–3 kg. Same tiny frame as puppy but proportions become slightly more defined.',
-        'adult_face_note'     => 'Large rounded apple-dome head (permanent breed trait). Large erect ears. Large expressive eyes. Face becomes slightly more refined but retains large-eyed round-headed look.',
-      ]);
-    } elseif ($this->mb($b, ['pomeranian'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'compact',
-        'coat_type' => 'curly/fluffy',
-        'grows_significantly' => false,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Pomeranians stay very small. No height increase.',
-        'adult_body_note'     => 'Tiny compact body hidden beneath a thick double coat. Weight 2–3.5 kg.',
-        'adult_face_note'     => 'Distinctive fox-like face with sharp pointed muzzle, alert eyes, small erect ears. Thick neck ruff develops.',
-      ]);
-    } elseif ($this->mb($b, ['yorkshire terrier', 'yorkie'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Yorkshire Terriers stay tiny — 2–3 kg. No size increase.',
-        'adult_body_note'     => 'Very small, fine-boned, compact body. Long silky coat reaches the floor in adults.',
-        'adult_face_note'     => 'Small flat face with medium-length muzzle. V-shaped erect ears. Classic steel blue and tan adult coloring develops.',
-      ]);
-    } elseif ($this->mb($b, ['maltese'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Maltese stay tiny. Pure white long silky coat develops fully.',
-        'adult_body_note'     => 'Tiny compact body completely covered in long, flowing pure white silky coat.',
-        'adult_face_note'     => 'Gentle, sweet face. Medium muzzle, dark eyes, drop ears hidden under long white hair.',
-      ]);
-    } elseif ($this->mb($b, ['papillon'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'size_note'           => 'Papillons stay small — 3–5 kg. Butterfly ears fully develop.',
-        'adult_body_note'     => 'Fine-boned, elegant tiny body with flowing coat.',
-        'adult_face_note'     => 'Large butterfly-shaped erect ears fringed with long hair — breed signature. Fine-boned elegant face.',
-      ]);
-    } elseif ($this->mb($b, ['miniature pinscher', 'min pin'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Min Pins stay small but develop a lean, muscular athletic build.',
-        'adult_body_note'     => 'Compact, muscular, athletic tiny body. High-stepping hackney gait. Very lean with defined muscle.',
-        'adult_face_note'     => 'Strong, narrow head. Erect ears. Alert, fearless expression.',
-      ]);
-    } elseif ($this->mb($b, ['italian greyhound'])) {
-      return array_merge($profile, [
-        'size_category'       => 'toy',
-        'body_shape' => 'sighthound',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'size_note'           => 'Italian Greyhounds stay slender and small. Sighthound shape becomes more defined.',
-        'adult_body_note'     => 'Extremely slender, elegant, arched back, deep narrow chest, tucked-up abdomen. Long thin legs.',
-        'adult_face_note'     => 'Long, narrow, fine head. Large doe eyes. Folded-back ears when relaxed.',
-      ]);
-
-      // ── SMALL ────────────────────────────────────────────────────────────
-    } elseif ($this->mb($b, ['corgi', 'pembroke', 'cardigan'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'long_low',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => false,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Corgis are a long-and-low breed. They DO NOT grow tall. Adult Corgis stay close to the ground with short legs.',
-        'adult_body_note'     => 'Long body, very short legs (dwarf breed), deep chest, muscular hindquarters. Body length much greater than height. Weight 10–14 kg.',
-        'adult_face_note'     => 'Fox-like face with large upright pointed ears (fully erect). Strong muzzle. Alert, intelligent expression.',
-      ]);
-    } elseif ($this->mb($b, ['dachshund', 'doxie', 'sausage', 'wiener'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'long_low',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'size_note'           => 'Dachshunds are extremely long and very low. They DO NOT grow tall — legs stay very short.',
-        'adult_body_note'     => 'Extremely elongated body, very short stubby legs, deep keel chest. Iconic sausage dog silhouette.',
-        'adult_face_note'     => 'Long tapered muzzle. Long floppy ears. Strong jaw. Confident, alert expression.',
-      ]);
-    } elseif ($this->mb($b, ['beagle'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Beagles grow moderately — some height and width but stays compact.',
-        'adult_body_note'     => 'Solid, muscular, compact body. Deep chest, strong back, sturdy legs. Weight 9–11 kg.',
-        'adult_face_note'     => 'Classic hound face — long square muzzle, long floppy ears, large brown eyes, gentle expression.',
-      ]);
-    } elseif ($this->mb($b, ['french bulldog'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'brachycephalic' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'French Bulldogs stay small and stocky. They get heavier and more muscular but not taller.',
-        'adult_body_note'     => 'Heavy, muscular, compact. Very wide shoulders and chest, narrow hindquarters. Weight 9–13 kg.',
-        'adult_face_note'     => 'Flat face with deep wrinkles/folds. Massive square head. Bat-like erect ears — breed signature. Very short pushed-in nose.',
-      ]);
-    } elseif ($this->mb($b, ['pug'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'brachycephalic' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Pugs stay small and round. They may get heavier but not taller.',
-        'adult_body_note'     => 'Cobby, round, compact. Heavy for size. Deep chest, wide body. Weight 6–9 kg.',
-        'adult_face_note'     => 'Massive round head, very flat face, deep wrinkles, bulging eyes, very short nose. Curly tail.',
-      ]);
-    } elseif ($this->mb($b, ['boston terrier'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'brachycephalic' => true,
-        'size_note'           => 'Boston Terriers stay small and square. Weight 5–11 kg.',
-        'adult_body_note'     => 'Square, compact, muscular. Deep chest, short back.',
-        'adult_face_note'     => 'Square flat face, large round eyes, erect ears. Tuxedo pattern well-defined.',
-      ]);
-    } elseif ($this->mb($b, ['shih tzu'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'brachycephalic' => true,
-        'size_note'           => 'Shih Tzus stay small and compact. Long flowing coat develops fully.',
-        'adult_body_note'     => 'Compact, sturdy, slightly longer than tall. Weight 4–8 kg. Covered in long flowing double coat.',
-        'adult_face_note'     => 'Sweet flat face with long flowing facial hair. Large dark eyes, broad muzzle. Topknot of hair.',
-      ]);
-    } elseif ($this->mb($b, ['bichon frise', 'bichon'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'compact',
-        'coat_type' => 'curly/fluffy',
-        'grows_significantly' => false,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Bichon Frises stay small with a puffy white rounded coat.',
-        'adult_body_note'     => 'Small compact body covered in dense, curly, white coat trimmed into a rounded shape.',
-        'adult_face_note'     => 'Round powder-puff face. Dark round eyes, black nose, surrounded by fluffy white coat.',
-      ]);
-    } elseif ($this->mb($b, ['cavalier king charles', 'cavalier'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'size_note'           => 'Cavaliers stay small and elegant. Weight 5–8 kg.',
-        'adult_body_note'     => 'Small, elegant, graceful body with flowing silky coat on ears, chest, legs, and tail.',
-        'adult_face_note'     => 'Gentle, mournful large dark eyes. Long floppy silky ears. Sweet melting expression.',
-      ]);
-    } elseif ($this->mb($b, ['cocker spaniel', 'english cocker', 'american cocker'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'size_note'           => 'Cocker Spaniels grow moderately. Heavy feathering develops on ears, legs, and belly.',
-        'adult_body_note'     => 'Compact, sturdy with well-developed chest. Heavy silky feathering on ears, chest, legs.',
-        'adult_face_note'     => 'Broad, well-rounded head. Long, low-set, heavily feathered ears. Large, round, expressive eyes.',
-      ]);
-    } elseif ($this->mb($b, ['shiba inu', 'shiba'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'compact',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Shiba Inus grow into compact, fox-like small dogs. Moderate size increase.',
-        'adult_body_note'     => 'Compact, well-muscled, agile. Thick double coat. Curled tail. Weight 8–11 kg.',
-        'adult_face_note'     => 'Fox-like face — triangular head, small erect triangular ears, small squinting eyes. Cream/white markings.',
-      ]);
-    } elseif ($this->mb($b, ['miniature schnauzer'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'square',
-        'coat_type' => 'wire',
-        'grows_significantly' => false,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Miniature Schnauzers stay small and square. Distinctive beard and eyebrows develop.',
-        'adult_body_note'     => 'Square build — height equals length. Compact, muscular, wiry-coated.',
-        'adult_face_note'     => 'Rectangular strong head. Signature long bushy eyebrows and thick beard. V-shaped ears.',
-      ]);
-    } elseif ($this->mb($b, ['jack russell', 'jack russel', 'parson russell'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'athletic',
-        'coat_type' => 'wire',
-        'grows_significantly' => false,
-        'size_note'           => 'Jack Russells stay small but very muscular and athletic.',
-        'adult_body_note'     => 'Small, tough, compact, athletic. Weight 5–8 kg. Lean muscle.',
-        'adult_face_note'     => 'Flat skull, strong muzzle. V-shaped drop ears or button ears. Alert, feisty expression.',
-      ]);
-    } elseif ($this->mb($b, ['scottish terrier', 'scotty', 'westie', 'west highland'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'stocky',
-        'coat_type' => 'wire',
-        'grows_significantly' => false,
-        'size_note'           => 'Scottish/West Highland Terriers stay small and low-slung. Wiry coat becomes very defined.',
-        'adult_body_note'     => 'Compact, low-slung, very sturdy. Short legs, barrel chest, thick wiry coat.',
-        'adult_face_note'     => 'Wedge-shaped head with beard and prominent eyebrows. Erect pointed ears. Determined expression.',
-      ]);
-    } elseif ($this->mb($b, ['havanese'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'compact',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Havanese stay small with a long, silky, flowing coat.',
-        'adult_body_note'     => 'Small, sturdy body covered in long, silky, slightly wavy coat.',
-        'adult_face_note'     => 'Broad, rounded head, large almond eyes, drop ears with long silky hair.',
-      ]);
-    } elseif ($this->mb($b, ['lhasa apso'])) {
-      return array_merge($profile, [
-        'size_category'       => 'small',
-        'body_shape' => 'long_low',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => false,
-        'size_note'           => 'Lhasa Apsos stay small. Long heavy coat reaching the floor develops fully.',
-        'adult_body_note'     => 'Longer than tall, sturdy body beneath a heavy, long, flowing coat.',
-        'adult_face_note'     => 'Heavy floor-length coat falls over the face. Strong muzzle, dark eyes. Dignified expression.',
-      ]);
-
-      // ── MEDIUM ───────────────────────────────────────────────────────────
-    } elseif ($this->mb($b, ['border collie'])) {
-      return array_merge($profile, [
+    // ── MUDI (special case — curly medium herding dog) ────────────────
+    if ($this->mb($b, ['mudi'])) {
+      return array_merge($default, [
         'size_category'       => 'medium',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
+        'body_shape'          => 'athletic',
+        'coat_type'           => 'curly/fluffy',
         'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Border Collies grow into a lean, athletic medium-sized dog. Noticeably taller and longer than puppy.',
-        'adult_body_note'     => 'Athletic, lithe, graceful. Lean muscle, not bulky. Well-proportioned agile frame. Weight 14–20 kg.',
-        'adult_face_note'     => 'Intelligent, intense expression — breed signature. Medium muzzle, semi-erect forward-tipping ears. Alert, focused eyes.',
-      ]);
-    } elseif ($this->mb($b, ['australian shepherd', 'aussie'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Australian Shepherds grow into a well-muscled medium dog.',
-        'adult_body_note'     => 'Medium, muscular, agile, slightly longer than tall. Strong bone, well-developed chest.',
-        'adult_face_note'     => 'Balanced head, medium muzzle. Striking eye colors (blue, amber, or brown). Semi-erect or rose ears.',
-      ]);
-    } elseif ($this->mb($b, ['bulldog', 'english bulldog'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => false,
-        'brachycephalic' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Bulldogs get heavier and more wrinkled but not taller. Wide and low to ground.',
-        'adult_body_note'     => 'Extremely wide, heavy, low-slung. Massive chest, short bowed legs, wide shoulders. Weight 22–25 kg.',
-        'adult_face_note'     => 'Massive wrinkled face with deep skin folds, flat nose, pronounced underbite, huge jowls.',
-      ]);
-    } elseif ($this->mb($b, ['chow chow'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'brachycephalic' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Chow Chows grow into a large, lion-maned, dignified dog.',
-        'adult_body_note'     => 'Large, powerful, compact, square body. Distinctive stilted gait. Lion mane of fur around neck. Weight 20–32 kg.',
-        'adult_face_note'     => 'Broad, massive head. Scowling dignified expression. Blue-black tongue. Heavy lion-like mane.',
-      ]);
-    } elseif ($this->mb($b, ['shar pei'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'brachycephalic' => true,
-        'size_note'           => 'Shar Peis grow moderately. Wrinkles become tighter and more defined as they grow.',
-        'adult_body_note'     => 'Medium, compact, square. Weight 18–25 kg. Wrinkles concentrated on head and shoulders.',
-        'adult_face_note'     => 'Broad hippopotamus-like muzzle. Small sunken eyes, small folded ears. Blue-black tongue.',
-      ]);
-    } elseif ($this->mb($b, ['whippet'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'sighthound',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'size_note'           => 'Whippets grow into a slender, elegant sighthound.',
-        'adult_body_note'     => 'Slender sighthound — prominent arched back, very deep narrow chest, extremely tucked waist, long thin legs. Weight 11–20 kg.',
-        'adult_face_note'     => 'Long, fine, lean head. Rose-shaped small ears. Alert, gentle expression.',
-      ]);
-    } elseif ($this->mb($b, ['dalmatian'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Dalmatians grow into a large, lean, muscular, spotted dog.',
-        'adult_body_note'     => 'Large, lean, muscular, elegant. Long legs, deep chest. Weight 23–27 kg. Spots fully developed.',
-        'adult_face_note'     => 'Long, strong, clean-cut head. Alert eyes, moderately large drop ears. Athletic, distinguished look.',
-      ]);
-    } elseif ($this->mb($b, ['standard poodle'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'curly/fluffy',
-        'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Standard Poodles grow into elegant, tall, curly-coated dogs.',
-        'adult_body_note'     => 'Elegant, well-proportioned, athletic. Squarely built, long neck, deep chest. Weight 20–32 kg.',
-        'adult_face_note'     => 'Long, straight, fine muzzle. Almond eyes, long flat ears. Refined, intelligent expression.',
-      ]);
-    } elseif ($this->mb($b, ['schnauzer', 'standard schnauzer'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'square',
-        'coat_type' => 'wire',
-        'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Standard Schnauzers grow into square, wiry-coated medium dogs.',
-        'adult_body_note'     => 'Square build, strong, compact. Wiry coat. Distinctive beard and eyebrows. Weight 14–20 kg.',
-        'adult_face_note'     => 'Rectangular head. Prominent bushy eyebrows and thick beard — breed signature.',
-      ]);
-    } elseif ($this->mb($b, ['airedale'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'athletic',
-        'coat_type' => 'wire',
-        'grows_significantly' => true,
-        'size_note'           => 'Airedales are the largest terrier — grow into athletic, wiry-coated medium dogs.',
-        'adult_body_note'     => 'Well-balanced, athletic medium body. Dense, hard, wiry black and tan coat. Weight 18–29 kg.',
-        'adult_face_note'     => 'Long, flat skull. Small V-shaped drop ears. Wiry beard. Alert, intelligent expression.',
-      ]);
-
-      // ── LARGE ────────────────────────────────────────────────────────────
-    } elseif ($this->mb($b, ['labrador', 'lab'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Labradors grow dramatically from puppy to adult — much taller, heavier, and broader.',
-        'adult_body_note'     => 'Broad, powerful, strongly built. Wide head, deep chest, strong neck, thick otter tail. Weight 25–36 kg.',
-        'adult_face_note'     => 'Broad, clean-cut head. Wide, powerful muzzle. Kind, intelligent eyes. Drop ears.',
-      ]);
-    } elseif ($this->mb($b, ['golden retriever'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'long_silky',
-        'grows_significantly' => true,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Golden Retrievers grow into large, beautiful, feathered dogs. Clear height and bulk increase.',
-        'adult_body_note'     => 'Large, well-balanced, powerful with flowing golden coat. Deep chest, strong neck, feathering on legs, belly, tail. Weight 25–34 kg.',
-        'adult_face_note'     => 'Broad, slightly arched skull. Gentle, intelligent expression. Drop ears, golden coat framing face.',
-      ]);
-    } elseif ($this->mb($b, ['german shepherd', 'alsatian'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'German Shepherds grow dramatically — much taller, broader chest, strong angular body.',
-        'adult_body_note'     => 'Strong, agile, muscular. Slightly longer than tall, deep chest, characteristic sloping back. Bushy tail. Weight 22–40 kg.',
-        'adult_face_note'     => 'Strong wedge-shaped head. Fully erect pointed ears — breed signature. Alert, intelligent expression. Strong muzzle.',
-      ]);
-    } elseif ($this->mb($b, ['rottweiler'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Rottweilers grow into powerful, massive dogs. Very dramatic size increase.',
-        'adult_body_note'     => 'Massive, powerful, compact. Heavy bone, deep broad chest, well-muscled. Weight 35–60 kg. Black and tan markings fully defined.',
-        'adult_face_note'     => 'Broad, powerful head. Strong wide muzzle. Drop ears. Calm, confident expression.',
-      ]);
-    } elseif ($this->mb($b, ['doberman', 'dobermann'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Dobermans grow into sleek, powerful, elegant large dogs.',
-        'adult_body_note'     => 'Compact, muscular, elegant. Square build, deep chest, well-arched neck. Weight 32–45 kg.',
-        'adult_face_note'     => 'Long, wedge-shaped head. Erect ears. Alert, intelligent, proud expression.',
-      ]);
-    } elseif ($this->mb($b, ['boxer'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'brachycephalic' => true,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Boxers grow into muscular, powerful dogs with a distinctive square head.',
-        'adult_body_note'     => 'Powerful, medium-large, square body. Well-muscled, deep chest, short back. Weight 25–32 kg.',
-        'adult_face_note'     => 'Broad, blunt, squarish muzzle. Strong underjaw. Wrinkled forehead. Energetic, alert expression.',
-      ]);
-    } elseif ($this->mb($b, ['siberian husky', 'husky'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Huskies grow into medium-large dogs with a dense, lush double coat.',
-        'adult_body_note'     => 'Medium-large, athletic, well-muscled. Thick double coat, bushy tail. Weight 16–27 kg.',
-        'adult_face_note'     => 'Finely chiseled head. Almond eyes (blue, brown, or heterochromatic). Erect ears. Striking facial markings.',
-      ]);
-    } elseif ($this->mb($b, ['alaskan malamute', 'malamute'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'size_note'           => 'Malamutes grow into very large, heavy, powerful sled dogs.',
-        'adult_body_note'     => 'Large, powerful, heavy-boned. Deep chest, strong shoulders, heavy coat. Weight 34–43 kg.',
-        'adult_face_note'     => 'Broad, powerful head. Brown almond eyes (never blue). Erect ears. Friendly, dignified expression.',
-      ]);
-    } elseif ($this->mb($b, ['weimaraner'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Weimaraners grow into sleek, elegant, gray-coated large dogs.',
-        'adult_body_note'     => 'Large, athletic, elegant. Sleek silver-gray coat. Deep chest. Weight 23–32 kg.',
-        'adult_face_note'     => 'Moderately long head. Amber or blue-gray eyes. Long drop ears. Aristocratic expression.',
-      ]);
-    } elseif ($this->mb($b, ['vizsla'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'size_note'           => 'Vizslas grow into lean, elegant, golden-rust hunting dogs.',
-        'adult_body_note'     => 'Lean, elegant, well-muscled. Golden-rust short coat. Deep chest. Weight 20–29 kg.',
-        'adult_face_note'     => 'Lean, aristocratic head. Warm golden-brown eyes. Broad drop ears. Distinguished, gentle expression.',
-      ]);
-    } elseif ($this->mb($b, ['akita'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'minimal',
-        'size_note'           => 'Akitas grow into very large, powerful, bear-like dogs.',
-        'adult_body_note'     => 'Large, powerful, heavy-boned. Deep broad chest, thick neck, curled tail. Weight 32–59 kg.',
-        'adult_face_note'     => 'Broad, massive bear-like head. Small triangular erect ears. Deep-set triangular eyes. Powerful muzzle. Dignified expression.',
-      ]);
-    } elseif ($this->mb($b, ['samoyed'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Samoyeds grow into medium-large dogs covered in a spectacular white double coat.',
-        'adult_body_note'     => 'Medium-large, well-proportioned under a thick white double coat. Weight 16–30 kg.',
-        'adult_face_note'     => 'Wedge-shaped head. Distinctive "Samoyed smile" — upturned mouth corners. Erect ears. Full white mane.',
-      ]);
-    } elseif ($this->mb($b, ['giant schnauzer'])) {
-      return array_merge($profile, [
-        'size_category'       => 'large',
-        'body_shape' => 'square',
-        'coat_type' => 'wire',
-        'grows_significantly' => true,
-        'gray_pattern' => 'prominent',
-        'size_note'           => 'Giant Schnauzers grow into powerful large dogs.',
-        'adult_body_note'     => 'Large, powerful, compact, square. Dense wiry coat. Weight 25–48 kg.',
-        'adult_face_note'     => 'Powerful rectangular head. Very prominent bushy eyebrows and thick beard. Bold expression.',
-      ]);
-
-      // ── GIANT ────────────────────────────────────────────────────────────
-    } elseif ($this->mb($b, ['great dane'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'Great Danes are the tallest dog breed. Growth from puppy to adult is EXTREME. At 1 year: very tall, long-legged adolescent. At 3 years: one of the largest dogs on Earth.',
-        'adult_body_note'     => 'Enormous, powerful, elegant. Very long legs, deep massive chest, well-arched neck. Weight 50–90 kg. Stands 71–86 cm at shoulder.',
-        'adult_face_note'     => 'Large, rectangular, expressive head. Strong muzzle, drop or cropped erect ears. Gentle, noble expression despite massive size.',
-      ]);
-    } elseif ($this->mb($b, ['saint bernard'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'size_note'           => 'Saint Bernards grow into enormous, massive dogs. One of the heaviest breeds.',
-        'adult_body_note'     => 'Enormous, very heavy, powerful. Deep wide chest, massive bone, thick coat. Weight 64–120 kg. Jowly.',
-        'adult_face_note'     => 'Massive broad head. Deep wrinkles, hanging jowls and lips. Kind, soulful eyes. Drop ears.',
-      ]);
-    } elseif ($this->mb($b, ['newfoundland', 'newfy'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'size_note'           => 'Newfoundlands grow into massive, bear-like water dogs.',
-        'adult_body_note'     => 'Massive, heavy-boned, muscular. Thick water-resistant double coat. Weight 54–68 kg.',
-        'adult_face_note'     => 'Broad, massive head. Soft, dark eyes. Small drop ears. Gentle, sweet expression.',
-      ]);
-    } elseif ($this->mb($b, ['irish wolfhound'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'sighthound',
-        'coat_type' => 'wire',
-        'grows_significantly' => true,
-        'size_note'           => 'Irish Wolfhounds grow into one of the tallest dogs in the world. Very dramatic growth.',
-        'adult_body_note'     => 'Enormous, long, lean, muscular sighthound. Very long legs, arched back, deep chest. Rough wiry coat. Weight 48–69 kg.',
-        'adult_face_note'     => 'Long, narrow head. Small folded ears. Gentle, calm expression. Rough wiry beard.',
-      ]);
-    } elseif ($this->mb($b, ['bernese mountain dog', 'bernese', 'berner'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'size_note'           => 'Bernese Mountain Dogs grow into large, heavy, tri-colored mountain dogs.',
-        'adult_body_note'     => 'Large, heavy, sturdy. Broad chest, strong legs. Long thick silky tricolor coat (black, white, rust). Weight 36–55 kg.',
-        'adult_face_note'     => 'Broad, flat skull. Tricolor face markings well-defined. Drop ears, dark brown eyes. Calm, gentle expression.',
-      ]);
-    } elseif ($this->mb($b, ['great pyrenees', 'pyrenean mountain'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'stocky',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'gray_pattern' => 'none',
-        'size_note'           => 'Great Pyrenees grow into massive, majestic white mountain dogs.',
-        'adult_body_note'     => 'Massive, well-balanced covered in thick white weather-resistant double coat. Weight 45–54+ kg.',
-        'adult_face_note'     => 'Large, wedge-shaped head. Dark brown eyes with black eye rims. V-shaped drop ears. Regal, calm expression.',
-      ]);
-    } elseif ($this->mb($b, ['mastiff', 'english mastiff'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'stocky',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'brachycephalic' => true,
-        'gray_pattern' => 'moderate',
-        'size_note'           => 'English Mastiffs are among the heaviest breeds. Growth is extreme — adult males can exceed 100 kg.',
-        'adult_body_note'     => 'Enormous, massive, heavy. Very broad deep chest. Weight 54–100+ kg. Jowly, wrinkled.',
-        'adult_face_note'     => 'Broad, wrinkled, massive head. Deep muzzle, black mask. Drop ears. Dignified, calm expression. Heavy jowls.',
-      ]);
-    } elseif ($this->mb($b, ['leonberger'])) {
-      return array_merge($profile, [
-        'size_category'       => 'giant',
-        'body_shape' => 'athletic',
-        'coat_type' => 'double_coat',
-        'grows_significantly' => true,
-        'size_note'           => 'Leonbergers grow into giant, lion-maned, majestic dogs.',
-        'adult_body_note'     => 'Giant, muscular, well-proportioned. Thick lion-like mane around neck. Weight 41–75 kg.',
-        'adult_face_note'     => 'Elongated lion-like face. Black mask, medium-length muzzle. Drop ears. Gentle, friendly expression.',
-      ]);
-
-      // ── MIXED / UNKNOWN ──────────────────────────────────────────────────
-    } elseif ($this->mb($b, ['aspin', 'askal', 'philippine', 'mixed', 'mongrel', 'mutt', 'crossbreed'])) {
-      return array_merge($profile, [
-        'size_category'       => 'medium',
-        'body_shape' => 'athletic',
-        'coat_type' => 'short',
-        'grows_significantly' => true,
-        'size_note'           => 'Mixed breed dogs vary. Expect moderate to significant growth into a lean, athletic adult.',
-        'adult_body_note'     => 'Lean, athletic, well-proportioned medium body. Short easy-care coat. Weight 10–25 kg depending on parentage.',
-        'adult_face_note'     => 'Defined adult muzzle and facial structure. Alert, intelligent expression.',
+        'gray_pattern'        => 'moderate',
+        'size_note'           => 'Mudis grow into medium-sized athletic herding dogs. Moderate size increase from puppy.',
+        'adult_body_note'     => 'Medium, muscular, athletic body. Well-proportioned, agile build. Weight 8–13 kg. Slightly longer than tall. Strong hindquarters for herding.',
+        'adult_face_note'     => 'Wedge-shaped head, slightly domed skull. Erect, pointed ears (fully upright in adults). Almond-shaped eyes. Defined, intelligent expression. Medium-length muzzle.',
       ]);
     }
 
-    // ── FALLBACK for any unrecognized breed ──────────────────────────────
-    return $profile;
+    // ── TOY BREEDS ────────────────────────────────────────────────────
+    if ($this->mb($b, ['chihuahua'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'compact',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'size_note' => 'Chihuahuas are one of the smallest breeds — adult is nearly the same size as puppy. No dramatic size change.',
+        'adult_body_note' => 'Compact, fine-boned tiny body. Delicate legs. Weight 1.5–3 kg. Same tiny frame as puppy but more defined proportions.',
+        'adult_face_note' => 'Large rounded apple-dome skull (permanent trait). Large, fully erect ears. Large, round, luminous eyes. Face becomes slightly more refined but stays delicate.',
+      ]);
+    }
+    if ($this->mb($b, ['pomeranian'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'compact',
+        'coat_type' => 'curly/fluffy',
+        'grows_significantly' => false,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Pomeranians stay very small (1.8–3.5 kg). The characteristic rounded puff-ball shape develops more fully. NO height increase.',
+        'adult_body_note' => 'Tiny compact body completely hidden beneath a massive, rounded, double coat. Body is compact and square. The thick fluffy coat is the breed\'s signature — it must stay rounded and puffed.',
+        'adult_face_note' => 'Distinctive fox-like face with sharp, pointed muzzle emerging from the coat ruff. Small, erect, triangular ears at top of head. Small, bright, almond eyes. Thick lion-like mane around the neck.',
+      ]);
+    }
+    if ($this->mb($b, ['yorkshire terrier', 'yorkie'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Yorkshire Terriers stay tiny — 2–3 kg. Long silky coat develops fully.',
+        'adult_body_note' => 'Very small, fine-boned, compact body hidden under long, silky, floor-length coat.',
+        'adult_face_note' => 'Small flat face with medium-length muzzle. V-shaped, fully erect ears. Classic steel-blue and tan coloring becomes more defined.',
+      ]);
+    }
+    if ($this->mb($b, ['maltese'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'gray_pattern' => 'none',
+        'size_note' => 'Maltese stay tiny. Pure white long silky coat develops fully and dramatically.',
+        'adult_body_note' => 'Tiny compact body completely covered in long, flowing, pure white silky coat.',
+        'adult_face_note' => 'Gentle, sweet face. Medium-length muzzle, large dark eyes, drop ears hidden under long white silky hair.',
+      ]);
+    }
+    if ($this->mb($b, ['papillon'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'size_note' => 'Papillons stay small — 3–5 kg. Signature butterfly ears grow very large and prominent.',
+        'adult_body_note' => 'Fine-boned, elegant tiny body with flowing coat.',
+        'adult_face_note' => 'SIGNATURE: Large butterfly-shaped ears, fully erect, heavily fringed with long hair — most distinctive feature of the breed.',
+      ]);
+    }
+    if ($this->mb($b, ['italian greyhound'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'sighthound',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'size_note' => 'Italian Greyhounds stay small. Their sighthound shape becomes more defined.',
+        'adult_body_note' => 'Extremely slender, elegant sighthound. Arched back, very deep narrow chest, tucked-up abdomen, long thin legs. Graceful.',
+        'adult_face_note' => 'Long, narrow, fine head. Large doe eyes. Folded-back ears when relaxed.',
+      ]);
+    }
+    if ($this->mb($b, ['miniature pinscher', 'min pin'])) {
+      return array_merge($default, [
+        'size_category' => 'toy',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Min Pins stay small but develop a lean, muscular, athletic build.',
+        'adult_body_note' => 'Compact, muscular, athletic tiny body. High-stepping hackney gait. Very lean with defined muscle.',
+        'adult_face_note' => 'Strong, narrow head. Fully erect ears. Alert, fearless, bold expression.',
+      ]);
+    }
+
+    // ── SMALL BREEDS ──────────────────────────────────────────────────
+    if ($this->mb($b, ['corgi', 'pembroke', 'cardigan'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'long_low',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => false,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Corgis are a long-and-low breed. THEY DO NOT GROW TALL. Short legs are a genetic trait (chondrodystrophy). Body gets more muscular and defined but stays low to ground.',
+        'adult_body_note' => 'Long body, very short legs, deep chest, muscular hindquarters. Body length is much greater than height. Weight 10–14 kg. Always stays low to ground.',
+        'adult_face_note' => 'Fox-like face. Large upright pointed ears — fully erect and prominent in adults. Strong muzzle. Alert, intelligent, foxy expression.',
+      ]);
+    }
+    if ($this->mb($b, ['dachshund', 'doxie', 'sausage', 'wiener'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'long_low',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'size_note' => 'Dachshunds have extremely elongated bodies and very short legs. LEGS DO NOT GROW TALLER. Body grows longer and heavier.',
+        'adult_body_note' => 'Extremely elongated body, very short stubby legs, deep keel-shaped chest. The iconic sausage dog silhouette. Weight 7–14 kg (standard).',
+        'adult_face_note' => 'Long, tapered muzzle fully developed. Long, floppy ears. Strong jaw. Confident, alert expression.',
+      ]);
+    }
+    if ($this->mb($b, ['beagle'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Beagles grow moderately into a compact, sturdy hound.',
+        'adult_body_note' => 'Solid, muscular, compact body. Deep chest, strong back, sturdy legs. Weight 9–11 kg.',
+        'adult_face_note' => 'Classic hound face — long square muzzle, long floppy ears, large brown eyes, gentle expression.',
+      ]);
+    }
+    if ($this->mb($b, ['french bulldog'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'brachycephalic' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'French Bulldogs stay small and stocky. They get heavier and more muscular but NOT taller.',
+        'adult_body_note' => 'Heavy, muscular, compact. Very wide shoulders and chest, narrow hindquarters. Short stocky legs. Weight 9–13 kg.',
+        'adult_face_note' => 'Flat face with deep wrinkles/folds. Massive square head. Bat-like erect ears — breed signature. Very short pushed-in nose. Heavy jowls.',
+      ]);
+    }
+    if ($this->mb($b, ['pug'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'brachycephalic' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Pugs stay small and round. They may get heavier and rounder but NOT taller.',
+        'adult_body_note' => 'Cobby, round, compact. Heavy for size. Wide body, deep chest. Weight 6–9 kg. Tightly curled tail.',
+        'adult_face_note' => 'Massive round head, very flat face, deep wrinkles, large bulging eyes, very short nose, heavy jowls.',
+      ]);
+    }
+    if ($this->mb($b, ['boston terrier'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'brachycephalic' => true,
+        'size_note' => 'Boston Terriers stay small and square. Weight 5–11 kg.',
+        'adult_body_note' => 'Square, compact, muscular body. Deep chest, short back.',
+        'adult_face_note' => 'Square flat face, large round eyes, erect ears. Tuxedo coat pattern (black and white) well-defined.',
+      ]);
+    }
+    if ($this->mb($b, ['shih tzu'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'brachycephalic' => true,
+        'size_note' => 'Shih Tzus stay small and compact. Long flowing coat develops fully.',
+        'adult_body_note' => 'Compact, sturdy, slightly longer than tall. Weight 4–8 kg. Covered in long flowing double coat.',
+        'adult_face_note' => 'Sweet flat face with long flowing facial hair. Large dark eyes, broad muzzle. Distinctive topknot.',
+      ]);
+    }
+    if ($this->mb($b, ['bichon frise', 'bichon'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'compact',
+        'coat_type' => 'curly/fluffy',
+        'grows_significantly' => false,
+        'gray_pattern' => 'none',
+        'size_note' => 'Bichon Frises stay small with a distinctive puffed-round white coat.',
+        'adult_body_note' => 'Small compact body covered in dense, curly, white coat trimmed into a perfect sphere/round shape.',
+        'adult_face_note' => 'Round, powder-puff face. Dark round eyes, black nose, surrounded by fluffy white rounded coat.',
+      ]);
+    }
+    if ($this->mb($b, ['cavalier king charles', 'cavalier'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'size_note' => 'Cavaliers stay small and elegant. Weight 5–8 kg.',
+        'adult_body_note' => 'Small, elegant, graceful body with flowing silky coat on ears, chest, legs, and tail.',
+        'adult_face_note' => 'Gentle, melting expression. Large, round, dark eyes. Long, silky, flowing ears. Sweet, kind face.',
+      ]);
+    }
+    if ($this->mb($b, ['cocker spaniel', 'english cocker', 'american cocker'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'size_note' => 'Cocker Spaniels grow moderately. Heavy feathering develops on ears, legs, and belly.',
+        'adult_body_note' => 'Compact, sturdy with well-developed chest. Heavy silky feathering on ears, chest, legs.',
+        'adult_face_note' => 'Broad, rounded head. Long, low-set, heavily feathered ears. Large, round, expressive eyes.',
+      ]);
+    }
+    if ($this->mb($b, ['shiba inu', 'shiba'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'compact',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Shiba Inus grow into compact, fox-like small dogs. Moderate size increase.',
+        'adult_body_note' => 'Compact, well-muscled, agile. Thick double coat. Tightly curled tail. Weight 8–11 kg.',
+        'adult_face_note' => 'Fox-like — triangular head, small erect triangular ears, small almond eyes with distinctive markings. Cream/white face markings.',
+      ]);
+    }
+    if ($this->mb($b, ['miniature schnauzer'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'square',
+        'coat_type' => 'wire',
+        'grows_significantly' => false,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Miniature Schnauzers stay small and square. Distinctive beard and eyebrows are signature features.',
+        'adult_body_note' => 'Square build — height equals length. Compact, muscular, wiry-coated.',
+        'adult_face_note' => 'Rectangular strong head. SIGNATURE: long bushy eyebrows and very thick beard. V-shaped ears.',
+      ]);
+    }
+    if ($this->mb($b, ['jack russell', 'jack russel', 'parson russell'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'athletic',
+        'coat_type' => 'wire',
+        'grows_significantly' => false,
+        'size_note' => 'Jack Russells stay small but are very muscular and athletic.',
+        'adult_body_note' => 'Small, tough, compact, athletic body. Weight 5–8 kg. Lean, hard muscle.',
+        'adult_face_note' => 'Flat skull, strong muzzle. V-shaped drop or button ears. Alert, feisty, intelligent expression.',
+      ]);
+    }
+    if ($this->mb($b, ['scottish terrier', 'scotty'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'wire',
+        'grows_significantly' => false,
+        'size_note' => 'Scottish Terriers stay small and low-slung.',
+        'adult_body_note' => 'Compact, low-slung, very sturdy. Short legs, barrel chest, thick wiry coat.',
+        'adult_face_note' => 'Strong wedge-shaped head with very prominent beard and eyebrows. Erect pointed ears.',
+      ]);
+    }
+    if ($this->mb($b, ['westie', 'west highland'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'stocky',
+        'coat_type' => 'wire',
+        'grows_significantly' => false,
+        'gray_pattern' => 'none',
+        'size_note' => 'West Highland White Terriers stay small and compact.',
+        'adult_body_note' => 'Compact, sturdy, all-white wiry-coated body. Short legs, barrel chest.',
+        'adult_face_note' => 'Round head with white wiry coat, prominent beard and eyebrows. Dark eyes. Erect pointed ears.',
+      ]);
+    }
+    if ($this->mb($b, ['havanese'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'compact',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'gray_pattern' => 'none',
+        'size_note' => 'Havanese stay small with a long, silky coat that develops dramatically.',
+        'adult_body_note' => 'Small, sturdy body covered in long, silky, slightly wavy coat.',
+        'adult_face_note' => 'Broad, rounded head, large almond eyes, drop ears with long silky hair. Sweet, alert expression.',
+      ]);
+    }
+    if ($this->mb($b, ['lhasa apso'])) {
+      return array_merge($default, [
+        'size_category' => 'small',
+        'body_shape' => 'long_low',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => false,
+        'size_note' => 'Lhasa Apsos stay small. Floor-length coat develops fully.',
+        'adult_body_note' => 'Longer than tall, sturdy body beneath a heavy, long, flowing coat.',
+        'adult_face_note' => 'Heavy floor-length coat falls over the face. Strong muzzle, dark eyes. Dignified expression.',
+      ]);
+    }
+
+    // ── MEDIUM BREEDS ─────────────────────────────────────────────────
+    if ($this->mb($b, ['border collie'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Border Collies grow into a lean, athletic medium dog. Noticeably taller and longer than puppy.',
+        'adult_body_note' => 'Athletic, lithe, graceful. Lean muscle, not bulky. Well-proportioned, agile frame. Weight 14–20 kg.',
+        'adult_face_note' => 'SIGNATURE: intense, intelligent, focused expression. Medium muzzle, semi-erect forward-tipping ears. Alert eyes.',
+      ]);
+    }
+    if ($this->mb($b, ['australian shepherd', 'aussie'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Australian Shepherds grow into a well-muscled medium dog.',
+        'adult_body_note' => 'Medium, muscular, agile, slightly longer than tall. Strong bone, well-developed chest.',
+        'adult_face_note' => 'Balanced head, medium muzzle. Striking eye colors possible (blue, amber, brown). Semi-erect or rose ears.',
+      ]);
+    }
+    if ($this->mb($b, ['whippet'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'sighthound',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'size_note' => 'Whippets grow into a slender, elegant sighthound.',
+        'adult_body_note' => 'Slender sighthound — pronounced arched back, very deep narrow chest, extremely tucked waist, long thin legs. Weight 11–20 kg.',
+        'adult_face_note' => 'Long, fine, lean head. Rose-shaped small ears. Alert, gentle expression.',
+      ]);
+    }
+    if ($this->mb($b, ['bulldog', 'english bulldog'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => false,
+        'brachycephalic' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Bulldogs get heavier and more wrinkled but NOT taller.',
+        'adult_body_note' => 'Extremely wide, heavy, low-slung. Massive chest, short bowed legs, wide shoulders. Weight 22–25 kg. Classic waddling walk.',
+        'adult_face_note' => 'Massive wrinkled face with deep skin folds, very flat nose, pronounced underbite, huge jowls.',
+      ]);
+    }
+    if ($this->mb($b, ['chow chow'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'brachycephalic' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Chow Chows grow into a large, lion-maned, dignified dog.',
+        'adult_body_note' => 'Large, powerful, compact, square body. Distinctive stilted gait. Massive lion mane of fur. Weight 20–32 kg.',
+        'adult_face_note' => 'Broad, massive head. Scowling dignified expression. Blue-black tongue. Heavy lion-like mane.',
+      ]);
+    }
+    if ($this->mb($b, ['shar pei'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'brachycephalic' => true,
+        'size_note' => 'Shar Peis grow moderately. NOTE: wrinkles become tighter and less extreme in adults (puppies have MORE wrinkles proportionally).',
+        'adult_body_note' => 'Medium, compact, square. Weight 18–25 kg. Wrinkles concentrated on head and shoulders.',
+        'adult_face_note' => 'Broad hippopotamus-like muzzle. Small sunken eyes, small folded ears. Blue-black tongue visible.',
+      ]);
+    }
+    if ($this->mb($b, ['dalmatian'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'none',
+        'size_note' => 'Dalmatians grow into a large, lean, muscular spotted dog.',
+        'adult_body_note' => 'Large, lean, muscular, elegant. Long legs, deep chest. Weight 23–27 kg. Spots fully developed.',
+        'adult_face_note' => 'Long, strong, clean-cut head. Alert eyes, moderately large drop ears. Distinguished, athletic.',
+      ]);
+    }
+    if ($this->mb($b, ['standard poodle'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'curly/fluffy',
+        'grows_significantly' => true,
+        'gray_pattern' => 'none',
+        'size_note' => 'Standard Poodles grow into elegant, tall, curly-coated dogs.',
+        'adult_body_note' => 'Elegant, well-proportioned, athletic. Squarely built, long neck, deep chest. Weight 20–32 kg.',
+        'adult_face_note' => 'Long, straight, fine muzzle. Almond eyes, long flat ears. Refined, intelligent expression.',
+      ]);
+    }
+    if ($this->mb($b, ['schnauzer', 'standard schnauzer'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'square',
+        'coat_type' => 'wire',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Standard Schnauzers grow into square, wiry-coated medium dogs.',
+        'adult_body_note' => 'Square build, strong, compact. Wiry coat. Prominent beard and eyebrows. Weight 14–20 kg.',
+        'adult_face_note' => 'Rectangular head. SIGNATURE: long bushy eyebrows and very thick beard.',
+      ]);
+    }
+    if ($this->mb($b, ['airedale'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'athletic',
+        'coat_type' => 'wire',
+        'grows_significantly' => true,
+        'size_note' => 'Airedales are the largest terrier — grow into athletic, wiry-coated medium dogs.',
+        'adult_body_note' => 'Well-balanced, athletic medium body. Dense, hard, wiry black and tan coat. Weight 18–29 kg.',
+        'adult_face_note' => 'Long, flat skull. Small V-shaped drop ears. Wiry beard. Alert, intelligent expression.',
+      ]);
+    }
+
+    // ── LARGE BREEDS ──────────────────────────────────────────────────
+    if ($this->mb($b, ['labrador', 'lab'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Labradors grow dramatically — much taller, heavier, and broader than puppy.',
+        'adult_body_note' => 'Broad, powerful, strongly built. Wide head, deep chest, strong neck, thick otter tail. Weight 25–36 kg.',
+        'adult_face_note' => 'Broad, clean-cut head. Wide powerful muzzle. Kind, intelligent eyes. Drop ears.',
+      ]);
+    }
+    if ($this->mb($b, ['golden retriever'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'long_silky',
+        'grows_significantly' => true,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Golden Retrievers grow into large, beautiful, feathered dogs.',
+        'adult_body_note' => 'Large, well-balanced, powerful. Deep chest, flowing golden coat, feathering on legs/belly/tail. Weight 25–34 kg.',
+        'adult_face_note' => 'Broad, slightly arched skull. Gentle, intelligent expression. Drop ears, golden framing coat.',
+      ]);
+    }
+    if ($this->mb($b, ['german shepherd', 'alsatian'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'German Shepherds grow dramatically — much taller, broader chest, strong angular body.',
+        'adult_body_note' => 'Strong, agile, muscular. Slightly longer than tall, deep chest, characteristic sloping back. Bushy tail. Weight 22–40 kg.',
+        'adult_face_note' => 'Strong wedge-shaped head. SIGNATURE: fully erect, pointed ears. Alert, intelligent expression. Strong muzzle.',
+      ]);
+    }
+    if ($this->mb($b, ['rottweiler'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Rottweilers grow into powerful, massive dogs. Very dramatic size increase.',
+        'adult_body_note' => 'Massive, powerful, compact. Heavy bone, deep broad chest. Weight 35–60 kg. Black and tan markings fully defined.',
+        'adult_face_note' => 'Broad, powerful head. Strong wide muzzle. Drop ears. Calm, confident expression.',
+      ]);
+    }
+    if ($this->mb($b, ['doberman', 'dobermann'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Dobermans grow into sleek, powerful, elegant large dogs.',
+        'adult_body_note' => 'Compact, muscular, elegant. Square build, deep chest, well-arched neck. Weight 32–45 kg.',
+        'adult_face_note' => 'Long, wedge-shaped head. Erect ears. Alert, intelligent, proud expression.',
+      ]);
+    }
+    if ($this->mb($b, ['boxer'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'brachycephalic' => true,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Boxers grow into muscular, powerful dogs with a distinctive square head.',
+        'adult_body_note' => 'Powerful, medium-large, square body. Well-muscled, deep chest, short back. Weight 25–32 kg.',
+        'adult_face_note' => 'Broad, blunt, squarish muzzle. Strong underjaw. Wrinkled forehead. Energetic, alert expression.',
+      ]);
+    }
+    if ($this->mb($b, ['siberian husky', 'husky'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'none',
+        'size_note' => 'Huskies grow into medium-large dogs with a dense, lush double coat.',
+        'adult_body_note' => 'Medium-large, athletic, well-muscled. Thick double coat, bushy tail. Weight 16–27 kg.',
+        'adult_face_note' => 'Finely chiseled head. Almond eyes (blue, brown, or heterochromatic). Erect ears. Striking facial markings.',
+      ]);
+    }
+    if ($this->mb($b, ['alaskan malamute', 'malamute'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'size_note' => 'Malamutes grow into very large, heavy, powerful sled dogs.',
+        'adult_body_note' => 'Large, powerful, heavy-boned. Deep chest, strong shoulders, very heavy coat. Weight 34–43 kg.',
+        'adult_face_note' => 'Broad, powerful head. Brown almond eyes (never blue). Erect ears. Friendly, dignified expression.',
+      ]);
+    }
+    if ($this->mb($b, ['weimaraner'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Weimaraners grow into sleek, elegant, silver-gray large dogs.',
+        'adult_body_note' => 'Large, athletic, elegant. Sleek silver-gray coat. Deep chest. Weight 23–32 kg.',
+        'adult_face_note' => 'Moderately long head. Amber or blue-gray eyes. Long drop ears. Aristocratic expression.',
+      ]);
+    }
+    if ($this->mb($b, ['vizsla'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'size_note' => 'Vizslas grow into lean, elegant, golden-rust hunting dogs.',
+        'adult_body_note' => 'Lean, elegant, well-muscled. Golden-rust short coat. Deep chest. Weight 20–29 kg.',
+        'adult_face_note' => 'Lean, aristocratic head. Warm golden-brown eyes. Broad drop ears.',
+      ]);
+    }
+    if ($this->mb($b, ['akita'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'minimal',
+        'size_note' => 'Akitas grow into very large, powerful, bear-like dogs.',
+        'adult_body_note' => 'Large, powerful, heavy-boned. Deep broad chest, thick neck, curled tail. Weight 32–59 kg.',
+        'adult_face_note' => 'Broad, massive bear-like head. Small triangular erect ears. Deep-set triangular eyes. Powerful muzzle. Dignified.',
+      ]);
+    }
+    if ($this->mb($b, ['samoyed'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'none',
+        'size_note' => 'Samoyeds grow into medium-large dogs with a spectacular white double coat.',
+        'adult_body_note' => 'Medium-large, well-proportioned under a thick, stand-off white double coat. Weight 16–30 kg.',
+        'adult_face_note' => 'Wedge-shaped head. SIGNATURE: "Samoyed smile" — upturned mouth corners. Erect ears. Full white mane.',
+      ]);
+    }
+    if ($this->mb($b, ['giant schnauzer'])) {
+      return array_merge($default, [
+        'size_category' => 'large',
+        'body_shape' => 'square',
+        'coat_type' => 'wire',
+        'grows_significantly' => true,
+        'gray_pattern' => 'prominent',
+        'size_note' => 'Giant Schnauzers grow into powerful large dogs.',
+        'adult_body_note' => 'Large, powerful, compact, square. Dense wiry coat. Weight 25–48 kg.',
+        'adult_face_note' => 'Powerful rectangular head. Very prominent bushy eyebrows and thick beard. Bold expression.',
+      ]);
+    }
+
+    // ── GIANT BREEDS ──────────────────────────────────────────────────
+    if ($this->mb($b, ['great dane'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'Great Danes are the tallest breed. Growth is EXTREME. At 1yr: very tall adolescent like a young horse. At 3yr: one of the largest dogs on Earth. Stands 71–86 cm at shoulder.',
+        'adult_body_note' => 'Enormous, powerful, elegant. Very long legs, deep massive chest. Weight 50–90 kg.',
+        'adult_face_note' => 'Large rectangular expressive head. Strong muzzle, drop or cropped erect ears. Noble expression.',
+      ]);
+    }
+    if ($this->mb($b, ['saint bernard'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'size_note' => 'Saint Bernards grow into enormous, massive dogs. One of the heaviest breeds.',
+        'adult_body_note' => 'Enormous, very heavy, powerful. Deep wide chest, massive bone, thick coat. Weight 64–120 kg. Heavy jowls.',
+        'adult_face_note' => 'Massive broad head. Deep wrinkles, hanging jowls, kind soulful eyes. Drop ears.',
+      ]);
+    }
+    if ($this->mb($b, ['newfoundland', 'newfy'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'size_note' => 'Newfoundlands grow into massive, bear-like water dogs.',
+        'adult_body_note' => 'Massive, heavy-boned, muscular. Thick water-resistant double coat. Weight 54–68 kg.',
+        'adult_face_note' => 'Broad massive head. Soft dark eyes. Small drop ears. Gentle, sweet expression.',
+      ]);
+    }
+    if ($this->mb($b, ['irish wolfhound'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'sighthound',
+        'coat_type' => 'wire',
+        'grows_significantly' => true,
+        'size_note' => 'Irish Wolfhounds grow into one of the tallest dogs in the world. Dramatic growth.',
+        'adult_body_note' => 'Enormous, long, lean, muscular sighthound. Very long legs, arched back, deep chest. Rough wiry coat. Weight 48–69 kg.',
+        'adult_face_note' => 'Long, narrow head. Small folded ears. Gentle, calm expression. Rough wiry beard.',
+      ]);
+    }
+    if ($this->mb($b, ['bernese mountain dog', 'bernese', 'berner'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'size_note' => 'Bernese Mountain Dogs grow into large, heavy, tri-colored mountain dogs.',
+        'adult_body_note' => 'Large, heavy, sturdy. Broad chest, strong legs. Long thick silky tricolor coat (black, white, rust). Weight 36–55 kg.',
+        'adult_face_note' => 'Broad flat skull. Tricolor face markings well-defined. Drop ears, dark brown eyes. Calm, gentle expression.',
+      ]);
+    }
+    if ($this->mb($b, ['great pyrenees', 'pyrenean mountain'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'stocky',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'gray_pattern' => 'none',
+        'size_note' => 'Great Pyrenees grow into massive, majestic white mountain dogs.',
+        'adult_body_note' => 'Massive, well-balanced covered in thick white weather-resistant double coat. Weight 45–54+ kg.',
+        'adult_face_note' => 'Large wedge-shaped head. Dark brown eyes with black rims. V-shaped drop ears. Regal, calm expression.',
+      ]);
+    }
+    if ($this->mb($b, ['mastiff', 'english mastiff'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'stocky',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'brachycephalic' => true,
+        'gray_pattern' => 'moderate',
+        'size_note' => 'English Mastiffs are among the heaviest breeds. Growth is extreme — adults can exceed 100 kg.',
+        'adult_body_note' => 'Enormous, massive, heavy. Very broad deep chest. Weight 54–100+ kg. Heavy jowls.',
+        'adult_face_note' => 'Broad, wrinkled, massive head. Deep muzzle, black mask. Drop ears. Dignified, calm expression.',
+      ]);
+    }
+    if ($this->mb($b, ['leonberger'])) {
+      return array_merge($default, [
+        'size_category' => 'giant',
+        'body_shape' => 'athletic',
+        'coat_type' => 'double_coat',
+        'grows_significantly' => true,
+        'size_note' => 'Leonbergers grow into giant, lion-maned, majestic dogs.',
+        'adult_body_note' => 'Giant, muscular, well-proportioned. Thick lion-like mane around neck. Weight 41–75 kg.',
+        'adult_face_note' => 'Elongated lion-like face. Black mask, medium muzzle. Drop ears. Gentle, friendly expression.',
+      ]);
+    }
+
+    // ── MIXED / ASPIN ─────────────────────────────────────────────────
+    if ($this->mb($b, ['aspin', 'askal', 'philippine', 'mixed', 'mongrel', 'mutt', 'crossbreed'])) {
+      return array_merge($default, [
+        'size_category' => 'medium',
+        'body_shape' => 'athletic',
+        'coat_type' => 'short',
+        'grows_significantly' => true,
+        'size_note' => 'Mixed breed dogs vary. Expect moderate growth into a lean, athletic adult.',
+        'adult_body_note' => 'Lean, athletic, well-proportioned medium body. Short easy-care coat. Weight 10–25 kg.',
+        'adult_face_note' => 'Defined adult muzzle, alert, intelligent expression. Features vary by mix.',
+      ]);
+    }
+
+    // ── FALLBACK ──────────────────────────────────────────────────────
+    return $default;
   }
 
-  /**
-   * Flexible substring-based breed matching
-   */
   private function mb(string $breedLower, array $patterns): bool
   {
     foreach ($patterns as $pattern) {
@@ -1253,7 +1508,7 @@ class GenerateAgeSimulations implements ShouldQueue
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  IMAGE HELPERS
+  //  IMAGE PREPARATION
   // ─────────────────────────────────────────────────────────────────────────
 
   private function prepareHighQualityImage(string $fullPath): ?array
@@ -1262,23 +1517,21 @@ class GenerateAgeSimulations implements ShouldQueue
       $cacheKey = 'hq_img_' . md5($fullPath);
       return Cache::remember($cacheKey, 600, function () use ($fullPath) {
 
-        // Support both full URL paths and relative storage paths
         if (str_starts_with($fullPath, 'http://') || str_starts_with($fullPath, 'https://')) {
-          // Download from URL
-          $client = new Client(['timeout' => 30]);
-          $response = $client->get($fullPath);
+          $client        = new Client(['timeout' => 30]);
+          $response      = $client->get($fullPath);
           $imageContents = $response->getBody()->getContents();
         } else {
           $imageContents = Storage::disk('object-storage')->get($fullPath);
         }
 
         if (empty($imageContents)) {
-          throw new \Exception('Empty or missing image file: ' . $fullPath);
+          throw new \Exception('Empty image file: ' . $fullPath);
         }
 
         $imageInfo = @getimagesizefromstring($imageContents);
         if ($imageInfo === false) {
-          throw new \Exception('Could not identify image format for: ' . $fullPath);
+          throw new \Exception('Unrecognized image format: ' . $fullPath);
         }
 
         $origWidth  = $imageInfo[0];
@@ -1287,18 +1540,16 @@ class GenerateAgeSimulations implements ShouldQueue
 
         if ($origWidth > $targetSize || $origHeight > $targetSize) {
           $imageContents = $this->resizeImage($imageContents, $targetSize);
-          $resized = @getimagesizefromstring($imageContents);
-          $width   = $resized[0];
-          $height  = $resized[1];
+          $resized       = @getimagesizefromstring($imageContents);
+          $width         = $resized[0];
+          $height        = $resized[1];
         } else {
           $width  = $origWidth;
           $height = $origHeight;
         }
 
         $img = @imagecreatefromstring($imageContents);
-        if ($img === false) {
-          throw new \Exception('GD failed to parse image data');
-        }
+        if ($img === false) throw new \Exception('GD could not parse image');
 
         ob_start();
         imagejpeg($img, null, 90);
@@ -1326,7 +1577,7 @@ class GenerateAgeSimulations implements ShouldQueue
   private function resizeImage(string $imageContents, int $maxSize): string
   {
     $source = @imagecreatefromstring($imageContents);
-    if ($source === false) throw new \Exception('GD failed to create source image for resize');
+    if ($source === false) throw new \Exception('GD resize: failed to create source');
 
     $width  = imagesx($source);
     $height = imagesy($source);
@@ -1350,12 +1601,11 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     try {
       $img = @imagecreatefromstring($imageOutput);
-      if ($img === false) throw new \Exception('GD failed to parse output image bytes');
+      if ($img === false) throw new \Exception('GD could not parse output image');
 
       $outW = imagesx($img);
       $outH = imagesy($img);
 
-      // Resize output to match original dimensions if available
       if ($imageData && isset($imageData['origWidth'], $imageData['origHeight'])) {
         $targetW = $imageData['origWidth'];
         $targetH = $imageData['origHeight'];
@@ -1399,7 +1649,6 @@ class GenerateAgeSimulations implements ShouldQueue
     if ($error)           $data['error']         = $error;
 
     $result->update(['simulation_data' => json_encode($data)]);
-
     Cache::forget("simulation_status_{$result->scan_id}");
     Cache::forget("sim_status_{$result->scan_id}");
   }

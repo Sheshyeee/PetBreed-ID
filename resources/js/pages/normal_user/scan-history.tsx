@@ -77,7 +77,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
     return (
         <>
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
 
                 @keyframes sh-bar-fill   { from { width: 0 } }
                 @keyframes sh-fade-up    { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
@@ -91,6 +91,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                 .sh-font-syne  { font-family: 'Syne', sans-serif; }
                 .sh-font-mono  { font-family: 'Space Mono', monospace; }
                 .sh-font-dm    { font-family: 'DM Sans', sans-serif; }
+                .sh-font-ibm   { font-family: 'IBM Plex Sans', sans-serif; }
 
                 .sh-grid-bg {
                     position:fixed; inset:0; pointer-events:none; z-index:0;
@@ -138,6 +139,66 @@ export default function ScanHistory({ mockScans, user }: Props) {
 
                 .sh-nsb::-webkit-scrollbar { display:none; }
                 .sh-nsb { scrollbar-width: none; }
+
+                /* Stats strip */
+                .sh-stat-card {
+                    position: relative;
+                    padding: 20px 22px 18px;
+                    border-right: 1px solid;
+                    border-bottom: 1px solid;
+                    transition: background .15s;
+                }
+                .sh-stat-card:hover { background: rgba(16,185,129,.025); }
+                .sh-stat-num {
+                    font-family: 'IBM Plex Sans', sans-serif;
+                    font-weight: 600;
+                    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+                    line-height: 1;
+                    letter-spacing: -0.02em;
+                    color: #0f172a;
+                }
+                :is(.dark) .sh-stat-num { color: #f1f5f9; }
+                .sh-stat-label {
+                    font-family: 'IBM Plex Sans', sans-serif;
+                    font-size: 10px;
+                    font-weight: 500;
+                    letter-spacing: .08em;
+                    text-transform: uppercase;
+                    color: #94a3b8;
+                    margin-bottom: 10px;
+                }
+                .sh-stat-sub {
+                    font-family: 'IBM Plex Sans', sans-serif;
+                    font-size: 11px;
+                    font-weight: 400;
+                    color: #94a3b8;
+                    margin-top: 4px;
+                }
+                :is(.dark) .sh-stat-sub { color: #475569; }
+                .sh-stat-bar-track {
+                    position: absolute;
+                    bottom: 0; left: 0; right: 0;
+                    height: 2px;
+                    background: #f1f5f9;
+                }
+                :is(.dark) .sh-stat-bar-track { background: rgba(255,255,255,.05); }
+                .sh-stat-bar-fill {
+                    height: 100%;
+                    background: #10b981;
+                    animation: sh-bar-fill 1.6s cubic-bezier(.16,1,.3,1) forwards;
+                }
+                .sh-stat-icon {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 7px;
+                    border: 1px solid rgba(16,185,129,.18);
+                    background: rgba(16,185,129,.07);
+                    color: #10b981;
+                    margin-bottom: 14px;
+                }
             `}</style>
 
             <div className="sh-font-dm relative min-h-screen overflow-x-hidden bg-slate-50 text-slate-700 dark:bg-[#070A0E] dark:text-slate-200">
@@ -161,7 +222,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                             className="sh-modal-pop relative w-full max-w-[340px] overflow-hidden rounded-[22px] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/[.08] dark:bg-[#0e1218]"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Top accent line */}
                             <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
 
                             <button
@@ -232,7 +292,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
 
                 {/* FAB */}
                 <button
-                    className="sh-fab fixed right-[18px] bottom-[18px] z-40 flex h-11 w-11 items-center justify-center rounded-[13px] bg-gradient-to-br from-emerald-500 to-cyan-500 text-black shadow-lg shadow-emerald-500/30 transition-transform hover:scale-105 active:scale-95"
+                    className="sh-fab fixed right-[18px] bottom-[18px] z-40 flex h-11 w-11 items-center justify-center rounded-[13px] bg-emerald-500 text-black shadow-lg shadow-emerald-500/25 transition-transform hover:scale-105 active:scale-95"
                     onClick={() => setShowQRModal(true)}
                 >
                     <QrCode size={17} />
@@ -265,17 +325,17 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     </div>
 
                     {/* STATS STRIP */}
-                    <div className="mt-7 mb-7 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm sm:grid-cols-4 dark:border-white/[.06] dark:bg-white/[.02]">
+                    <div className="mt-7 mb-7 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-4 dark:border-white/[.06] dark:bg-[#0d1117]">
                         {[
                             {
-                                icon: <History size={14} />,
+                                icon: <History size={13} />,
                                 lbl: 'Total Scans',
                                 val: mockScans.length,
                                 sub: 'All time',
                                 bar: 100,
                             },
                             {
-                                icon: <Shield size={14} />,
+                                icon: <Shield size={13} />,
                                 lbl: 'Verified',
                                 val: verifiedCount,
                                 sub: 'By licensed vets',
@@ -284,7 +344,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     : 0,
                             },
                             {
-                                icon: <Clock size={14} />,
+                                icon: <Clock size={13} />,
                                 lbl: 'Pending',
                                 val: pendingCount,
                                 sub: 'Awaiting review',
@@ -293,8 +353,8 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                     : 0,
                             },
                             {
-                                icon: <TrendingUp size={14} />,
-                                lbl: 'Avg Confidence',
+                                icon: <TrendingUp size={13} />,
+                                lbl: 'Avg. Confidence',
                                 val: `${avgConfidence}%`,
                                 sub: 'Accuracy score',
                                 bar: avgConfidence,
@@ -302,24 +362,16 @@ export default function ScanHistory({ mockScans, user }: Props) {
                         ].map((s, i) => (
                             <div
                                 key={i}
-                                className={`sh-fade-up relative border-r border-b border-slate-100 p-5 pb-[18px] transition-colors hover:bg-emerald-500/[.04] dark:border-white/[.05] sm:[&:last-child]:border-r-0 [&:nth-child(2n)]:border-r-0 sm:[&:nth-child(2n)]:border-r [&:nth-child(n+3)]:border-b-0 sm:[&:nth-child(n+3)]:border-b-0`}
+                                className={`sh-stat-card sh-fade-up border-slate-100 dark:border-white/[.05] sm:[&:last-child]:border-r-0 [&:nth-child(2n)]:border-r-0 sm:[&:nth-child(2n)]:border-r [&:nth-child(n+3)]:border-b-0 sm:[&:nth-child(n+3)]:border-b`}
                                 style={{ animationDelay: `${i * 0.08}s` }}
                             >
-                                <div className="mb-3 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] border border-emerald-500/18 bg-emerald-500/10 text-emerald-500 dark:border-emerald-500/20">
-                                    {s.icon}
-                                </div>
-                                <div className="sh-font-mono mb-1 text-[8px] font-bold tracking-[.12em] text-slate-400 uppercase dark:text-slate-500">
-                                    {s.lbl}
-                                </div>
-                                <div className="sh-font-syne mb-0.5 text-[clamp(1.5rem,4vw,2.4rem)] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
-                                    {s.val}
-                                </div>
-                                <div className="text-[10px] text-slate-400 dark:text-slate-500">
-                                    {s.sub}
-                                </div>
-                                <div className="absolute right-0 bottom-0 left-0 h-[2px] bg-slate-100 dark:bg-white/[.05]">
+                                <div className="sh-stat-icon">{s.icon}</div>
+                                <div className="sh-stat-label">{s.lbl}</div>
+                                <div className="sh-stat-num">{s.val}</div>
+                                <div className="sh-stat-sub">{s.sub}</div>
+                                <div className="sh-stat-bar-track">
                                     <div
-                                        className="sh-bar-fill h-full bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-[0_0_8px_rgba(16,185,129,.5)]"
+                                        className="sh-stat-bar-fill"
                                         style={{
                                             width: `${s.bar}%`,
                                             animationDelay: `${i * 0.12 + 0.3}s`,
@@ -331,15 +383,15 @@ export default function ScanHistory({ mockScans, user }: Props) {
                     </div>
 
                     {/* VET BANNER */}
-                    <div className="mb-7 flex items-start gap-3.5 rounded-[14px] border border-cyan-500/15 bg-gradient-to-br from-cyan-500/[.06] to-emerald-500/[.04] p-4">
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[9px] border border-cyan-500/20 bg-cyan-500/10 text-cyan-500">
+                    <div className="mb-7 flex items-start gap-3.5 rounded-[14px] border border-slate-200 bg-slate-50 p-4 dark:border-white/[.06] dark:bg-white/[.025]">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[9px] border border-slate-200 bg-white text-slate-500 dark:border-white/[.07] dark:bg-white/[.05] dark:text-slate-400">
                             <Shield size={14} />
                         </div>
                         <div>
-                            <div className="sh-font-syne mb-0.5 text-[12px] font-bold text-cyan-600 dark:text-cyan-400">
+                            <div className="sh-font-ibm font-600 mb-0.5 text-[12px] font-semibold text-slate-700 dark:text-slate-300">
                                 Veterinarian Verification
                             </div>
-                            <div className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+                            <div className="sh-font-ibm text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
                                 All system breed identifications can be reviewed
                                 by licensed veterinarians. Verified scans are
                                 confirmed by professional vets, while pending
@@ -368,7 +420,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                 onClick={() => setFilter(f)}
                                 className={`sh-font-mono flex items-center gap-[5px] rounded-[9px] border px-[13px] py-[9px] text-[9px] font-bold tracking-[.06em] whitespace-nowrap uppercase transition-all ${
                                     filter === f
-                                        ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-600 shadow-[0_0_16px_rgba(16,185,129,.1)] dark:text-emerald-400'
+                                        ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                                         : 'border-slate-200 bg-white text-slate-400 hover:border-emerald-500/25 hover:bg-emerald-500/[.04] hover:text-emerald-600 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-500 dark:hover:text-emerald-400'
                                 }`}
                             >
@@ -434,16 +486,13 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                             className="h-full w-full object-cover transition-transform duration-[600ms] group-hover:scale-[1.07]"
                                         />
 
-                                        {/* Scan line on hover */}
                                         <div
                                             className="sh-scan-line-el pointer-events-none absolute top-0 right-0 left-0 z-[4] h-[2px] bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent"
                                             style={{ position: 'absolute' }}
                                         />
 
-                                        {/* Overlay gradient */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
-                                        {/* HUD corners */}
                                         {[
                                             'top-[7px] left-[7px] border-t-2 border-l-2',
                                             'top-[7px] right-[7px] border-t-2 border-r-2',
@@ -456,7 +505,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                             />
                                         ))}
 
-                                        {/* Status badge */}
                                         <div
                                             className={`sh-font-mono absolute top-[9px] left-[9px] z-[4] rounded-[5px] px-2 py-[3px] text-[8px] font-bold tracking-[.08em] uppercase backdrop-blur-sm ${
                                                 scan.status === 'verified'
@@ -469,7 +517,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                                 : '⏳ Pending'}
                                         </div>
 
-                                        {/* Delete button overlay */}
                                         <div className="sh-del-overlay absolute top-[9px] right-[9px] z-[5]">
                                             <button
                                                 onClick={() =>
@@ -484,8 +531,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                             </button>
                                         </div>
 
-                                        {/* Confidence badge */}
-                                        <div className="sh-font-mono absolute right-[9px] bottom-[9px] z-[4] rounded-[5px] bg-gradient-to-r from-emerald-500 to-cyan-500 px-2 py-0.5 text-[10px] font-bold text-black shadow-lg shadow-emerald-500/40">
+                                        <div className="sh-font-mono absolute right-[9px] bottom-[9px] z-[4] rounded-[5px] bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-black">
                                             {scan.confidence}%
                                         </div>
                                     </div>
@@ -505,7 +551,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                                         </div>
                                         <div className="mb-3 h-[3px] overflow-hidden rounded-full bg-slate-100 dark:bg-white/[.07]">
                                             <div
-                                                className="sh-conf-fill h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-[0_0_6px_rgba(16,185,129,.5)]"
+                                                className="sh-conf-fill h-full rounded-full bg-emerald-500"
                                                 style={{
                                                     width: `${scan.confidence}%`,
                                                 }}

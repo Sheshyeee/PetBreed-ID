@@ -189,11 +189,6 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                             <div className="vo-panel relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
                                 {/* Terminal bar */}
                                 <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
-                                    <div className="flex gap-1.5">
-                                        <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
-                                        <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                                        <div className="vo-hudblink h-2.5 w-2.5 rounded-full bg-cyan-500 shadow-[0_0_5px_#06b6d4]" />
-                                    </div>
                                     <span className="vo-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">
                                         doglens://origin/
                                         {results?.scan_id?.slice(0, 8)}

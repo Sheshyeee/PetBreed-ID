@@ -20,7 +20,18 @@ export default function Login({ status }: LoginProps) {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
-                @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.7)} }
+                /* ── HIDE AUTH LAYOUT'S TOP LOGO BLOCK ── */
+                /* Targets the icon + title + description header rendered by AuthLayout */
+                .lv-kill-header {
+                    display: none !important;
+                    visibility: hidden !important;
+                    height: 0 !important;
+                    overflow: hidden !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.5)} }
                 @keyframes lv-ring  { 0%{transform:scale(.8);opacity:.6} 70%,100%{transform:scale(1.3);opacity:0} }
                 @keyframes lv-paw   { 0%,100%{transform:rotate(0deg)} 30%{transform:rotate(-10deg)} 70%{transform:rotate(10deg)} }
                 @keyframes lv-orb   { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
@@ -44,16 +55,19 @@ export default function Login({ status }: LoginProps) {
                     border: 1px solid rgba(0,0,0,.08);
                     box-shadow: 0 16px 48px rgba(0,0,0,.1);
                     background: #fff;
+                    width: 100%;
+                    max-width: 580px;
+                    margin: 0 auto;
                 }
                 :is(.dark) .lv-card {
                     background: #0D1117;
                     border-color: rgba(255,255,255,.07);
-                    box-shadow: 0 16px 48px rgba(0,0,0,.5);
+                    box-shadow: 0 20px 60px rgba(0,0,0,.6);
                 }
 
                 /* ── LEFT ── */
                 .lv-left {
-                    width: 160px;
+                    width: 170px;
                     flex-shrink: 0;
                     position: relative;
                     overflow: hidden;
@@ -61,25 +75,24 @@ export default function Login({ status }: LoginProps) {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    padding: 28px 18px;
+                    padding: 32px 18px;
                     gap: 18px;
-                    background: linear-gradient(160deg, #0d2b1f 0%, #091e2d 100%);
+                    background: #09201a;
                 }
                 .lv-left::before {
                     content:'';
                     position:absolute; inset:0; pointer-events:none;
-                    background-image:radial-gradient(circle, rgba(16,185,129,.11) 1px, transparent 1px);
+                    background-image:radial-gradient(circle, rgba(16,185,129,.10) 1px, transparent 1px);
                     background-size:20px 20px;
                     -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
                     mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
                 }
                 .lv-left-beam {
-                    position:absolute; top:0; left:0; right:0; height:1.5px;
-                    background:linear-gradient(90deg,transparent,#10b981 50%,transparent);
-                    opacity:.55;
+                    position:absolute; top:0; left:0; right:0; height:1px;
+                    background:rgba(16,185,129,.30);
                 }
-                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.07); filter:blur(48px); pointer-events:none; }
-                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.05); filter:blur(42px); pointer-events:none; }
+                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.05); filter:blur(48px); pointer-events:none; }
+                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.04); filter:blur(42px); pointer-events:none; }
 
                 /* icon */
                 .lv-icon-wrap {
@@ -87,44 +100,39 @@ export default function Login({ status }: LoginProps) {
                     display:flex; align-items:center; justify-content:center;
                     animation:lv-float 4s ease-in-out infinite;
                 }
-                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.2); animation:lv-ring 2.8s ease-out infinite; }
-                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.07); animation:lv-ring 2.8s ease-out infinite .9s; }
-                .lv-orb  { position:absolute; width:6px; height:6px; border-radius:50%; top:50%; left:50%; margin:-3px 0 0 -3px; background:#10b981; box-shadow:0 0 10px #10b981; animation:lv-orb 3.4s linear infinite; }
-                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; box-shadow:0 0 7px #06b6d4; animation:lv-orb2 4s linear infinite; }
+                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.18); animation:lv-ring 2.8s ease-out infinite; }
+                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.06); animation:lv-ring 2.8s ease-out infinite .9s; }
+                .lv-orb  { position:absolute; width:6px; height:6px; border-radius:50%; top:50%; left:50%; margin:-3px 0 0 -3px; background:#10b981; animation:lv-orb 3.4s linear infinite; }
+                .lv-orb2 { position:absolute; width:4px; height:4px; border-radius:50%; top:50%; left:50%; margin:-2px 0 0 -2px; background:#06b6d4; animation:lv-orb2 4s linear infinite; }
                 .lv-icon-bg {
                     width:76px; height:76px; border-radius:22px;
                     display:flex; align-items:center; justify-content:center;
-                    border:1px solid rgba(16,185,129,.22);
-                    background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(6,182,212,.06));
-                    box-shadow:0 0 28px rgba(16,185,129,.18),inset 0 0 18px rgba(16,185,129,.05);
+                    border:1px solid rgba(16,185,129,.20);
+                    background:rgba(16,185,129,.09);
                 }
 
                 /* left text */
                 .lv-left-body { text-align:center; }
                 .lv-left-title {
-                    font-size:16px; font-weight:800; color:#fff;
-                    line-height:1.25; letter-spacing:-.01em; margin-bottom:6px;
+                    font-size:15px; font-weight:700; color:#fff;
+                    line-height:1.3; letter-spacing:-.01em; margin-bottom:6px;
                 }
-                .lv-left-title span {
-                    background:linear-gradient(135deg,#10b981,#06b6d4);
-                    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-                    background-clip:text;
-                }
+                .lv-left-title span { color:#10b981; }
                 .lv-left-sub {
-                    font-size:10px; color:rgba(255,255,255,.35);
-                    line-height:1.55; max-width:145px; margin:0 auto;
+                    font-size:10px; color:rgba(255,255,255,.30);
+                    line-height:1.6; max-width:140px; margin:0 auto;
                 }
 
                 /* dots */
                 .lv-dots { display:flex; gap:5px; justify-content:center; margin-top:16px; }
-                .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.18); }
-                .lv-dot.on { width:16px; background:#10b981; box-shadow:0 0 6px #10b981; }
+                .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
+                .lv-dot.on { width:16px; background:#10b981; }
 
                 /* ── RIGHT ── */
                 .lv-right {
                     flex:1;
                     min-width:0;
-                    padding:26px 28px;
+                    padding:32px 34px;
                     display:flex;
                     flex-direction:column;
                     justify-content:center;
@@ -137,14 +145,14 @@ export default function Login({ status }: LoginProps) {
                 .lv-brand {
                     display:inline-flex; align-items:center; gap:5px;
                     padding:3px 10px; border-radius:99px;
-                    border:1px solid rgba(16,185,129,.2);
-                    background:rgba(16,185,129,.07);
+                    border:1px solid rgba(16,185,129,.18);
+                    background:rgba(16,185,129,.06);
                     width:fit-content;
                 }
-                .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; box-shadow:0 0 5px #10b981; animation:lv-pulse 2s ease-in-out infinite; }
+                .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; animation:lv-pulse 2s ease-in-out infinite; }
                 .lv-brand-text { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; }
 
-                .lv-title { font-size:19px; font-weight:800; letter-spacing:-.015em; color:#0f172a; line-height:1.2; }
+                .lv-title { font-size:21px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.2; }
                 :is(.dark) .lv-title { color:#f8fafc; }
                 .lv-sub { font-size:11px; color:#94a3b8; line-height:1.5; margin-top:3px; }
 
@@ -152,41 +160,38 @@ export default function Login({ status }: LoginProps) {
                 .lv-google {
                     position:relative; overflow:hidden; width:100%;
                     display:flex; align-items:center; justify-content:center; gap:9px;
-                    padding:12px 16px; border-radius:11px;
+                    padding:13px 16px; border-radius:11px;
                     background:#fff; border:1.5px solid #e2e8f0;
-                    color:#1e293b; font-size:13px; font-weight:700;
+                    color:#1e293b; font-size:13px; font-weight:600;
                     font-family:'Plus Jakarta Sans',sans-serif;
                     cursor:pointer;
                     transition:transform .17s, box-shadow .17s, border-color .17s;
-                    box-shadow:0 1px 4px rgba(0,0,0,.07);
+                    box-shadow:0 1px 3px rgba(0,0,0,.05);
                 }
-                .lv-google:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.1); border-color:#cbd5e1; }
+                .lv-google:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,.09); border-color:#cbd5e1; }
                 .lv-google:active { transform:translateY(0); }
-                :is(.dark) .lv-google { background:#161d27; border-color:rgba(255,255,255,.09); color:#f1f5f9; box-shadow:none; }
-                :is(.dark) .lv-google:hover { border-color:rgba(16,185,129,.3); box-shadow:0 6px 20px rgba(16,185,129,.08); }
-                .lv-shine { position:absolute; top:0; left:-80%; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); transform:skewX(-18deg); pointer-events:none; }
+                :is(.dark) .lv-google { background:#111827; border-color:rgba(255,255,255,.08); color:#f1f5f9; box-shadow:none; }
+                :is(.dark) .lv-google:hover { border-color:rgba(16,185,129,.22); }
+                .lv-shine { position:absolute; top:0; left:-80%; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent); transform:skewX(-18deg); pointer-events:none; }
                 .lv-google:hover .lv-shine { animation:lv-sweep .5s ease forwards; }
 
                 /* divider */
                 .lv-divider { display:flex; align-items:center; gap:10px; }
                 .lv-div-line { flex:1; height:1px; background:#f1f5f9; }
-                :is(.dark) .lv-div-line { background:rgba(255,255,255,.07); }
+                :is(.dark) .lv-div-line { background:rgba(255,255,255,.06); }
                 .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
-                :is(.dark) .lv-div-text { color:rgba(255,255,255,.18); }
+                :is(.dark) .lv-div-text { color:rgba(255,255,255,.14); }
 
                 /* footer note */
                 .lv-note { font-size:10px; color:#94a3b8; text-align:center; line-height:1.5; }
-                :is(.dark) .lv-note { color:rgba(255,255,255,.25); }
+                :is(.dark) .lv-note { color:rgba(255,255,255,.20); }
 
                 /* alerts */
                 .lv-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:10px; }
-                .lv-ok  { border:1px solid rgba(16,185,129,.25); background:rgba(16,185,129,.07); color:#059669; }
+                .lv-ok  { border:1px solid rgba(16,185,129,.22); background:rgba(16,185,129,.06); color:#059669; }
                 :is(.dark) .lv-ok { color:#6ee7b7; }
-                .lv-err { border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.07); color:#dc2626; }
+                .lv-err { border:1px solid rgba(239,68,68,.22); background:rgba(239,68,68,.06); color:#dc2626; }
                 :is(.dark) .lv-err { color:#fca5a5; }
-
-                /* hide auth layout header */
-                .lv-root ~ * h2, .lv-root ~ * p { display: none !important; }
 
                 /* mobile */
                 @media (max-width:540px) {
@@ -196,9 +201,35 @@ export default function Login({ status }: LoginProps) {
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:20px 22px; }
+                    .lv-right { padding:22px 22px; }
                 }
             `}</style>
+
+            {/*
+              This hidden ref-div walks up to AuthLayout's wrapper and hides
+              any sibling elements injected before our card (the logo header block).
+            */}
+            <div
+                style={{ display: 'none' }}
+                ref={(el) => {
+                    if (!el) return;
+                    const parent =
+                        el.closest('form, [class]')?.parentElement ??
+                        el.parentElement;
+                    if (!parent) return;
+                    Array.from(parent.children).forEach((child) => {
+                        const el2 = child as HTMLElement;
+                        // Hide any block that is NOT our lv-root div
+                        if (
+                            !el2.classList.contains('lv-root') &&
+                            !el2.querySelector('.lv-root') &&
+                            !el2.querySelector('.lv-alert')
+                        ) {
+                            el2.style.cssText = 'display:none!important';
+                        }
+                    });
+                }}
+            />
 
             <div className="lv-root">
                 {status && (
