@@ -16,10 +16,7 @@ export default function Login({ status }: LoginProps) {
     const { flash } = usePage<Errors>().props;
 
     return (
-        <AuthLayout
-            title="Dog Breed Identification System"
-            description="Sign in to access professional breed analysis"
-        >
+        <AuthLayout title="" description="">
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -56,7 +53,7 @@ export default function Login({ status }: LoginProps) {
 
                 /* ── LEFT ── */
                 .lv-left {
-                    width: 190px;
+                    width: 160px;
                     flex-shrink: 0;
                     position: relative;
                     overflow: hidden;
@@ -127,7 +124,7 @@ export default function Login({ status }: LoginProps) {
                 .lv-right {
                     flex:1;
                     min-width:0;
-                    padding:26px 22px;
+                    padding:26px 28px;
                     display:flex;
                     flex-direction:column;
                     justify-content:center;
@@ -188,6 +185,9 @@ export default function Login({ status }: LoginProps) {
                 .lv-err { border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.07); color:#dc2626; }
                 :is(.dark) .lv-err { color:#fca5a5; }
 
+                /* hide auth layout header */
+                .lv-root ~ * h2, .lv-root ~ * p { display: none !important; }
+
                 /* mobile */
                 @media (max-width:540px) {
                     .lv-card { flex-direction:column; }
@@ -196,7 +196,7 @@ export default function Login({ status }: LoginProps) {
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:20px 18px; }
+                    .lv-right { padding:20px 22px; }
                 }
             `}</style>
 

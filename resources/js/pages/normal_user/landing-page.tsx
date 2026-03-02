@@ -62,7 +62,7 @@ function LandingPage() {
                 .lp-hero-card { position:relative; overflow:hidden; }
                 .lp-hero-card::before {
                     content:''; position:absolute; top:0; left:0; right:0; height:1.5px;
-                    background:linear-gradient(90deg,transparent,#10b981 45%,#06b6d4 55%,transparent); opacity:.4;
+                    background:linear-gradient(90deg,transparent,rgba(255,255,255,.15) 45%,rgba(255,255,255,.1) 55%,transparent); opacity:.4;
                 }
 
                 .lp-feat-card { position:relative; overflow:hidden; }
@@ -192,27 +192,27 @@ function LandingPage() {
                         {/* ── HERO SECTION ── */}
                         <div className="lp-hero-card lp-fu flex h-auto w-full flex-col items-center justify-between gap-4 rounded-2xl bg-[#0C134F] p-6 text-white sm:p-8 lg:h-[300px] lg:flex-row lg:gap-3">
                             {/* Subtle inner glow */}
-                            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/[.04] via-transparent to-cyan-500/[.03]" />
-                            <div className="pointer-events-none absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[.02] via-transparent to-white/[.01]" />
+                            <div className="pointer-events-none absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
                             <div className="relative flex h-auto flex-1 flex-col justify-center gap-3 text-center lg:h-[270px] lg:gap-4 lg:text-left">
-                                {/* Badge */}
-                                <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/[.1] px-3 py-1.5 lg:mx-0">
+                                {/* Badge — transparent to match bg */}
+                                <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/[.06] px-3 py-1.5 backdrop-blur-sm lg:mx-0">
                                     <span
-                                        className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"
+                                        className="h-1.5 w-1.5 rounded-full bg-white/60"
                                         style={{
                                             animation:
                                                 'lp-pulse 2s ease-in-out infinite',
                                         }}
                                     />
-                                    <span className="lp-mono text-[10px] font-semibold tracking-[.12em] text-emerald-300 uppercase">
+                                    <span className="lp-mono text-[10px] font-semibold tracking-[.12em] text-white/70 uppercase">
                                         Breed Detection
                                     </span>
                                 </div>
 
                                 <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-3xl">
                                     Identify dog{' '}
-                                    <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                                    <span className="bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
                                         breed
                                     </span>{' '}
                                     instantly
@@ -226,7 +226,7 @@ function LandingPage() {
 
                                 <Link href={getScanLink()}>
                                     <button
-                                        className="lp-shim mx-auto flex w-[240px] items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/[.12] px-5 py-2.5 text-sm font-bold text-emerald-300 transition-all hover:border-emerald-400/50 hover:bg-emerald-500/20 lg:mx-0"
+                                        className="lp-shim mx-auto flex w-[240px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[.07] px-5 py-2.5 text-sm font-bold text-white/80 transition-all hover:border-white/25 hover:bg-white/[.12] lg:mx-0"
                                         onClick={() => setOpen(false)}
                                     >
                                         <PawPrintIcon size={15} />
@@ -241,7 +241,7 @@ function LandingPage() {
 
                             <div className="lp-float relative ml-8 hidden lg:block">
                                 <div
-                                    className="absolute inset-[-20px] rounded-full border border-emerald-500/10"
+                                    className="absolute inset-[-20px] rounded-full border border-white/[.08]"
                                     style={{
                                         animation:
                                             'lp-ring 3s ease-out infinite',
@@ -361,7 +361,7 @@ function LandingPage() {
 
                     {/* ── SIDE CARD ── */}
                     <div className="lp-hero-card lp-fu2 w-full rounded-2xl bg-[#1D267D] p-5 sm:p-6 lg:w-[400px]">
-                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/[.03] via-transparent to-cyan-500/[.02]" />
+                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[.02] via-transparent to-white/[.01]" />
 
                         <div className="relative mb-4 overflow-hidden rounded-xl">
                             <img
@@ -369,10 +369,10 @@ function LandingPage() {
                                 className="h-[200px] w-full rounded-xl object-cover sm:h-[250px]"
                                 alt="Dog breed identification"
                             />
-                            {/* Overlay tag */}
-                            <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-black/60 px-2.5 py-1.5 backdrop-blur-sm">
-                                <span className="lp-blink h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
-                                <span className="lp-mono text-[9px] font-semibold tracking-[.1em] text-emerald-400 uppercase">
+                            {/* Overlay tag — transparent to bg */}
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-white/15 bg-[#1D267D]/75 px-2.5 py-1.5 backdrop-blur-sm">
+                                <span className="lp-blink h-1.5 w-1.5 rounded-full bg-white/60" />
+                                <span className="lp-mono text-[9px] font-semibold tracking-[.1em] text-white/70 uppercase">
                                     Ready
                                 </span>
                             </div>
@@ -385,10 +385,10 @@ function LandingPage() {
 
                             {/* Vet badge */}
                             <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.07] px-3 py-2.5 backdrop-blur-sm">
-                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-green-500/20 bg-green-500/15">
+                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10">
                                     <ShieldCheck
                                         size={16}
-                                        className="text-green-400"
+                                        className="text-white/80"
                                     />
                                 </div>
                                 <div>
@@ -404,7 +404,7 @@ function LandingPage() {
                             <div className="border-t border-white/15 pt-4">
                                 <Link href={login()}>
                                     <button
-                                        className="lp-shim w-full rounded-xl border border-emerald-500/30 bg-emerald-500/[.12] py-3 text-sm font-bold text-emerald-300 transition-all hover:border-emerald-400/50 hover:bg-emerald-500/20"
+                                        className="lp-shim w-full rounded-xl border border-white/15 bg-white/[.07] py-3 text-sm font-bold text-white/80 transition-all hover:border-white/25 hover:bg-white/[.12]"
                                         onClick={() => setOpen(false)}
                                     >
                                         Get Started Now
