@@ -517,7 +517,7 @@ export default function Scan() {
                             <div className="mb-5 flex justify-center">
                                 <div className="rounded-xl bg-white p-2.5 shadow-lg">
                                     <img
-                                        src="/doglens_apk_qr.jpeg"
+                                        src="/qr-DogLens.png"
                                         alt="QR"
                                         className="block h-32 w-32"
                                     />

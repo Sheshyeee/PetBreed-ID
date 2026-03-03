@@ -640,7 +640,7 @@ scansLastWeek = 0,
                            {
     label: 'Most Scanned Breed',
     val: mostScannedBreed,
-    sub: 'Most frequent AI prediction',
+    sub: 'Most frequent prediction',
     Icon: Database,
     a: '#8b5cf6',
 },

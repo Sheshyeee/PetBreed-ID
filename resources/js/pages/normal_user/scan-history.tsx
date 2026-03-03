@@ -224,7 +224,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                             <div className="mb-[18px] flex justify-center">
                                 <div className="rounded-xl bg-white p-2 shadow-lg">
                                     <img
-                                        src="/doglens_apk_qr.jpeg"
+                                        src="/qr-DogLens.png"
                                         alt="QR"
                                         className="block h-28 w-28"
                                     />

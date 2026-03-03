@@ -133,7 +133,7 @@ function LandingPage() {
                             <div className="mb-5 flex justify-center">
                                 <div className="rounded-xl bg-white p-3 shadow-lg ring-1 ring-slate-200">
                                     <img
-                                        src="/doglens_apk_qr.jpeg"
+                                        src="/qr-DogLens.png"
                                         alt="QR Code"
                                         className="block h-36 w-36"
                                     />
