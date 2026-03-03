@@ -65,6 +65,8 @@ type PageProps = {
     avgScansPerDay?: number;
     pendingReviewCount: number;
     lowConfidenceCount: number;
+    scansThisWeek?: number;
+scansLastWeek?: number;
     highConfidenceCount: number;
     highConfidenceRate?: number;
     totalScansWeeklyTrend?: number;
@@ -455,6 +457,8 @@ export default function Dashboard() {
         memoryCount = 0,
         avgConfidence = 0,
         memoryHitRate = 0,
+        scansThisWeek = 0,
+scansLastWeek = 0,
         avgScansPerDay = 0,
         learningHeatmap = [],
         heatmapSummary,
@@ -631,13 +635,13 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {(
                         [
-                            {
-                                label: 'Memory Usage Rate',
-                                val: `${memoryHitRate.toFixed(1)}%`,
-                                sub: `Learning Data"`,
-                                Icon: Database,
-                                a: '#8b5cf6',
-                            },
+                           {
+    label: 'Scans This Week',
+    val: scansThisWeek.toString(),
+    sub: `vs ${scansLastWeek} last week`,
+    Icon: BarChart3,
+    a: '#3b82f6',
+},
                             {
                                 label: 'High Confidence Rate',
                                 val: `${highConfidenceRate.toFixed(1)}%`,
