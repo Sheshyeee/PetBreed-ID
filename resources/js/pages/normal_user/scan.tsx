@@ -1055,7 +1055,7 @@ export default function Scan() {
                                             },
                                             {
                                                 n: '02',
-                                                t: 'AI model analyzes visual breed features in ~1.2s',
+                                                t: 'System analyzes visual breed features',
                                             },
                                             {
                                                 n: '03',

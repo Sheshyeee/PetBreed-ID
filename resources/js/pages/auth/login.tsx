@@ -121,10 +121,10 @@ export default function Login({ status }: LoginProps) {
                 .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
                 .lv-dot.on { width:16px; background:#10b981; }
 
-                /* ── RIGHT — more horizontal padding, no min-width squeeze ── */
+                /* ── RIGHT — more horizontal padding, fixed min-width to prevent cutoff ── */
                 .lv-right {
                     flex: 1;
-                    min-width: 0;
+                    min-width: 320px; /* ✅ Increased from 0 to 320px to prevent button text cutoff */
                     padding: 32px 36px; /* ✅ increased horizontal padding from 28px → 36px */
                     display: flex;
                     flex-direction: column;
@@ -194,7 +194,7 @@ export default function Login({ status }: LoginProps) {
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:22px 24px; }
+                    .lv-right { padding:22px 24px; min-width: auto; } /* ✅ reset min-width on mobile */
                 }
             `}</style>
 
