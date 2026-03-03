@@ -62,6 +62,7 @@ type PageProps = {
     results?: Result[];
     correctedBreedCount: number;
     resultCount: number;
+    avgScansPerDay?: number;
     pendingReviewCount: number;
     lowConfidenceCount: number;
     highConfidenceCount: number;
@@ -454,6 +455,7 @@ export default function Dashboard() {
         memoryCount = 0,
         avgConfidence = 0,
         memoryHitRate = 0,
+        avgScansPerDay = 0,
         learningHeatmap = [],
         heatmapSummary,
         breedMemoryWall = [],
@@ -644,12 +646,12 @@ export default function Dashboard() {
                                 a: '#10b981',
                             },
                             {
-                                label: 'Breeds in Memory',
-                                val: uniqueBreedsLearned.toString(),
-                                sub: 'Unique breeds AI has learned',
-                                Icon: Brain,
-                                a: '#10b981',
-                            },
+    label: 'Avg Scans Per Day',
+    val: avgScansPerDay.toFixed(1),
+    sub: 'Daily scanning activity',
+    Icon: BarChart3,
+    a: '#3b82f6',
+},
                         ] as const
                     ).map(({ label, val, sub, Icon, a }) => (
                         <StatCard key={label} accent={a}>

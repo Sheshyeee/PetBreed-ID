@@ -559,6 +559,12 @@ class ScanResultController extends Controller
 
         $lastMilestone = floor($correctedBreedCount / 5) * 5;
 
+        $firstScan = Results::oldest()->first();
+$daysSinceFirst = $firstScan 
+    ? max(1, (int) \Carbon\Carbon::parse($firstScan->created_at)->diffInDays(now()) + 1)
+    : 1;
+$avgScansPerDay = round($resultCount / $daysSinceFirst, 1);
+
         // -------------------------------------------------------------------------
         // Return to Inertia
         // -------------------------------------------------------------------------
@@ -568,6 +574,7 @@ class ScanResultController extends Controller
             'resultCount'               => $resultCount,
             'pendingReviewCount'        => $pendingReviewCount,
             'lowConfidenceCount'        => $lowConfidenceCount,
+            'avgScansPerDay' => $avgScansPerDay,
             'highConfidenceCount'       => $highConfidenceCount,
             'highConfidenceRate'        => $highConfidenceRate,        // ← NEW
             'totalScansWeeklyTrend'     => round($totalScansWeeklyTrend, 1),
