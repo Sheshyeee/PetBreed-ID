@@ -2044,531 +2044,633 @@ Be verbose and detailed. Output ONLY the JSON.";
      * Preserves: Admin correction, exact match caching, learning mechanism, simulations
      * ==========================================
      */
-public function analyze(Request $request)
-{
-    Log::info('=================================');
-    Log::info('=== ANALYZE REQUEST STARTED ===');
-    Log::info('=================================');
 
-    $path = null;
-    $persistentTempPath = null;
+    public function analyze(Request $request)
+    {
+        Log::info('=================================');
+        Log::info('=== ANALYZE REQUEST STARTED ===');
+        Log::info('=================================');
 
-    try {
-        $validated = $request->validate([
-            'image' => [
-                'required',
-                'mimes:jpeg,jpg,png,webp,gif,avif,bmp,svg',
-                'max:10240',
-                function ($attribute, $value, $fail) {
-                    if (!($value instanceof UploadedFile)) {
-                        $fail('The upload was not a valid file.');
-                        return;
+        $path = null;
+        $persistentTempPath = null; // Track temp file for cleanup
+
+        try {
+            $validated = $request->validate([
+                'image' => [
+                    'required',
+                    'mimes:jpeg,jpg,png,webp,gif,avif,bmp,svg',
+                    'max:10240',
+                    function ($attribute, $value, $fail) {
+                        if (!($value instanceof UploadedFile)) {
+                            $fail('The upload was not a valid file.');
+                            return;
+                        }
+
+                        if (!$value->isValid()) {
+                            $fail('The uploaded file is invalid.');
+                            return;
+                        }
+
+                        $tempPath = $value->getRealPath();
+                        if (!$tempPath || !file_exists($tempPath)) {
+                            $fail('Unable to access the uploaded file.');
+                            return;
+                        }
+
+                        $imageInfo = @getimagesize($tempPath);
+                        if ($imageInfo === false) {
+                            $fail('The file must be a valid image.');
+                            return;
+                        }
+
+                        if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
+                            $fail('Image dimensions are too large. Maximum 10000x10000 pixels.');
+                            return;
+                        }
+
+                        $supportedMimes = [
+                            'image/jpeg',
+                            'image/jpg',
+                            'image/png',
+                            'image/webp',
+                            'image/gif',
+                            'image/avif',
+                            'image/bmp',
+                            'image/x-ms-bmp',
+                            'image/svg+xml'
+                        ];
+
+                        if (!in_array($imageInfo['mime'], $supportedMimes)) {
+                            $fail('Unsupported image format: ' . $imageInfo['mime']);
+                            return;
+                        }
                     }
-                    if (!$value->isValid()) {
-                        $fail('The uploaded file is invalid.');
-                        return;
-                    }
-                    $tempPath = $value->getRealPath();
-                    if (!$tempPath || !file_exists($tempPath)) {
-                        $fail('Unable to access the uploaded file.');
-                        return;
-                    }
-                    $imageInfo = @getimagesize($tempPath);
-                    if ($imageInfo === false) {
-                        $fail('The file must be a valid image.');
-                        return;
-                    }
-                    if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
-                        $fail('Image dimensions are too large. Maximum 10000x10000 pixels.');
-                        return;
-                    }
-                    $supportedMimes = [
-                        'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
-                        'image/gif', 'image/avif', 'image/bmp', 'image/x-ms-bmp', 'image/svg+xml'
-                    ];
-                    if (!in_array($imageInfo['mime'], $supportedMimes)) {
-                        $fail('Unsupported image format: ' . $imageInfo['mime']);
-                        return;
-                    }
-                }
-            ],
-        ]);
-
-        Log::info('✓ Validation passed');
-
-        $image     = $request->file('image');
-        $mimeType  = $image->getMimeType();
-
-        $openAiSupported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-        $needsConversion = !in_array($mimeType, $openAiSupported);
-
-        $storageExtension = match ($mimeType) {
-            'image/jpeg', 'image/jpg'        => 'jpg',
-            'image/png'                      => 'png',
-            'image/webp'                     => 'webp',
-            'image/gif'                      => 'gif',
-            'image/avif'                     => 'avif',
-            'image/bmp', 'image/x-ms-bmp'   => 'bmp',
-            default                          => $image->extension()
-        };
-
-        $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $storageExtension;
-        $tempPath = $image->getRealPath();
-
-        if ($needsConversion) {
-            Log::info("→ Unsupported format detected ({$mimeType}) - converting to PNG");
-            $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.png';
-            try {
-                $gdImage = null;
-                if ($mimeType === 'image/avif' && function_exists('imagecreatefromavif')) {
-                    $gdImage = imagecreatefromavif($tempPath);
-                } elseif ($mimeType === 'image/bmp' || $mimeType === 'image/x-ms-bmp') {
-                    $gdImage = imagecreatefrombmp($tempPath);
-                } else {
-                    $imageInfo = getimagesize($tempPath);
-                    switch ($imageInfo[2]) {
-                        case IMAGETYPE_JPEG:  $gdImage = imagecreatefromjpeg($tempPath); break;
-                        case IMAGETYPE_PNG:   $gdImage = imagecreatefrompng($tempPath);  break;
-                        case IMAGETYPE_GIF:   $gdImage = imagecreatefromgif($tempPath);  break;
-                        case IMAGETYPE_WEBP:  $gdImage = imagecreatefromwebp($tempPath); break;
-                        case IMAGETYPE_BMP:   $gdImage = imagecreatefrombmp($tempPath);  break;
-                        default: throw new \Exception("Unable to process image format: {$mimeType}");
-                    }
-                }
-                if ($gdImage === false) throw new \Exception("Failed to load image with GD");
-                if (!imagepng($gdImage, $persistentTempPath, 9)) {
-                    imagedestroy($gdImage);
-                    throw new \Exception("Failed to save converted PNG");
-                }
-                imagedestroy($gdImage);
-                Log::info("✓ Image converted to PNG");
-            } catch (\Exception $e) {
-                Log::error("✗ Image conversion failed: " . $e->getMessage());
-                throw new \Exception("Unable to process {$mimeType} image. Please upload as JPEG, PNG, WebP, or GIF.");
-            }
-        } else {
-            $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $storageExtension;
-            if (!copy($tempPath, $persistentTempPath)) {
-                throw new \Exception('Failed to create temporary image file');
-            }
-            Log::info("✓ Image format ({$mimeType}) compatible - no conversion needed");
-        }
-
-        register_shutdown_function(function () use ($persistentTempPath) {
-            if (file_exists($persistentTempPath)) {
-                @unlink($persistentTempPath);
-                Log::info('✓ Temp file cleaned up on shutdown: ' . basename($persistentTempPath));
-            }
-        });
-
-        $fullPath = $persistentTempPath;
-        Log::info('✓ Persistent temp file created: ' . $fullPath);
-
-        // ==========================================
-        // STEP 1: DOG VALIDATION
-        // ==========================================
-        Log::info('→ Starting dog validation...');
-
-        if (!file_exists($fullPath)) {
-            throw new \Exception('Image file was lost during processing');
-        }
-
-        $dogValidation = $this->validateDogImage($fullPath);
-
-        if (!$dogValidation['is_dog']) {
-            if (file_exists($persistentTempPath)) {
-                @unlink($persistentTempPath);
-            }
-            Log::warning('⚠️ Image rejected - Not a dog', [
-                'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
+                ],
             ]);
+
+            Log::info('✓ Validation passed');
+
+            $image = $request->file('image');
+            $mimeType = $image->getMimeType();
+
+            // ==========================================
+            // ✅ FIXED: LARAVEL CLOUD COMPATIBLE - CONVERT AVIF/BMP TO PNG FOR OPENAI
+            // ==========================================
+
+            // OpenAI supported formats: jpeg, png, webp, gif ONLY
+            $openAiSupported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+            $needsConversion = !in_array($mimeType, $openAiSupported);
+
+            // Determine extension for storage (keep original format in object storage)
+            $storageExtension = match ($mimeType) {
+                'image/jpeg', 'image/jpg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                'image/gif' => 'gif',
+                'image/avif' => 'avif',
+                'image/bmp', 'image/x-ms-bmp' => 'bmp',
+                default => $image->extension()
+            };
+
+            $filename = time() . '_' . pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME) . '.' . $storageExtension;
+
+            // ==========================================
+            // FIXED: Create temp file and convert unsupported formats to PNG for OpenAI
+            // ==========================================
+            $tempPath = $image->getRealPath();
+
+            if ($needsConversion) {
+                Log::info("→ Unsupported format detected ({$mimeType}) - converting to PNG for OpenAI API compatibility");
+
+                // Create temp PNG file for OpenAI API
+                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.png';
+
+                try {
+                    // Use GD library (built into Laravel Cloud)
+                    $gdImage = null;
+
+                    // Load based on original format
+                    if ($mimeType === 'image/avif' && function_exists('imagecreatefromavif')) {
+                        $gdImage = imagecreatefromavif($tempPath);
+                    } elseif ($mimeType === 'image/bmp' || $mimeType === 'image/x-ms-bmp') {
+                        $gdImage = imagecreatefrombmp($tempPath);
+                    } else {
+                        // Fallback: try to detect from file
+                        $imageInfo = getimagesize($tempPath);
+                        switch ($imageInfo[2]) {
+                            case IMAGETYPE_JPEG:
+                                $gdImage = imagecreatefromjpeg($tempPath);
+                                break;
+                            case IMAGETYPE_PNG:
+                                $gdImage = imagecreatefrompng($tempPath);
+                                break;
+                            case IMAGETYPE_GIF:
+                                $gdImage = imagecreatefromgif($tempPath);
+                                break;
+                            case IMAGETYPE_WEBP:
+                                $gdImage = imagecreatefromwebp($tempPath);
+                                break;
+                            case IMAGETYPE_BMP:
+                                $gdImage = imagecreatefrombmp($tempPath);
+                                break;
+                            default:
+                                throw new \Exception("Unable to process image format: {$mimeType}");
+                        }
+                    }
+
+                    if ($gdImage === false) {
+                        throw new \Exception("Failed to load image with GD");
+                    }
+
+                    // Save as PNG (universally supported by OpenAI)
+                    if (!imagepng($gdImage, $persistentTempPath, 9)) {
+                        imagedestroy($gdImage);
+                        throw new \Exception("Failed to save converted PNG");
+                    }
+
+                    imagedestroy($gdImage);
+                    Log::info("✓ Image converted to PNG for OpenAI API compatibility");
+                } catch (\Exception $e) {
+                    Log::error("✗ Image conversion failed: " . $e->getMessage());
+
+                    // If conversion fails, reject unsupported formats
+                    throw new \Exception(
+                        "Unable to process {$mimeType} image. " .
+                            "Please upload as JPEG, PNG, WebP, or GIF for best compatibility."
+                    );
+                }
+            } else {
+                // Supported format - copy directly (no conversion needed)
+                $persistentTempPath = sys_get_temp_dir() . '/' . uniqid('dog_scan_', true) . '.' . $storageExtension;
+
+                // Copy to our controlled temp location
+                if (!copy($tempPath, $persistentTempPath)) {
+                    throw new \Exception('Failed to create temporary image file');
+                }
+
+                Log::info("✓ Image format ({$mimeType}) is OpenAI compatible - no conversion needed");
+            }
+
+            // Register cleanup on shutdown (ensures file is deleted even if script crashes)
+            register_shutdown_function(function () use ($persistentTempPath) {
+                if (file_exists($persistentTempPath)) {
+                    @unlink($persistentTempPath);
+                    Log::info('✓ Temp file cleaned up on shutdown: ' . basename($persistentTempPath));
+                }
+            });
+
+            $fullPath = $persistentTempPath; // Use this for AI processing
+
+            Log::info('✓ Persistent temp file created: ' . $fullPath);
+
+            // ==========================================
+            // STEP 1: DOG VALIDATION
+            // ==========================================
+            Log::info('→ Starting dog validation...');
+
+            // Validate file exists before dog validation
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Image file was lost during processing');
+            }
+
+            $dogValidation = $this->validateDogImage($fullPath);
+
+            if (!$dogValidation['is_dog']) {
+                // Clean up temp file before returning
+                if (file_exists($persistentTempPath)) {
+                    @unlink($persistentTempPath);
+                }
+
+                Log::warning('⚠️ Image rejected - Not a dog', [
+                    'validation_response' => $dogValidation['raw_response'] ?? 'N/A'
+                ]);
+
+                // Return error response for non-dog images
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                        'not_a_dog' => true
+                    ], 400);
+                }
+
+                return redirect()->back()->with('error', [
+                    'message' => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
+                    'not_a_dog' => true
+                ]);
+            }
+
+            Log::info('✓ Dog validation passed - proceeding with breed analysis');
+
+            // ==========================================
+            // STEP 2: STORE IMAGE (only after dog validation passes)
+            // ==========================================
+
+            // Validate file exists before storing
+            if (!file_exists($persistentTempPath)) {
+                throw new \Exception('Image file was lost before storage');
+            }
+
+            $path = $image->storeAs('scans', $filename, 'object-storage');
+
+            // Verify file was uploaded successfully
+            Storage::disk('object-storage')->put($path, file_get_contents($persistentTempPath));
+
+            // Validate file exists after storage
+            if (!file_exists($persistentTempPath)) {
+                throw new \Exception('Image file was lost after storage');
+            }
+
+            Log::info('✓ Image saved to object storage: ' . $path);
+
+            // ==========================================
+            // STEP 3: CALCULATE IMAGE HASH
+            // ==========================================
+
+            // Validate file exists before hashing
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Image file was lost before hash calculation');
+            }
+
+            $imageHash = $this->calculateImageHash($fullPath);
+            Log::info('✓ Image hash calculated: ' . $imageHash);
+
+            // Check for exact image match
+            list($hasExactMatch, $previousResult) = $this->checkExactImageMatch($imageHash);
+
+            // Check for admin correction
+            list($hasCorrection, $correction) = $this->checkAdminCorrection($imageHash);
+
+            // Determine breed and confidence
+            $detectedBreed = null;
+            $confidence = null;
+            $topPredictions = [];
+            $predictionMethod = 'exact_match';
+            $dogFeatures = [];
+            $aiData = ['description' => '', 'origin_history' => [], 'health_risks' => []];
+            $simulationData = [];
+
+            if ($hasCorrection) {
+                // EXACT IMAGE WITH ADMIN CORRECTION = 100%
+                $detectedBreed = $correction->corrected_breed;
+                $confidence = 100.0;
+                $topPredictions = [
+                    ['breed' => $detectedBreed, 'confidence' => 100.0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                    ['breed' => 'Other Breeds', 'confidence' => 0],
+                ];
+                $predictionMethod = 'admin_corrected';
+
+                // REUSE ALL DATA FROM PREVIOUS RESULT INCLUDING SIMULATIONS
+                $aiData = [
+                    'description' => $previousResult->description,
+                    'origin_history' => $previousResult->origin_history,
+                    'health_risks' => $previousResult->health_risks,
+                ];
+
+                $previousSimulationData = is_string($previousResult->simulation_data)
+                    ? json_decode($previousResult->simulation_data, true)
+                    : $previousResult->simulation_data;
+
+                $dogFeatures = $previousSimulationData['dog_features'] ?? [];
+
+                // CACHE SIMULATIONS - Copy from previous result
+                $simulationData = [
+                    '1_years' => $previousSimulationData['1_years'] ?? null,
+                    '3_years' => $previousSimulationData['3_years'] ?? null,
+                    'status' => $previousSimulationData['status'] ?? 'complete',
+                    'dog_features' => $dogFeatures,
+                    'prediction_method' => $predictionMethod,
+                    'is_exact_match' => true,
+                    'has_admin_correction' => true,
+                ];
+
+                Log::info('✓✓✓ ADMIN-CORRECTED EXACT MATCH - SIMULATIONS CACHED', [
+                    'breed' => $detectedBreed,
+                    'confidence' => '100%',
+                    'method' => 'admin_corrected',
+                    'simulations_cached' => [
+                        '1_years' => !is_null($simulationData['1_years']),
+                        '3_years' => !is_null($simulationData['3_years']),
+                    ]
+                ]);
+            } elseif ($hasExactMatch && $previousResult) {
+                // EXACT IMAGE MATCH - REUSE ALL DATA
+                $detectedBreed = $previousResult->breed;
+                $confidence = $previousResult->confidence;
+                $topPredictions = $previousResult->top_predictions;
+                $predictionMethod = 'exact_match';
+
+                // REUSE ALL DATA FROM PREVIOUS RESULT
+                $aiData = [
+                    'description' => $previousResult->description,
+                    'origin_history' => $previousResult->origin_history,
+                    'health_risks' => $previousResult->health_risks,
+                ];
+
+                // CACHE SIMULATIONS - Copy from previous result
+                $previousSimulationData = is_string($previousResult->simulation_data)
+                    ? json_decode($previousResult->simulation_data, true)
+                    : $previousResult->simulation_data;
+
+                $dogFeatures = $previousSimulationData['dog_features'] ?? [];
+
+                $simulationData = [
+                    '1_years' => $previousSimulationData['1_years'] ?? null,
+                    '3_years' => $previousSimulationData['3_years'] ?? null,
+                    'status' => $previousSimulationData['status'] ?? 'complete',
+                    'dog_features' => $dogFeatures,
+                    'prediction_method' => $predictionMethod,
+                    'is_exact_match' => true,
+                    'has_admin_correction' => false,
+                ];
+
+                Log::info('✓ EXACT IMAGE MATCH - ALL DATA CACHED', [
+                    'breed' => $detectedBreed,
+                    'confidence' => $confidence . '%',
+                    'method' => 'exact_match',
+                    'previous_scan' => $previousResult->scan_id,
+                    'simulations_cached' => [
+                        '1_years' => !is_null($simulationData['1_years']),
+                        '3_years' => !is_null($simulationData['3_years']),
+                    ]
+                ]);
+            } else {
+                // NEW IMAGE — YOLO runs first, then Gemini Pro Preview makes the final call
+                Log::info('→ New image — running YOLO classification + Gemini Pro forensic analysis...');
+
+                if (!file_exists($fullPath)) {
+                    throw new \Exception('Image file was lost before breed identification');
+                }
+
+                // ── STEP A: ML API (YOLO — fast classification + hybrid flag) ──────────
+                $mlResult = $this->identifyBreedWithModel($fullPath);
+
+                if ($mlResult['success']) {
+                    $mlBreed        = $mlResult['breed'];
+                    $mlConfidence   = $mlResult['confidence']; // already percentage
+                    $mlMethod       = $mlResult['method'];
+                    $isHybridProne  = $mlResult['metadata']['learning_stats']['is_hybrid_prone'] ?? false;
+
+                    Log::info('✓ ML model result', [
+                        'breed'          => $mlBreed,
+                        'confidence'     => $mlConfidence,
+                        'method'         => $mlMethod,
+                        'is_hybrid_prone' => $isHybridProne,
+                    ]);
+
+                    // ── STEP B: GEMINI Pro Preview — the sole intelligent brain ──────────
+                    // Always runs on every new image.
+                    // When YOLO flagged a hybrid-prone breed, we inject that signal
+                    // so Gemini knows to apply extra scrutiny for hybrid detection.
+                    // Gemini Pro Preview (not Flash) makes the final call on everything.
+                    $hybridContext = '';
+                    if ($isHybridProne) {
+                        $hybridContext = " NOTE: The ML model flagged \"{$mlBreed}\" as a hybrid-prone breed — pay extra attention to hybrid indicators (coat texture, mixed proportions, features from two breeds). Check carefully if this could be a recognized designer hybrid (Cockapoo, Goldendoodle, Labradoodle, Cavapoo, Maltipoo, etc.).";
+                        Log::info('⚠️ Hybrid-prone breed flagged — injecting hybrid context into Gemini Pro prompt');
+                    }
+
+                    Log::info('→ Running Gemini Pro Preview (full forensic analysis)...');
+
+                    $geminiResult = $this->identifyBreedWithAPI(
+                        $fullPath,
+                        false,
+                        $mlBreed . $hybridContext,
+                        $mlConfidence
+                    );
+
+                    if ($geminiResult['success']) {
+                        $geminiBreed      = $geminiResult['breed'];
+                        $geminiConfidence = $geminiResult['confidence'];
+
+                        if (strtolower(trim($geminiBreed)) !== strtolower(trim($mlBreed)) && $geminiConfidence >= 75) {
+                            // Gemini disagrees with YOLO — trust Gemini
+                            // This covers both hybrid corrections AND breed corrections
+                            $detectedBreed    = $geminiBreed;
+                            $confidence       = $geminiConfidence;
+                            $predictionMethod = $isHybridProne ? 'gemini_hybrid_override' : 'gemini_override';
+                            Log::info('✓ Gemini overrides YOLO', [
+                                'yolo_breed'   => $mlBreed,
+                                'gemini_breed' => $geminiBreed,
+                                'gemini_conf'  => $geminiConfidence,
+                                'hybrid_prone' => $isHybridProne,
+                            ]);
+                        } else {
+                            // Gemini agrees with YOLO — use YOLO breed, take higher confidence
+                            $detectedBreed    = $mlBreed;
+                            $confidence       = max($mlConfidence, $geminiConfidence);
+                            $predictionMethod = 'ml_gemini_confirmed';
+                            Log::info('✓ Gemini confirms YOLO breed', [
+                                'breed'      => $detectedBreed,
+                                'confidence' => $confidence,
+                            ]);
+                        }
+
+                        $topPredictions = $geminiResult['top_predictions'];
+                    } else {
+                        // Gemini failed — use ML result only
+                        Log::warning('⚠️ Gemini failed — using ML result only', [
+                            'error' => $geminiResult['error'] ?? 'unknown',
+                        ]);
+                        $detectedBreed    = $mlBreed;
+                        $confidence       = $mlConfidence;
+                        $predictionMethod = $mlMethod;
+                        $topPredictions   = $mlResult['top_predictions'];
+                    }
+                } else {
+                    // ML API unavailable — fall back to Gemini-only (original behaviour)
+                    Log::warning('⚠️ ML API unavailable — falling back to Gemini-only', [
+                        'error' => $mlResult['error'] ?? 'unknown',
+                    ]);
+
+                    $predictionResult = $this->identifyBreedWithAPI($fullPath, false);
+
+                    if (!$predictionResult['success']) {
+                        Log::error('✗ Both ML and Gemini failed: ' . ($predictionResult['error'] ?? ''));
+
+                        $errorMessage = $predictionResult['error'] ?? '';
+                        $userMessage  = 'Unable to identify the dog breed. Please try again.';
+
+                        if (str_contains($errorMessage, 'API key not configured')) {
+                            $userMessage = 'Service is temporarily unavailable. Please contact support.';
+                        } elseif (str_contains($errorMessage, 'quota') || str_contains($errorMessage, 'rate limit')) {
+                            $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
+                        } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'Connection')) {
+                            $userMessage = 'Network connection issue. Please check your internet and try again.';
+                        } elseif (str_contains($errorMessage, 'Image file not found')) {
+                            $userMessage = 'Failed to process the image. Please try uploading again.';
+                        } elseif (str_contains($errorMessage, 'Invalid image')) {
+                            $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+                        }
+
+                        throw new \Exception($userMessage);
+                    }
+
+                    $detectedBreed    = $predictionResult['breed'];
+                    $confidence       = $predictionResult['confidence'];
+                    $predictionMethod = $predictionResult['method'];
+                    $topPredictions   = $predictionResult['top_predictions'];
+                }
+
+                Log::info('✓ Final breed identification', [
+                    'breed'      => $detectedBreed,
+                    'confidence' => $confidence,
+                    'method'     => $predictionMethod,
+                    'range'      => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : 'Low'),
+                ]);
+
+                // Generate AI descriptions — check DB cache first to avoid ~10s Flash call
+                // If we've scanned this breed before, reuse description/health/origin data
+                $cachedResult = Results::where('breed', $detectedBreed)
+                    ->whereNotNull('description')
+                    ->where('description', '!=', '')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($cachedResult && !empty($cachedResult->description)) {
+                    Log::info('⚡ Using cached AI description for breed: ' . $detectedBreed);
+                    $aiData = [
+                        'description'    => $cachedResult->description,
+                        'origin_history' => is_string($cachedResult->origin_history)
+                            ? json_decode($cachedResult->origin_history, true)
+                            : ($cachedResult->origin_history ?? []),
+                        'health_risks'   => is_string($cachedResult->health_risks)
+                            ? json_decode($cachedResult->health_risks, true)
+                            : ($cachedResult->health_risks ?? []),
+                    ];
+                } else {
+                    $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
+                }
+
+                // Initialize simulation data — identical to original
+                $simulationData = [
+                    '1_years'              => null,
+                    '3_years'              => null,
+                    'status'               => 'pending',
+                    'dog_features'         => [],
+                    'prediction_method'    => $predictionMethod,
+                    'is_exact_match'       => false,
+                    'has_admin_correction' => false,
+                ];
+
+                Log::info('✓ NEW scan prediction completed', [
+                    'breed'      => $detectedBreed,
+                    'confidence' => $confidence,
+                    'method'     => $predictionMethod,
+                ]);
+            }
+
+            // Save to Database
+            $uniqueId = strtoupper(Str::random(6));
+
+            $dbResult = Results::create([
+                'scan_id' => $uniqueId,
+                'user_id' => Auth::id(),
+                'image' => $path,
+                'image_hash' => $imageHash,
+                'breed' => $detectedBreed,
+                'confidence' => round($confidence, 2),
+                'pending' => 'pending',
+                'top_predictions' => $topPredictions,
+                'description' => $aiData['description'],
+                'origin_history' => is_string($aiData['origin_history']) ? $aiData['origin_history'] : json_encode($aiData['origin_history']),
+                'health_risks' => is_string($aiData['health_risks']) ? $aiData['health_risks'] : json_encode($aiData['health_risks']),
+                'age_simulation' => null,
+                'simulation_data' => json_encode($simulationData),
+            ]);
+
+            session(['last_scan_id' => $dbResult->scan_id]);
+
+            // Only dispatch simulation job for NEW images (not exact matches)
+            if (!$hasExactMatch) {
+                // CRITICAL FIX: Pass object storage path ($path), NOT temp file path ($fullPath)
+                \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $path);
+                Log::info('✓ Simulation job dispatched for new image', [
+                    'storage_path' => $path
+                ]);
+            } else {
+                Log::info('✓ Simulations cached from previous scan - no job dispatched');
+            }
+
+            // Clean up persistent temp file (success case)
+            if (file_exists($persistentTempPath)) {
+                @unlink($persistentTempPath);
+                Log::info('✓ Temp file cleaned up after successful processing');
+            }
+
+            $responseData = [
+                'scan_id' => $dbResult->scan_id,
+                'breed' => $dbResult->breed,
+                'confidence' => $dbResult->confidence,
+                'image' => $dbResult->image,
+                'image_url' => asset('storage/' . $dbResult->image),
+                'top_predictions' => $dbResult->top_predictions,
+                'description' => $dbResult->description,
+                'created_at' => $dbResult->created_at,
+                'prediction_method' => $predictionMethod,
+                'is_exact_match' => $hasExactMatch,
+                'has_admin_correction' => $hasCorrection,
+            ];
+
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
-                    'success'    => false,
-                    'message'    => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
-                    'not_a_dog'  => true
-                ], 400);
+                    'success' => true,
+                    'data' => $responseData,
+                    'message' => 'Analysis completed successfully'
+                ], 200);
             }
+
+            // For web requests, redirect to scan-results page
+            return redirect('/scan-results');
+        } catch (\Exception $e) {
+            Log::error('Analyze Error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            // Clean up persistent temp file (error case)
+            if (isset($persistentTempPath) && file_exists($persistentTempPath)) {
+                @unlink($persistentTempPath);
+                Log::info('✓ Temp file cleaned up after error');
+            }
+
+            // Clean up object storage if upload succeeded
+            if ($path && Storage::disk('object-storage')->exists($path)) {
+                Storage::disk('object-storage')->delete($path);
+                Log::info('✓ Object storage file cleaned up after error');
+            }
+
+            // User-friendly error messages (no mention of OpenAI/API)
+            $userMessage = 'An unexpected error occurred. Please try again.';
+
+            if (str_contains($e->getMessage(), 'Service is temporarily unavailable')) {
+                $userMessage = 'Service is temporarily unavailable. Please contact support.';
+            } elseif (str_contains($e->getMessage(), 'temporarily busy')) {
+                $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
+            } elseif (str_contains($e->getMessage(), 'Network connection issue')) {
+                $userMessage = 'Network connection issue. Please check your internet and try again.';
+            } elseif (str_contains($e->getMessage(), 'Failed to process the image')) {
+                $userMessage = 'Failed to process the uploaded image. Please try uploading again.';
+            } elseif (str_contains($e->getMessage(), 'image appears to be corrupted')) {
+                $userMessage = 'The image appears to be corrupted. Please try a different photo.';
+            } elseif (str_contains($e->getMessage(), 'Unable to identify')) {
+                $userMessage = 'Unable to identify the dog breed. Please try again with a clearer photo.';
+            } elseif (str_contains($e->getMessage(), 'Image file was lost')) {
+                $userMessage = 'Image processing failed. Please try uploading again.';
+            }
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $userMessage
+                ], 500);
+            }
+
             return redirect()->back()->with('error', [
-                'message'   => 'This image does not appear to contain a dog. Please upload a clear photo of a dog for breed identification.',
-                'not_a_dog' => true
+                'message' => $userMessage,
             ]);
         }
-
-        Log::info('✓ Dog validation passed - proceeding with breed analysis');
-
-        // ==========================================
-        // STEP 2: STORE IMAGE
-        // ==========================================
-        if (!file_exists($persistentTempPath)) {
-            throw new \Exception('Image file was lost before storage');
-        }
-
-        $path = $image->storeAs('scans', $filename, 'object-storage');
-        Storage::disk('object-storage')->put($path, file_get_contents($persistentTempPath));
-
-        if (!file_exists($persistentTempPath)) {
-            throw new \Exception('Image file was lost after storage');
-        }
-
-        Log::info('✓ Image saved to object storage: ' . $path);
-
-        // ==========================================
-        // STEP 3: CALCULATE IMAGE HASH
-        // ==========================================
-        if (!file_exists($fullPath)) {
-            throw new \Exception('Image file was lost before hash calculation');
-        }
-
-        $imageHash = $this->calculateImageHash($fullPath);
-        Log::info('✓ Image hash calculated: ' . $imageHash);
-
-        list($hasExactMatch, $previousResult) = $this->checkExactImageMatch($imageHash);
-        list($hasCorrection, $correction)     = $this->checkAdminCorrection($imageHash);
-
-        $detectedBreed    = null;
-        $confidence       = null;
-        $topPredictions   = [];
-        $predictionMethod = 'exact_match';
-        $dogFeatures      = [];
-        $aiData           = ['description' => '', 'origin_history' => [], 'health_risks' => []];
-        $simulationData   = [];
-
-        if ($hasCorrection) {
-            // ── EXACT IMAGE WITH ADMIN CORRECTION = 100% ──────────────────────
-            $detectedBreed  = $correction->corrected_breed;
-            $confidence     = 100.0;
-            $topPredictions = [
-                ['breed' => $detectedBreed, 'confidence' => 100.0],
-                ['breed' => 'Other Breeds',  'confidence' => 0],
-                ['breed' => 'Other Breeds',  'confidence' => 0],
-                ['breed' => 'Other Breeds',  'confidence' => 0],
-                ['breed' => 'Other Breeds',  'confidence' => 0],
-            ];
-            $predictionMethod = 'admin_corrected';
-
-            $aiData = [
-                'description'    => $previousResult->description,
-                'origin_history' => $previousResult->origin_history,
-                'health_risks'   => $previousResult->health_risks,
-            ];
-
-            $previousSimulationData = is_string($previousResult->simulation_data)
-                ? json_decode($previousResult->simulation_data, true)
-                : $previousResult->simulation_data;
-
-            $dogFeatures    = $previousSimulationData['dog_features'] ?? [];
-            $simulationData = [
-                '1_years'              => $previousSimulationData['1_years'] ?? null,
-                '3_years'              => $previousSimulationData['3_years'] ?? null,
-                'status'               => $previousSimulationData['status'] ?? 'complete',
-                'dog_features'         => $dogFeatures,
-                'prediction_method'    => $predictionMethod,
-                'is_exact_match'       => true,
-                'has_admin_correction' => true,
-            ];
-
-            Log::info('✓✓✓ ADMIN-CORRECTED EXACT MATCH - SIMULATIONS CACHED', [
-                'breed'              => $detectedBreed,
-                'confidence'         => '100%',
-                'method'             => 'admin_corrected',
-                'simulations_cached' => [
-                    '1_years' => !is_null($simulationData['1_years']),
-                    '3_years' => !is_null($simulationData['3_years']),
-                ]
-            ]);
-
-        } elseif ($hasExactMatch && $previousResult) {
-            // ── EXACT IMAGE MATCH - REUSE ALL DATA ────────────────────────────
-            $detectedBreed    = $previousResult->breed;
-            $confidence       = $previousResult->confidence;
-            $topPredictions   = $previousResult->top_predictions;
-            $predictionMethod = 'exact_match';
-
-            $aiData = [
-                'description'    => $previousResult->description,
-                'origin_history' => $previousResult->origin_history,
-                'health_risks'   => $previousResult->health_risks,
-            ];
-
-            $previousSimulationData = is_string($previousResult->simulation_data)
-                ? json_decode($previousResult->simulation_data, true)
-                : $previousResult->simulation_data;
-
-            $dogFeatures    = $previousSimulationData['dog_features'] ?? [];
-            $simulationData = [
-                '1_years'              => $previousSimulationData['1_years'] ?? null,
-                '3_years'              => $previousSimulationData['3_years'] ?? null,
-                'status'               => $previousSimulationData['status'] ?? 'complete',
-                'dog_features'         => $dogFeatures,
-                'prediction_method'    => $predictionMethod,
-                'is_exact_match'       => true,
-                'has_admin_correction' => false,
-            ];
-
-            Log::info('✓ EXACT IMAGE MATCH - ALL DATA CACHED', [
-                'breed'              => $detectedBreed,
-                'confidence'         => $confidence . '%',
-                'method'             => 'exact_match',
-                'previous_scan'      => $previousResult->scan_id,
-                'simulations_cached' => [
-                    '1_years' => !is_null($simulationData['1_years']),
-                    '3_years' => !is_null($simulationData['3_years']),
-                ]
-            ]);
-
-        } else {
-            // ══════════════════════════════════════════════════════════════════
-            // NEW IMAGE — GEMINI IS ALWAYS THE PRIMARY CLASSIFIER
-            // YOLO runs in parallel as a 100%-confidence-only emergency fallback.
-            // Gemini classifies completely independently (no YOLO hint injected).
-            // ══════════════════════════════════════════════════════════════════
-            Log::info('→ New image — Gemini classifying independently (no ML hint)...');
-
-            if (!file_exists($fullPath)) {
-                throw new \Exception('Image file was lost before breed identification');
-            }
-
-            // ── STEP A: ML API (YOLO) — runs only for the 100% fallback ──────
-            // We run YOLO alongside Gemini, but its result is NEVER passed to
-            // Gemini and is only used if Gemini itself fails completely.
-            $mlResult      = $this->identifyBreedWithModel($fullPath);
-            $mlBreed       = null;
-            $mlConfidence  = 0;
-            $isHybridProne = false;
-
-            if ($mlResult['success']) {
-                $mlBreed       = $mlResult['breed'];
-                $mlConfidence  = $mlResult['confidence']; // already percentage
-                $isHybridProne = $mlResult['metadata']['learning_stats']['is_hybrid_prone'] ?? false;
-
-                Log::info('✓ ML model result (standalone — NOT passed to Gemini)', [
-                    'breed'            => $mlBreed,
-                    'confidence'       => $mlConfidence,
-                    'method'           => $mlResult['method'],
-                    'is_hybrid_prone'  => $isHybridProne,
-                ]);
-            } else {
-                Log::warning('⚠️ ML API unavailable — Gemini will be the sole classifier', [
-                    'error' => $mlResult['error'] ?? 'unknown',
-                ]);
-            }
-
-            // ── STEP B: GEMINI — classifies completely on its own ─────────────
-            // NO mlBreed and NO mlConfidence passed → Gemini has zero YOLO bias.
-            // Gemini's answer is ALWAYS the final answer.
-            Log::info('→ Running Gemini (fully independent — no YOLO hint)...');
-
-            $geminiResult = $this->identifyBreedWithAPI(
-                $fullPath,
-                false,
-                null,   // ← no ML breed hint
-                null    // ← no ML confidence hint
-            );
-
-            if ($geminiResult['success']) {
-                // ✅ GEMINI IS ALWAYS THE FINAL ANSWER
-                $detectedBreed    = $geminiResult['breed'];
-                $confidence       = $geminiResult['confidence'];
-                $predictionMethod = 'gemini_primary';
-                $topPredictions   = $geminiResult['top_predictions'];
-
-                Log::info('✓ Gemini classification is the final result', [
-                    'gemini_breed'      => $detectedBreed,
-                    'gemini_confidence' => $confidence,
-                    'ml_also_said'      => $mlBreed ?? 'unavailable',
-                    'ml_confidence'     => $mlConfidence,
-                ]);
-
-            } elseif ($mlResult['success'] && $mlConfidence >= 100) {
-                // ── EMERGENCY FALLBACK: Gemini failed + YOLO is 100% certain ──
-                // Only in this case do we accept YOLO's answer.
-                $detectedBreed    = $mlBreed;
-                $confidence       = $mlConfidence;
-                $predictionMethod = 'ml_100_gemini_failed';
-                $topPredictions   = $mlResult['top_predictions'];
-
-                Log::warning('⚠️ Gemini failed — using ML 100% result as emergency fallback', [
-                    'breed'       => $detectedBreed,
-                    'confidence'  => $confidence,
-                    'gemini_error' => $geminiResult['error'] ?? 'unknown',
-                ]);
-
-            } else {
-                // ── TOTAL FAILURE — both Gemini and YOLO couldn't help ─────────
-                Log::error('✗ Both Gemini and ML failed', [
-                    'gemini_error' => $geminiResult['error'] ?? 'unknown',
-                    'ml_success'   => $mlResult['success'],
-                    'ml_confidence' => $mlConfidence,
-                ]);
-
-                $errorMessage = $geminiResult['error'] ?? '';
-                $userMessage  = 'Unable to identify the dog breed. Please try again.';
-
-                if (str_contains($errorMessage, 'API key not configured')) {
-                    $userMessage = 'Service is temporarily unavailable. Please contact support.';
-                } elseif (str_contains($errorMessage, 'quota') || str_contains($errorMessage, 'rate limit')) {
-                    $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
-                } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'Connection')) {
-                    $userMessage = 'Network connection issue. Please check your internet and try again.';
-                } elseif (str_contains($errorMessage, 'Image file not found')) {
-                    $userMessage = 'Failed to process the image. Please try uploading again.';
-                } elseif (str_contains($errorMessage, 'Invalid image')) {
-                    $userMessage = 'The image appears to be corrupted. Please try a different photo.';
-                }
-
-                throw new \Exception($userMessage);
-            }
-
-            Log::info('✓ Final breed identification', [
-                'breed'      => $detectedBreed,
-                'confidence' => $confidence,
-                'method'     => $predictionMethod,
-                'range'      => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : 'Low'),
-            ]);
-
-            // Generate AI descriptions — check DB cache first
-            $cachedResult = Results::where('breed', $detectedBreed)
-                ->whereNotNull('description')
-                ->where('description', '!=', '')
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if ($cachedResult && !empty($cachedResult->description)) {
-                Log::info('⚡ Using cached AI description for breed: ' . $detectedBreed);
-                $aiData = [
-                    'description'    => $cachedResult->description,
-                    'origin_history' => is_string($cachedResult->origin_history)
-                        ? json_decode($cachedResult->origin_history, true)
-                        : ($cachedResult->origin_history ?? []),
-                    'health_risks'   => is_string($cachedResult->health_risks)
-                        ? json_decode($cachedResult->health_risks, true)
-                        : ($cachedResult->health_risks ?? []),
-                ];
-            } else {
-                $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
-            }
-
-            $simulationData = [
-                '1_years'              => null,
-                '3_years'              => null,
-                'status'               => 'pending',
-                'dog_features'         => [],
-                'prediction_method'    => $predictionMethod,
-                'is_exact_match'       => false,
-                'has_admin_correction' => false,
-            ];
-
-            Log::info('✓ NEW scan prediction completed', [
-                'breed'      => $detectedBreed,
-                'confidence' => $confidence,
-                'method'     => $predictionMethod,
-            ]);
-        }
-
-        // ==========================================
-        // SAVE TO DATABASE
-        // ==========================================
-        $uniqueId = strtoupper(Str::random(6));
-
-        $dbResult = Results::create([
-            'scan_id'         => $uniqueId,
-            'user_id'         => Auth::id(),
-            'image'           => $path,
-            'image_hash'      => $imageHash,
-            'breed'           => $detectedBreed,
-            'confidence'      => round($confidence, 2),
-            'pending'         => 'pending',
-            'top_predictions' => $topPredictions,
-            'description'     => $aiData['description'],
-            'origin_history'  => is_string($aiData['origin_history']) ? $aiData['origin_history'] : json_encode($aiData['origin_history']),
-            'health_risks'    => is_string($aiData['health_risks'])    ? $aiData['health_risks']   : json_encode($aiData['health_risks']),
-            'age_simulation'  => null,
-            'simulation_data' => json_encode($simulationData),
-        ]);
-
-        session(['last_scan_id' => $dbResult->scan_id]);
-
-        if (!$hasExactMatch) {
-            \App\Jobs\GenerateAgeSimulations::dispatch($dbResult->id, $detectedBreed, $path);
-            Log::info('✓ Simulation job dispatched for new image', ['storage_path' => $path]);
-        } else {
-            Log::info('✓ Simulations cached from previous scan - no job dispatched');
-        }
-
-        if (file_exists($persistentTempPath)) {
-            @unlink($persistentTempPath);
-            Log::info('✓ Temp file cleaned up after successful processing');
-        }
-
-        $responseData = [
-            'scan_id'           => $dbResult->scan_id,
-            'breed'             => $dbResult->breed,
-            'confidence'        => $dbResult->confidence,
-            'image'             => $dbResult->image,
-            'image_url'         => asset('storage/' . $dbResult->image),
-            'top_predictions'   => $dbResult->top_predictions,
-            'description'       => $dbResult->description,
-            'created_at'        => $dbResult->created_at,
-            'prediction_method' => $predictionMethod,
-            'is_exact_match'    => $hasExactMatch,
-            'has_admin_correction' => $hasCorrection,
-        ];
-
-        if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json([
-                'success' => true,
-                'data'    => $responseData,
-                'message' => 'Analysis completed successfully'
-            ], 200);
-        }
-
-        return redirect('/scan-results');
-
-    } catch (\Exception $e) {
-        Log::error('Analyze Error: ' . $e->getMessage());
-        Log::error('Stack trace: ' . $e->getTraceAsString());
-
-        if (isset($persistentTempPath) && file_exists($persistentTempPath)) {
-            @unlink($persistentTempPath);
-            Log::info('✓ Temp file cleaned up after error');
-        }
-
-        if ($path && Storage::disk('object-storage')->exists($path)) {
-            Storage::disk('object-storage')->delete($path);
-            Log::info('✓ Object storage file cleaned up after error');
-        }
-
-        $userMessage = 'An unexpected error occurred. Please try again.';
-
-        if (str_contains($e->getMessage(), 'Service is temporarily unavailable')) {
-            $userMessage = 'Service is temporarily unavailable. Please contact support.';
-        } elseif (str_contains($e->getMessage(), 'temporarily busy')) {
-            $userMessage = 'Service is temporarily busy. Please try again in a few minutes.';
-        } elseif (str_contains($e->getMessage(), 'Network connection issue')) {
-            $userMessage = 'Network connection issue. Please check your internet and try again.';
-        } elseif (str_contains($e->getMessage(), 'Failed to process the image')) {
-            $userMessage = 'Failed to process the uploaded image. Please try uploading again.';
-        } elseif (str_contains($e->getMessage(), 'image appears to be corrupted')) {
-            $userMessage = 'The image appears to be corrupted. Please try a different photo.';
-        } elseif (str_contains($e->getMessage(), 'Unable to identify')) {
-            $userMessage = 'Unable to identify the dog breed. Please try again with a clearer photo.';
-        } elseif (str_contains($e->getMessage(), 'Image file was lost')) {
-            $userMessage = 'Image processing failed. Please try uploading again.';
-        }
-
-        if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json([
-                'success' => false,
-                'message' => $userMessage
-            ], 500);
-        }
-
-        return redirect()->back()->with('error', [
-            'message' => $userMessage,
-        ]);
     }
-}
 
 
 

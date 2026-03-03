@@ -1,7 +1,5 @@
 import AuthLayout from '@/layouts/auth-layout';
-
 import { usePage } from '@inertiajs/react';
-
 import { CheckCircle2, PawPrint, XCircle } from 'lucide-react';
 
 interface LoginProps {
@@ -52,7 +50,7 @@ export default function Login({ status }: LoginProps) {
                     box-shadow: 0 16px 48px rgba(0,0,0,.1);
                     background: #fff;
                     width: 100%;
-                    max-width: 760px; /* ✅ increased from 660px */
+                    max-width: 840px; /* ✅ increased from 760px to give right side more space */
                     margin: 0 auto;
                 }
                 :is(.dark) .lv-card {
@@ -61,9 +59,9 @@ export default function Login({ status }: LoginProps) {
                     box-shadow: 0 20px 60px rgba(0,0,0,.6);
                 }
 
-                /* ── LEFT — slightly narrower to give right more room ── */
+                /* ── LEFT — adjusted to balance the wider card ── */
                 .lv-left {
-                    width: 160px; /* ✅ reduced from 170px */
+                    width: 180px; /* ✅ balanced slightly for the wider card */
                     flex-shrink: 0;
                     position: relative;
                     overflow: hidden;
@@ -121,15 +119,15 @@ export default function Login({ status }: LoginProps) {
                 .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
                 .lv-dot.on { width:16px; background:#10b981; }
 
-                /* ── RIGHT — more horizontal padding, fixed min-width to prevent cutoff ── */
+                /* ── RIGHT — vastly wider, more padding, ensures NO cutoff ── */
                 .lv-right {
                     flex: 1;
-                    min-width: 320px; /* ✅ Increased from 0 to 320px to prevent button text cutoff */
-                    padding: 32px 36px; /* ✅ increased horizontal padding from 28px → 36px */
+                    min-width: 380px; /* ✅ Increased from 320px to prevent button text cutoff */
+                    padding: 40px 56px; /* ✅ Increased horizontal padding for plenty of room */
                     display: flex;
                     flex-direction: column;
                     justify-content: center;
-                    gap: 14px;
+                    gap: 16px; /* ✅ Slightly increased gap for breathing room */
                     background: #fff;
                 }
                 :is(.dark) .lv-right { background:#0D1117; }
@@ -145,17 +143,17 @@ export default function Login({ status }: LoginProps) {
                 .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; animation:lv-pulse 2s ease-in-out infinite; }
                 .lv-brand-text { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; }
 
-                .lv-title { font-size:21px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.2; }
+                .lv-title { font-size:24px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.2; } /* ✅ Slightly bigger title */
                 :is(.dark) .lv-title { color:#f8fafc; }
-                .lv-sub { font-size:11px; color:#94a3b8; line-height:1.5; margin-top:3px; }
+                .lv-sub { font-size:12px; color:#94a3b8; line-height:1.5; margin-top:4px; } /* ✅ Slightly bigger subtitle */
 
                 /* Google btn */
                 .lv-google {
                     position:relative; overflow:hidden; width:100%;
                     display:flex; align-items:center; justify-content:center; gap:9px;
-                    padding:13px 16px; border-radius:11px;
+                    padding:14px 16px; border-radius:11px; /* ✅ Increased height slightly */
                     background:#fff; border:1.5px solid #e2e8f0;
-                    color:#1e293b; font-size:13px; font-weight:600;
+                    color:#1e293b; font-size:14px; font-weight:600; /* ✅ Larger text to fill space */
                     font-family:'Plus Jakarta Sans',sans-serif;
                     cursor:pointer;
                     white-space:nowrap;
@@ -170,14 +168,14 @@ export default function Login({ status }: LoginProps) {
                 .lv-google:hover .lv-shine { animation:lv-sweep .5s ease forwards; }
 
                 /* divider */
-                .lv-divider { display:flex; align-items:center; gap:10px; }
+                .lv-divider { display:flex; align-items:center; gap:10px; margin: 4px 0; }
                 .lv-div-line { flex:1; height:1px; background:#f1f5f9; }
                 :is(.dark) .lv-div-line { background:rgba(255,255,255,.06); }
                 .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
                 :is(.dark) .lv-div-text { color:rgba(255,255,255,.14); }
 
                 /* footer note */
-                .lv-note { font-size:10px; color:#94a3b8; text-align:center; line-height:1.5; }
+                .lv-note { font-size:11px; color:#94a3b8; text-align:center; line-height:1.5; }
                 :is(.dark) .lv-note { color:rgba(255,255,255,.20); }
 
                 /* alerts */
@@ -188,13 +186,13 @@ export default function Login({ status }: LoginProps) {
                 :is(.dark) .lv-err { color:#fca5a5; }
 
                 /* mobile */
-                @media (max-width:540px) {
+                @media (max-width:640px) { /* ✅ increased breakpoint from 540px to 640px to stack sooner */
                     .lv-card { flex-direction:column; }
                     .lv-left { width:100%; flex-direction:row; padding:20px 18px; gap:14px; justify-content:flex-start; min-height:auto; }
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:22px 24px; min-width: auto; } /* ✅ reset min-width on mobile */
+                    .lv-right { padding:32px 24px; min-width: auto; } /* ✅ reset min-width on mobile */
                 }
             `}</style>
 

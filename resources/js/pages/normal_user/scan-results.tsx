@@ -302,7 +302,7 @@ const ScanResults = () => {
                                         Analysis Complete
                                     </span>
                                 </div>
-                                <h1 className="text-[1.65rem] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
+                                <h1 className="text-[1.5rem] leading-none font-extrabold tracking-tight text-slate-900 dark:text-white">
                                     Scan Results
                                 </h1>
                                 <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
