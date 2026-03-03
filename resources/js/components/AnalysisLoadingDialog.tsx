@@ -50,7 +50,7 @@ const AnalysisLoadingDialog: React.FC<AnalysisLoadingDialogProps> = ({
             label: 'Identifying breed',
             sublabel: 'Running neural network inference',
             icon: <Brain className="h-4 w-4" />,
-            duration: 7500,
+            duration: 9500,
             color: 'from-emerald-400 to-cyan-500',
         },
         {

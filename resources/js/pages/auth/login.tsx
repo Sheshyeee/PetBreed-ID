@@ -43,7 +43,7 @@ export default function Login({ status }: LoginProps) {
 
                 .lv-root { font-family:'Plus Jakarta Sans',sans-serif; }
 
-                /* ── CARD ── */
+                /* ── CARD — wider to prevent text cutoff ── */
                 .lv-card {
                     display: flex;
                     border-radius: 18px;
@@ -52,7 +52,7 @@ export default function Login({ status }: LoginProps) {
                     box-shadow: 0 16px 48px rgba(0,0,0,.1);
                     background: #fff;
                     width: 100%;
-                    max-width: 660px;
+                    max-width: 760px; /* ✅ increased from 660px */
                     margin: 0 auto;
                 }
                 :is(.dark) .lv-card {
@@ -61,9 +61,9 @@ export default function Login({ status }: LoginProps) {
                     box-shadow: 0 20px 60px rgba(0,0,0,.6);
                 }
 
-                /* ── LEFT ── */
+                /* ── LEFT — slightly narrower to give right more room ── */
                 .lv-left {
-                    width: 170px;
+                    width: 160px; /* ✅ reduced from 170px */
                     flex-shrink: 0;
                     position: relative;
                     overflow: hidden;
@@ -71,7 +71,7 @@ export default function Login({ status }: LoginProps) {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    padding: 32px 18px;
+                    padding: 32px 16px;
                     gap: 18px;
                     background: #09201a;
                 }
@@ -90,15 +90,13 @@ export default function Login({ status }: LoginProps) {
                 .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.05); filter:blur(48px); pointer-events:none; }
                 .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.04); filter:blur(42px); pointer-events:none; }
 
-                /* icon — NO float animation */
+                /* icon */
                 .lv-icon-wrap {
                     position:relative; width:76px; height:76px;
                     display:flex; align-items:center; justify-content:center;
                 }
-                /* static rings — no animation */
                 .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.18); }
                 .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.06); }
-                /* orbiting dots removed */
                 .lv-icon-bg {
                     width:76px; height:76px; border-radius:22px;
                     display:flex; align-items:center; justify-content:center;
@@ -123,16 +121,16 @@ export default function Login({ status }: LoginProps) {
                 .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
                 .lv-dot.on { width:16px; background:#10b981; }
 
-                /* ── RIGHT — wider, less padding ── */
+                /* ── RIGHT — more horizontal padding, no min-width squeeze ── */
                 .lv-right {
-                    flex:1;
-                    min-width:0;
-                    padding:32px 28px;
-                    display:flex;
-                    flex-direction:column;
-                    justify-content:center;
-                    gap:14px;
-                    background:#fff;
+                    flex: 1;
+                    min-width: 0;
+                    padding: 32px 36px; /* ✅ increased horizontal padding from 28px → 36px */
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    gap: 14px;
+                    background: #fff;
                 }
                 :is(.dark) .lv-right { background:#0D1117; }
 
@@ -196,7 +194,7 @@ export default function Login({ status }: LoginProps) {
                     .lv-left-body { text-align:left; }
                     .lv-left-sub { margin:0; }
                     .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:22px 22px; }
+                    .lv-right { padding:22px 24px; }
                 }
             `}</style>
 
