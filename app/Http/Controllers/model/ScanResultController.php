@@ -1778,49 +1778,49 @@ PROMPT;
             Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
             $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}. 
-Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
+    Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
 
-1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
+    1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
 
-2. 'health_risks': {
-     'concerns': [
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
-       { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
-     ],
-     'screenings': [
-       { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
-       { 'name': 'Exam Name', 'description': 'Detailed explanation.' }
-     ],
-     'lifespan': 'e.g. 10-12',
-     'care_tips': [
-        '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
-        '(generate only 8-10 words only) tip about diet or weight management.',
-        '(generate only 8-10 words only) tip about grooming or coat care.',
-        '(generate only 8-10 words only) tip about training or temperament management.'
-     ]
-},
+    2. 'health_risks': {
+        'concerns': [
+        { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'High Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+        { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Moderate Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' },
+        { 'name': 'Condition Name (summarized 2-3 words only!)', 'risk_level': 'Low Risk', 'description': 'Detailed description of the condition.', 'prevention': 'Practical prevention advice.' }
+        ],
+        'screenings': [
+        { 'name': 'Exam Name', 'description': 'Detailed explanation of what this exam checks for and why it is critical.' },
+        { 'name': 'Exam Name', 'description': 'Detailed explanation.' }
+        ],
+        'lifespan': 'e.g. 10-12',
+        'care_tips': [
+            '(generate only 8-10 words only) tip about exercise needs specific to this breed.',
+            '(generate only 8-10 words only) tip about diet or weight management.',
+            '(generate only 8-10 words only) tip about grooming or coat care.',
+            '(generate only 8-10 words only) tip about training or temperament management.'
+        ]
+    },
 
-3. 'origin_data': {
-    'country': 'Country Name (e.g. United Kingdom)',
-    'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
-    'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
-    'description': 'Write a rich, descriptive paragraph (2 sentences) about the geography and climate of the origin region and how it influenced the breed.',
-    'timeline': [
-        { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
-        { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' }
-    ],
-    'details': [
-        { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 70-80 words) tracing the breed\\'s genetic ancestors and early development.' },
-        { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 70-80 words) describing exactly what work the dog was bred to do, including specific tasks.' },
-        { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 70-80 words) about the breed\\'s current status as pets, service dogs, or working dogs.' }
-    ]
-}
+    3. 'origin_data': {
+        'country': 'Country Name (e.g. United Kingdom)',
+        'country_code': 'ISO 2-letter country code lowercase (e.g. gb, us, de, fr)',
+        'region': 'Specific Region (e.g. Scottish Highlands, Black Forest)',
+        'description': 'Write a rich, descriptive paragraph (2 sentences) about the geography and climate of the origin region and how it influenced the breed.',
+        'timeline': [
+            { 'year': 'Year (e.g. 1860s)', 'event': 'Write 2-3 sentences explaining this specific historical event or breeding milestone.' },
+            { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+            { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+            { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' },
+            { 'year': 'Year', 'event': 'Write 1 sentence explaining this event.' }
+        ],
+        'details': [
+            { 'title': 'Ancestry & Lineage', 'content': 'Write a long, detailed paragraph (approx 70-80 words) tracing the breed\\'s genetic ancestors and early development.' },
+            { 'title': 'Original Purpose', 'content': 'Write a long, detailed paragraph (approx 70-80 words) describing exactly what work the dog was bred to do, including specific tasks.' },
+            { 'title': 'Modern Roles', 'content': 'Write a long, detailed paragraph (approx 70-80 words) about the breed\\'s current status as pets, service dogs, or working dogs.' }
+        ]
+    }
 
-Be verbose and detailed. Output ONLY the JSON.";
+    Be verbose and detailed. Output ONLY the JSON.";
 
             $apiKey = config('services.gemini.api_key');
             if (empty($apiKey)) {
@@ -2942,40 +2942,62 @@ Be verbose and detailed. Output ONLY the JSON.";
     }
 
     public function getRecentResults(Request $request)
-    {
-        try {
-            $limit = $request->input('limit', 10);
-            $userId = $request->user()->id;
+{
+    try {
+        $perPage = min((int) $request->input('per_page', 20), 100);
+        $page    = max((int) $request->input('page', 1), 1);
+        $userId  = $request->user()->id;
+        $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // Build base URL from object storage
-            $baseUrl = config('filesystems.disks.object-storage.url');
+        // ── Aggregate stats across ALL records for this user ──
+        $stats = Results::where('user_id', $userId)
+            ->selectRaw("
+                COUNT(*)                                          AS total,
+                SUM(CASE WHEN pending = 'verified' THEN 1 ELSE 0 END) AS verified_count,
+                SUM(CASE WHEN pending != 'verified' THEN 1 ELSE 0 END) AS pending_count,
+                ROUND(AVG(confidence), 1)                         AS avg_confidence
+            ")
+            ->first();
 
-            $results = Results::where('user_id', $userId)
-                ->latest()
-                ->take($limit)
-                ->get()
-                ->map(function ($scan) use ($baseUrl) {
-                    return [
-                        'id' => $scan->id,
-                        'scan_id' => $scan->scan_id,
-                        'image_url' => $baseUrl . '/' . $scan->image,
-                        'breed' => $scan->breed,
-                        'confidence' => (float)$scan->confidence,
-                        'created_at' => $scan->created_at->toISOString(),
-                        'status' => $scan->pending, // 'pending' or 'verified'
-                    ];
-                });
+        $paginator = Results::where('user_id', $userId)
+            ->latest()
+            ->paginate($perPage, ['*'], 'page', $page);
 
-            return response()->json([
-                'success' => true,
-                'data' => $results
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Get recent results error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch scan history'
-            ], 500);
-        }
+        $data = collect($paginator->items())->map(function ($scan) use ($baseUrl) {
+            return [
+                'id'         => $scan->id,
+                'scan_id'    => $scan->scan_id,
+                'image_url'  => $baseUrl . '/' . $scan->image,
+                'breed'      => $scan->breed,
+                'confidence' => (float) $scan->confidence,
+                'created_at' => $scan->created_at->toISOString(),
+                'status'     => $scan->pending,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+            'stats'   => [
+                'total'          => (int)   ($stats->total          ?? 0),
+                'verified_count' => (int)   ($stats->verified_count ?? 0),
+                'pending_count'  => (int)   ($stats->pending_count  ?? 0),
+                'avg_confidence' => (float) ($stats->avg_confidence ?? 0),
+            ],
+            'pagination' => [
+                'total'        => $paginator->total(),
+                'per_page'     => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Get recent results error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch scan history',
+        ], 500);
     }
+}
 }

@@ -17,10 +17,10 @@ export default function Login({ status }: LoginProps) {
 
     return (
         <AuthLayout title="" description="">
+            {/* Keeping only the font import and the parent header kill-switch hack intact */}
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-                /* ── HIDE AUTH LAYOUT'S TOP LOGO BLOCK ── */
                 .lv-kill-header {
                     display: none !important;
                     visibility: hidden !important;
@@ -28,171 +28,6 @@ export default function Login({ status }: LoginProps) {
                     overflow: hidden !important;
                     margin: 0 !important;
                     padding: 0 !important;
-                }
-
-                @keyframes lv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(1.5)} }
-                @keyframes lv-sweep { 0%{left:-80%} 100%{left:160%} }
-                @keyframes lv-fade  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-
-                .lv-f1 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .05s both; }
-                .lv-f2 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .14s both; }
-                .lv-f3 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .22s both; }
-                .lv-f4 { animation:lv-fade .4s cubic-bezier(.16,1,.3,1) .30s both; }
-
-                .lv-root { font-family:'Plus Jakarta Sans',sans-serif; }
-
-                /* ── CARD — wider to prevent text cutoff ── */
-                .lv-card {
-                    display: flex;
-                    border-radius: 18px;
-                    overflow: hidden;
-                    border: 1px solid rgba(0,0,0,.08);
-                    box-shadow: 0 16px 48px rgba(0,0,0,.1);
-                    background: #fff;
-                    width: 100%;
-                    max-width: 840px; /* ✅ increased from 760px to give right side more space */
-                    margin: 0 auto;
-                }
-                :is(.dark) .lv-card {
-                    background: #0D1117;
-                    border-color: rgba(255,255,255,.07);
-                    box-shadow: 0 20px 60px rgba(0,0,0,.6);
-                }
-
-                /* ── LEFT — adjusted to balance the wider card ── */
-                .lv-left {
-                    width: 180px; /* ✅ balanced slightly for the wider card */
-                    flex-shrink: 0;
-                    position: relative;
-                    overflow: hidden;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 32px 16px;
-                    gap: 18px;
-                    background: #09201a;
-                }
-                .lv-left::before {
-                    content:'';
-                    position:absolute; inset:0; pointer-events:none;
-                    background-image:radial-gradient(circle, rgba(16,185,129,.10) 1px, transparent 1px);
-                    background-size:20px 20px;
-                    -webkit-mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
-                    mask-image:radial-gradient(ellipse 100% 100% at 50% 50%, black 0%, transparent 100%);
-                }
-                .lv-left-beam {
-                    position:absolute; top:0; left:0; right:0; height:1px;
-                    background:rgba(16,185,129,.30);
-                }
-                .lv-blob1 { position:absolute; top:-40px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(16,185,129,.05); filter:blur(48px); pointer-events:none; }
-                .lv-blob2 { position:absolute; bottom:-30px; right:-20px; width:110px; height:110px; border-radius:50%; background:rgba(6,182,212,.04); filter:blur(42px); pointer-events:none; }
-
-                /* icon */
-                .lv-icon-wrap {
-                    position:relative; width:76px; height:76px;
-                    display:flex; align-items:center; justify-content:center;
-                }
-                .lv-ring1 { position:absolute; inset:-10px; border-radius:50%; border:1px solid rgba(16,185,129,.18); }
-                .lv-ring2 { position:absolute; inset:-20px; border-radius:50%; border:1px solid rgba(16,185,129,.06); }
-                .lv-icon-bg {
-                    width:76px; height:76px; border-radius:22px;
-                    display:flex; align-items:center; justify-content:center;
-                    border:1px solid rgba(16,185,129,.20);
-                    background:rgba(16,185,129,.09);
-                }
-
-                /* left text */
-                .lv-left-body { text-align:center; }
-                .lv-left-title {
-                    font-size:15px; font-weight:700; color:#fff;
-                    line-height:1.3; letter-spacing:-.01em; margin-bottom:6px;
-                }
-                .lv-left-title span { color:#10b981; }
-                .lv-left-sub {
-                    font-size:10px; color:rgba(255,255,255,.30);
-                    line-height:1.6; max-width:140px; margin:0 auto;
-                }
-
-                /* dots */
-                .lv-dots { display:flex; gap:5px; justify-content:center; margin-top:16px; }
-                .lv-dot  { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.14); }
-                .lv-dot.on { width:16px; background:#10b981; }
-
-                /* ── RIGHT — vastly wider, more padding, ensures NO cutoff ── */
-                .lv-right {
-                    flex: 1;
-                    min-width: 380px; /* ✅ Increased from 320px to prevent button text cutoff */
-                    padding: 40px 56px; /* ✅ Increased horizontal padding for plenty of room */
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    gap: 16px; /* ✅ Slightly increased gap for breathing room */
-                    background: #fff;
-                }
-                :is(.dark) .lv-right { background:#0D1117; }
-
-                /* brand */
-                .lv-brand {
-                    display:inline-flex; align-items:center; gap:5px;
-                    padding:3px 10px; border-radius:99px;
-                    border:1px solid rgba(16,185,129,.18);
-                    background:rgba(16,185,129,.06);
-                    width:fit-content;
-                }
-                .lv-brand-dot { width:5px; height:5px; border-radius:50%; background:#10b981; animation:lv-pulse 2s ease-in-out infinite; }
-                .lv-brand-text { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600; letter-spacing:.12em; color:#10b981; text-transform:uppercase; }
-
-                .lv-title { font-size:24px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.2; } /* ✅ Slightly bigger title */
-                :is(.dark) .lv-title { color:#f8fafc; }
-                .lv-sub { font-size:12px; color:#94a3b8; line-height:1.5; margin-top:4px; } /* ✅ Slightly bigger subtitle */
-
-                /* Google btn */
-                .lv-google {
-                    position:relative; overflow:hidden; width:100%;
-                    display:flex; align-items:center; justify-content:center; gap:9px;
-                    padding:14px 16px; border-radius:11px; /* ✅ Increased height slightly */
-                    background:#fff; border:1.5px solid #e2e8f0;
-                    color:#1e293b; font-size:14px; font-weight:600; /* ✅ Larger text to fill space */
-                    font-family:'Plus Jakarta Sans',sans-serif;
-                    cursor:pointer;
-                    white-space:nowrap;
-                    transition:transform .17s, box-shadow .17s, border-color .17s;
-                    box-shadow:0 1px 3px rgba(0,0,0,.05);
-                }
-                .lv-google:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,.09); border-color:#cbd5e1; }
-                .lv-google:active { transform:translateY(0); }
-                :is(.dark) .lv-google { background:#111827; border-color:rgba(255,255,255,.08); color:#f1f5f9; box-shadow:none; }
-                :is(.dark) .lv-google:hover { border-color:rgba(16,185,129,.22); }
-                .lv-shine { position:absolute; top:0; left:-80%; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent); transform:skewX(-18deg); pointer-events:none; }
-                .lv-google:hover .lv-shine { animation:lv-sweep .5s ease forwards; }
-
-                /* divider */
-                .lv-divider { display:flex; align-items:center; gap:10px; margin: 4px 0; }
-                .lv-div-line { flex:1; height:1px; background:#f1f5f9; }
-                :is(.dark) .lv-div-line { background:rgba(255,255,255,.06); }
-                .lv-div-text { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; color:#cbd5e1; text-transform:uppercase; white-space:nowrap; }
-                :is(.dark) .lv-div-text { color:rgba(255,255,255,.14); }
-
-                /* footer note */
-                .lv-note { font-size:11px; color:#94a3b8; text-align:center; line-height:1.5; }
-                :is(.dark) .lv-note { color:rgba(255,255,255,.20); }
-
-                /* alerts */
-                .lv-alert { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:500; margin-bottom:10px; }
-                .lv-ok  { border:1px solid rgba(16,185,129,.22); background:rgba(16,185,129,.06); color:#059669; }
-                :is(.dark) .lv-ok { color:#6ee7b7; }
-                .lv-err { border:1px solid rgba(239,68,68,.22); background:rgba(239,68,68,.06); color:#dc2626; }
-                :is(.dark) .lv-err { color:#fca5a5; }
-
-                /* mobile */
-                @media (max-width:640px) { /* ✅ increased breakpoint from 540px to 640px to stack sooner */
-                    .lv-card { flex-direction:column; }
-                    .lv-left { width:100%; flex-direction:row; padding:20px 18px; gap:14px; justify-content:flex-start; min-height:auto; }
-                    .lv-left-body { text-align:left; }
-                    .lv-left-sub { margin:0; }
-                    .lv-dots { justify-content:flex-start; }
-                    .lv-right { padding:32px 24px; min-width: auto; } /* ✅ reset min-width on mobile */
                 }
             `}</style>
 
@@ -217,37 +52,42 @@ export default function Login({ status }: LoginProps) {
                 }}
             />
 
-            <div className="lv-root">
+            <div className="lv-root font-['Plus_Jakarta_Sans',sans-serif] w-full">
                 {status && (
-                    <div className="lv-alert lv-ok lv-f1">
+                    <div className="lv-alert flex items-start gap-2 p-3 rounded-[10px] text-xs font-medium mb-3 border border-[#10b981]/20 bg-[#10b981]/10 text-[#059669] dark:text-[#6ee7b7]">
                         <CheckCircle2
-                            size={13}
+                            size={14}
                             style={{ flexShrink: 0, marginTop: 1 }}
                         />
                         {status}
                     </div>
                 )}
                 {flash?.error && (
-                    <div className="lv-alert lv-err lv-f1">
+                    <div className="lv-alert flex items-start gap-2 p-3 rounded-[10px] text-xs font-medium mb-3 border border-[#ef4444]/20 bg-[#ef4444]/10 text-[#dc2626] dark:text-[#fca5a5]">
                         <XCircle
-                            size={13}
+                            size={14}
                             style={{ flexShrink: 0, marginTop: 1 }}
                         />
                         {flash.error}
                     </div>
                 )}
 
-                <div className="lv-card">
-                    {/* LEFT */}
-                    <div className="lv-left">
-                        <div className="lv-left-beam" />
-                        <div className="lv-blob1" />
-                        <div className="lv-blob2" />
+                {/* ✅ Card layout - Made responsive, wider max-w, and better flex handling */}
+                <div className="flex flex-col md:flex-row w-full max-w-[900px] mx-auto rounded-[18px] overflow-hidden border border-black/10 bg-white shadow-[0_16px_48px_rgba(0,0,0,0.1)] dark:bg-[#0D1117] dark:border-white/10 dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+                    
+                    {/* LEFT SECTION */}
+                    <div className="relative overflow-hidden flex flex-col items-center justify-center p-8 md:py-12 gap-5 bg-[#09201a] w-full md:w-[300px] shrink-0">
+                        {/* Decorative Background Elements */}
+                        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,rgba(16,185,129,0.10)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_100%_100%_at_50%_50%,black_0%,transparent_100%)]" />
+                        <div className="absolute top-0 inset-x-0 h-px bg-[#10b981]/30" />
+                        <div className="absolute -top-10 -left-8 w-[150px] h-[150px] rounded-full bg-[#10b981]/5 blur-[48px] pointer-events-none" />
+                        <div className="absolute -bottom-8 -right-5 w-[110px] h-[110px] rounded-full bg-[#06b6d4]/5 blur-[42px] pointer-events-none" />
 
-                        <div className="lv-icon-wrap">
-                            <div className="lv-ring1" />
-                            <div className="lv-ring2" />
-                            <div className="lv-icon-bg">
+                        {/* Icon */}
+                        <div className="relative w-[76px] h-[76px] flex items-center justify-center">
+                            <div className="absolute -inset-[10px] rounded-full border border-[#10b981]/20" />
+                            <div className="absolute -inset-[20px] rounded-full border border-[#10b981]/10" />
+                            <div className="w-[76px] h-[76px] rounded-[22px] flex items-center justify-center border border-[#10b981]/20 bg-[#10b981]/10 z-10">
                                 <PawPrint
                                     size={30}
                                     style={{ color: '#10b981' }}
@@ -255,51 +95,61 @@ export default function Login({ status }: LoginProps) {
                             </div>
                         </div>
 
-                        <div className="lv-left-body">
-                            <p className="lv-left-title">
+                        {/* Left Text */}
+                        <div className="text-center z-10">
+                            <p className="text-[16px] font-bold text-white leading-tight tracking-tight mb-2">
                                 Identify any
                                 <br />
-                                <span>dog breed</span>
+                                <span className="text-[#10b981]">dog breed</span>
                             </p>
-                            <p className="lv-left-sub">
-                                Upload a photo, get results instantly with
-                                health insights
+                            <p className="text-[11px] text-white/40 leading-relaxed max-w-[150px] mx-auto">
+                                Upload a photo, get results instantly with health insights
                             </p>
-                            <div className="lv-dots">
-                                <div className="lv-dot on" />
-                                <div className="lv-dot" />
-                                <div className="lv-dot" />
+                            
+                            {/* Dots */}
+                            <div className="flex gap-1.5 justify-center mt-5">
+                                <div className="w-4 h-1.5 rounded-full bg-[#10b981]" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/15" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/15" />
                             </div>
                         </div>
                     </div>
 
-                    {/* RIGHT */}
-                    <div className="lv-right">
-                        <div className="lv-brand lv-f1">
-                            <span className="lv-brand-dot" />
-                            <span className="lv-brand-text">DogLens</span>
+                    {/* RIGHT SECTION - ✅ Removed min-width, added flex-1 and min-w-0 to fix overflow cutoffs */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-5 p-8 sm:p-12 md:p-16 bg-white dark:bg-[#0D1117]">
+                        
+                        {/* Brand Pill */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#10b981]/20 bg-[#10b981]/5 w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
+                            <span className="font-['JetBrains_Mono',monospace] text-[10px] font-semibold tracking-widest text-[#10b981] uppercase">
+                                DogLens
+                            </span>
                         </div>
 
-                        <div className="lv-f2">
-                            <p className="lv-title">Welcome back</p>
-                            <p className="lv-sub">
+                        {/* Title Wrapper */}
+                        <div>
+                            <p className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-[#0f172a] dark:text-[#f8fafc] leading-tight break-words">
+                                Welcome back
+                            </p>
+                            <p className="text-[13px] sm:text-sm text-[#94a3b8] leading-relaxed mt-1.5 break-words">
                                 Sign in to access your breed analysis
                             </p>
                         </div>
 
+                        {/* Google Button */}
                         <button
-                            onClick={() =>
-                                (window.location.href = '/auth/google')
-                            }
-                            className="lv-google lv-f3"
+                            onClick={() => (window.location.href = '/auth/google')}
+                            className="group relative overflow-hidden w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-[11px] bg-white border-[1.5px] border-[#e2e8f0] text-[#1e293b] text-[15px] font-semibold transition-all duration-200 shadow-sm hover:-translate-y-[1px] hover:shadow-md hover:border-[#cbd5e1] active:translate-y-0 dark:bg-[#111827] dark:border-white/10 dark:text-[#f1f5f9] dark:hover:border-[#10b981]/30 dark:shadow-none"
                         >
-                            <span className="lv-shine" />
+                            {/* Tailwind shine effect conversion */}
+                            <span className="absolute top-0 -left-[100%] w-[40%] h-full bg-gradient-to-r from-transparent via-black/5 dark:via-white/10 to-transparent -skew-x-[18deg] pointer-events-none transition-all duration-700 ease-in-out group-hover:left-[120%]" />
+                            
                             <svg
                                 width="18"
                                 height="18"
                                 viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg"
-                                style={{ flexShrink: 0 }}
+                                className="shrink-0"
                             >
                                 <path
                                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -321,15 +171,17 @@ export default function Login({ status }: LoginProps) {
                             Continue with Google
                         </button>
 
-                        <div className="lv-divider lv-f4">
-                            <div className="lv-div-line" />
-                            <span className="lv-div-text">
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 my-1">
+                            <div className="flex-1 h-px bg-[#f1f5f9] dark:bg-white/10" />
+                            <span className="font-['JetBrains_Mono',monospace] text-[9px] tracking-[0.12em] text-[#cbd5e1] dark:text-white/20 uppercase whitespace-nowrap">
                                 secured · oauth 2.0
                             </span>
-                            <div className="lv-div-line" />
+                            <div className="flex-1 h-px bg-[#f1f5f9] dark:bg-white/10" />
                         </div>
 
-                        <p className="lv-note lv-f4">
+                        {/* Note */}
+                        <p className="text-[11px] sm:text-xs text-[#94a3b8] dark:text-white/30 text-center leading-relaxed">
                             By signing in you agree to our terms &amp; privacy
                             policy
                         </p>
