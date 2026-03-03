@@ -64,6 +64,7 @@ type PageProps = {
     resultCount: number;
     avgScansPerDay?: number;
     pendingReviewCount: number;
+    mostScannedBreed?: string;
     lowConfidenceCount: number;
     scansThisWeek?: number;
 scansLastWeek?: number;
@@ -461,6 +462,7 @@ export default function Dashboard() {
 scansLastWeek = 0,
         avgScansPerDay = 0,
         learningHeatmap = [],
+        mostScannedBreed = 'None',
         heatmapSummary,
         breedMemoryWall = [],
         uniqueBreedsLearned = 0,
@@ -636,11 +638,11 @@ scansLastWeek = 0,
                     {(
                         [
                            {
-    label: 'Scans This Week',
-    val: scansThisWeek.toString(),
-    sub: `vs ${scansLastWeek} last week`,
-    Icon: BarChart3,
-    a: '#3b82f6',
+    label: 'Most Scanned Breed',
+    val: mostScannedBreed,
+    sub: 'Most frequent AI prediction',
+    Icon: Database,
+    a: '#8b5cf6',
 },
                             {
                                 label: 'High Confidence Rate',

@@ -565,12 +565,19 @@ $daysSinceFirst = $firstScan
     : 1;
 $avgScansPerDay = round($resultCount / $daysSinceFirst, 1);
 
+$mostScannedBreed = Results::selectRaw('breed, COUNT(*) as cnt')
+    ->groupBy('breed')
+    ->orderByDesc('cnt')
+    ->first();
+$mostScannedLabel = $mostScannedBreed->breed ?? 'None';
+
         // -------------------------------------------------------------------------
         // Return to Inertia
         // -------------------------------------------------------------------------
         return inertia('dashboard', [
             'results'                   => $results,
             'correctedBreedCount'       => $correctedBreedCount,
+            'mostScannedBreed' => $mostScannedLabel,
             'resultCount'               => $resultCount,
             'pendingReviewCount'        => $pendingReviewCount,
             'lowConfidenceCount'        => $lowConfidenceCount,
