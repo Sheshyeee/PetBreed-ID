@@ -567,7 +567,7 @@ export default function Scan() {
                 </button>
 
                 {/* ── MAIN CONTENT ── */}
-                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-hidden p-3">
+                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-hidden p-3 px-4">
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR — desktop only ── */}
