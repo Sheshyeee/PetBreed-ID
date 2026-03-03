@@ -202,30 +202,30 @@ const ViewSimulation: React.FC<Props> = ({
     return (
         <>
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-                @keyframes vs-faderise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes vs-sweep    { 0%{top:-100%} 100%{top:100%} }
-                @keyframes vs-dpulse   { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:.45} }
-                @keyframes vs-huddim   { 0%,88%,100%{opacity:1} 94%{opacity:.12} }
-                @keyframes vs-spin     { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-                @keyframes vs-ping     { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.5);opacity:0} }
-                .vs-root { font-family:'Plus Jakarta Sans',sans-serif; }
-                .vs-mono { font-family:'JetBrains Mono',monospace !important; }
-                .vs-dotgrid { position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(circle,rgba(16,185,129,.07) 1px,transparent 1px);background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%);mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%); }
-                .dark .vs-dotgrid { background-image:radial-gradient(circle,rgba(16,185,129,.055) 1px,transparent 1px); }
-                .vs-panel-line { background:linear-gradient(90deg,transparent,#10b981 45%,#a855f7 55%,transparent);opacity:.3; }
-                .vs-imgcard::before { content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#10b981 45%,#a855f7 55%,transparent);opacity:.3; }
-                .vs-fu  { animation:vs-faderise .45s cubic-bezier(.16,1,.3,1) both; }
-                .vs-fu1 { animation-delay:.07s } .vs-fu2 { animation-delay:.14s } .vs-fu3 { animation-delay:.21s } .vs-fu4 { animation-delay:.28s }
-                .vs-sweep { position:absolute;left:0;top:-100%;width:100%;height:100%;background:linear-gradient(180deg,transparent 0%,rgba(168,85,247,.04) 46%,rgba(168,85,247,.11) 50%,rgba(168,85,247,.04) 54%,transparent 100%);animation:vs-sweep 4s ease-in-out infinite;pointer-events:none;z-index:3; }
-                .vs-hc { position:absolute;width:12px;height:12px;border-color:rgba(168,85,247,.65);border-style:solid;z-index:4;pointer-events:none; }
-                .vs-htl{top:6px;left:6px;border-width:2px 0 0 2px} .vs-htr{top:6px;right:6px;border-width:2px 2px 0 0} .vs-hbl{bottom:6px;left:6px;border-width:0 0 2px 2px} .vs-hbr{bottom:6px;right:6px;border-width:0 2px 2px 0}
-                .vs-hudblink { animation:vs-huddim 3s ease-in-out infinite; }
-                .vs-nsb::-webkit-scrollbar{display:none} .vs-nsb{scrollbar-width:none}
-                .vs-tab { transition:all .18s; }
-                .vs-tab-active { background:white;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,.1); }
-                .dark .vs-tab-active { background:#131720;color:white;box-shadow:0 1px 3px rgba(0,0,0,.4); }
-            `}</style>
+                    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+                    @keyframes vs-faderise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+                    @keyframes vs-sweep    { 0%{top:-100%} 100%{top:100%} }
+                    @keyframes vs-dpulse   { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:.45} }
+                    @keyframes vs-huddim   { 0%,88%,100%{opacity:1} 94%{opacity:.12} }
+                    @keyframes vs-spin     { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+                    @keyframes vs-ping     { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.5);opacity:0} }
+                    .vs-root { font-family:'Plus Jakarta Sans',sans-serif; }
+                    .vs-mono { font-family:'JetBrains Mono',monospace !important; }
+                    .vs-dotgrid { position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(circle,rgba(16,185,129,.07) 1px,transparent 1px);background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%);mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,black 0%,transparent 100%); }
+                    .dark .vs-dotgrid { background-image:radial-gradient(circle,rgba(16,185,129,.055) 1px,transparent 1px); }
+                    .vs-panel-line { background:linear-gradient(90deg,transparent,#10b981 45%,#a855f7 55%,transparent);opacity:.3; }
+                    .vs-imgcard::before { content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#10b981 45%,#a855f7 55%,transparent);opacity:.3; }
+                    .vs-fu  { animation:vs-faderise .45s cubic-bezier(.16,1,.3,1) both; }
+                    .vs-fu1 { animation-delay:.07s } .vs-fu2 { animation-delay:.14s } .vs-fu3 { animation-delay:.21s } .vs-fu4 { animation-delay:.28s }
+                    .vs-sweep { position:absolute;left:0;top:-100%;width:100%;height:100%;background:linear-gradient(180deg,transparent 0%,rgba(168,85,247,.04) 46%,rgba(168,85,247,.11) 50%,rgba(168,85,247,.04) 54%,transparent 100%);animation:vs-sweep 4s ease-in-out infinite;pointer-events:none;z-index:3; }
+                    .vs-hc { position:absolute;width:12px;height:12px;border-color:rgba(168,85,247,.65);border-style:solid;z-index:4;pointer-events:none; }
+                    .vs-htl{top:6px;left:6px;border-width:2px 0 0 2px} .vs-htr{top:6px;right:6px;border-width:2px 2px 0 0} .vs-hbl{bottom:6px;left:6px;border-width:0 0 2px 2px} .vs-hbr{bottom:6px;right:6px;border-width:0 2px 2px 0}
+                    .vs-hudblink { animation:vs-huddim 3s ease-in-out infinite; }
+                    .vs-nsb::-webkit-scrollbar{display:none} .vs-nsb{scrollbar-width:none}
+                    .vs-tab { transition:all .18s; }
+                    .vs-tab-active { background:white;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+                    .dark .vs-tab-active { background:#131720;color:white;box-shadow:0 1px 3px rgba(0,0,0,.4); }
+                `}</style>
 
             <div className="vs-root flex min-h-screen flex-col bg-slate-50 dark:bg-[#080B0F]">
                 <div className="pointer-events-none fixed top-[-120px] left-[-60px] z-0 h-[260px] w-[440px] rounded-full bg-violet-400/[.03] blur-[85px]" />

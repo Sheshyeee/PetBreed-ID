@@ -663,7 +663,7 @@ export default function Scan() {
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-[13px] font-bold text-red-600 dark:text-red-400">
                                                     {localError.not_a_dog
-                                                        ? 'Not a Dog Detected'
+                                                        ? 'Not a Dog '
                                                         : 'Analysis Error'}
                                                 </p>
                                                 <p className="mt-0.5 text-xs text-red-600/80 dark:text-red-500/75">
