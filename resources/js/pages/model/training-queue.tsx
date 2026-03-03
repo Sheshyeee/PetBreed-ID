@@ -28,7 +28,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: dashboard().url,
     },
     {
-        title: 'Training Queue',
+        title: 'Learning Feed',
         href: '/model/training-queue',
     },
 ];
@@ -84,7 +84,7 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
             <div className="flex h-full flex-col gap-6 p-4 md:p-8">
                 <div>
                     <h1 className="text-xl font-bold dark:text-white">
-                        Model Feedback & Training Queue
+                        Learning Feed
                     </h1>
                     <p className="text-sm text-gray-600 dark:text-white/70">
                         Track corrections and monitor model retraining progress

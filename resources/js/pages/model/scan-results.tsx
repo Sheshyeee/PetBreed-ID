@@ -410,6 +410,7 @@ export default function Dashboard() {
                                     </TableHead>
                                     <TableHead>Scan Date</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Review</TableHead>
                                     <TableHead className="flex items-center justify-center">
                                         Actions
                                     </TableHead>

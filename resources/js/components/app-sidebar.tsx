@@ -27,7 +27,7 @@ const mainNavItems: NavItem[] = [
         icon: Scan,
     },
     {
-        title: 'Training Queue',
+        title: 'Learning Feed',
         href: '/model/training-queue',
         icon: Logs,
     },

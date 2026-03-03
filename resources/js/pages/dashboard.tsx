@@ -23,7 +23,6 @@ import {
     Minus,
     ShieldCheck,
     Sparkles,
-    Target,
 } from 'lucide-react';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 
@@ -78,6 +77,7 @@ type PageProps = {
     learningHeatmap?: HeatmapDay[];
     heatmapSummary?: HeatmapSummary;
     breedMemoryWall?: MemoryChip[];
+    uniqueBreedsLearned?: number;
 };
 
 /* ── level config ──────────────────────────────────────────────────────────── */
@@ -454,10 +454,10 @@ export default function Dashboard() {
         memoryCount = 0,
         avgConfidence = 0,
         memoryHitRate = 0,
-        accuracyImprovement = 0,
         learningHeatmap = [],
         heatmapSummary,
         breedMemoryWall = [],
+        uniqueBreedsLearned = 0,
     } = usePage<PageProps>().props;
 
     const fmt = (t: number) => `${t >= 0 ? '+' : ''}${t.toFixed(1)}%`;
@@ -491,6 +491,7 @@ export default function Dashboard() {
                         'heatmapSummary',
                         'correctedBreedCount',
                         'highConfidenceRate',
+                        'uniqueBreedsLearned',
                     ],
                 }),
             30000,
@@ -500,12 +501,12 @@ export default function Dashboard() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="AI Learning Dashboard" />
+            <Head title="Learning Dashboard" />
 
             <div className="flex h-full flex-col gap-5 p-4 md:p-6">
                 {/* ── 4 metric cards ────────────────────────────────────── */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {/* Total Scans — only card with trend */}
+                    {/* Total Scans */}
                     <StatCard accent="#3b82f6">
                         <div className="flex items-start justify-between">
                             <div>
@@ -518,7 +519,7 @@ export default function Dashboard() {
                                     </p>
                                 </div>
                                 <p className="mt-1 text-[11px] text-neutral-400 dark:text-white/20">
-                                    vs last week
+                                    All Time
                                 </p>
                             </div>
                             <div
@@ -536,7 +537,7 @@ export default function Dashboard() {
                         </div>
                     </StatCard>
 
-                    {/* Corrections Made — no trend */}
+                    {/* Corrections Made */}
                     <StatCard accent="#8b5cf6">
                         <div className="flex items-start justify-between">
                             <div>
@@ -565,7 +566,7 @@ export default function Dashboard() {
                         </div>
                     </StatCard>
 
-                    {/* Avg Confidence — no trend */}
+                    {/* Avg Confidence */}
                     <StatCard accent="#10b981">
                         <div className="flex items-start justify-between">
                             <div>
@@ -594,7 +595,7 @@ export default function Dashboard() {
                         </div>
                     </StatCard>
 
-                    {/* Pending Review — no trend */}
+                    {/* Pending Review */}
                     <StatCard accent="#f59e0b">
                         <div className="flex items-start justify-between">
                             <div>
@@ -629,16 +630,16 @@ export default function Dashboard() {
                     {(
                         [
                             {
-                                label: 'Learning Progress',
-                                val: `${accuracyImprovement.toFixed(0)}/100`,
-                                sub: 'Composite score',
-                                Icon: Target,
+                                label: 'Breeds in Memory',
+                                val: uniqueBreedsLearned.toString(),
+                                sub: 'Unique breeds AI has learned',
+                                Icon: Brain,
                                 a: '#10b981',
                             },
                             {
                                 label: 'Memory Usage Rate',
                                 val: `${memoryHitRate.toFixed(1)}%`,
-                                sub: `${memoryCount} patterns stored`,
+                                sub: `Learning Data"`,
                                 Icon: Database,
                                 a: '#8b5cf6',
                             },
@@ -690,7 +691,7 @@ export default function Dashboard() {
                             </div>
                             <div>
                                 <h2 className="font-bold text-neutral-900 dark:text-white">
-                                    Training Activity
+                                    Training Activity Heatmap
                                 </h2>
                                 <p className="text-xs text-neutral-400 dark:text-white/35">
                                     12-week correction history &amp; breed
