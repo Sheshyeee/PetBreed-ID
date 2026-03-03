@@ -630,13 +630,6 @@ export default function Dashboard() {
                     {(
                         [
                             {
-                                label: 'Breeds in Memory',
-                                val: uniqueBreedsLearned.toString(),
-                                sub: 'Unique breeds AI has learned',
-                                Icon: Brain,
-                                a: '#10b981',
-                            },
-                            {
                                 label: 'Memory Usage Rate',
                                 val: `${memoryHitRate.toFixed(1)}%`,
                                 sub: `Learning Data"`,
@@ -648,6 +641,13 @@ export default function Dashboard() {
                                 val: `${highConfidenceRate.toFixed(1)}%`,
                                 sub: 'Scans scoring ≥80% confidence',
                                 Icon: ShieldCheck,
+                                a: '#10b981',
+                            },
+                            {
+                                label: 'Breeds in Memory',
+                                val: uniqueBreedsLearned.toString(),
+                                sub: 'Unique breeds AI has learned',
+                                Icon: Brain,
                                 a: '#10b981',
                             },
                         ] as const
@@ -682,7 +682,7 @@ export default function Dashboard() {
                     ))}
                 </div>
 
-                {/* ── AI Training Activity ───────────────────────────────── */}
+                {/* ── Training Activity ───────────────────────────────── */}
                 <div className="overflow-hidden rounded-2xl border border-neutral-200/60 bg-white shadow-sm dark:border-white/[0.06] dark:bg-neutral-900">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-5 py-4 dark:border-white/[0.06]">
                         <div className="flex items-center gap-3">
