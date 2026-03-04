@@ -114,7 +114,7 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                 .vo-hudblink { animation:vo-huddim 3s ease-in-out infinite; }
                 .vo-nsb::-webkit-scrollbar{display:none} .vo-nsb{scrollbar-width:none}
                 .vo-timeline-line { position:relative;margin-left:1rem;border-left:2px solid; }
-                .vo-dot { position:absolute;left:-9px;top:5px;width:14px;height:14px;border-radius:50%;border:2px solid white;background:#06b6d4;box-shadow:0 0 8px rgba(6,182,212,.6); }
+                .vo-dot { position:absolute;left:-20px;top:5px;width:14px;height:14px;border-radius:50%;border:2px solid white;background:#06b6d4;box-shadow:0 0 8px rgba(6,182,212,.6); }
                 .dark .vo-dot { border-color:#131720; }
                 .vo-accord-btn { transition:background .15s; }
                 .vo-accord-btn:hover { background:rgba(6,182,212,.04); }
@@ -316,7 +316,7 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                         {timeline.length > 0 ? (
                                             // ✅ FIX: increased pl-6 → pl-9 so the dot (left:-9px, w:14px)
                                             // no longer overlaps the year text
-                                            <div className="vo-timeline-line space-y-7 border-cyan-200 pl-9 dark:border-cyan-500/20">
+                                            <div className="vo-timeline-line space-y-7 border-cyan-200 pl-8 dark:border-cyan-500/20">
                                                 {timeline.map((item, i) => (
                                                     <div
                                                         key={i}
