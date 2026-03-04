@@ -45,7 +45,6 @@ type PageProps = {
 export default function ReviewDog() {
     const { result } = usePage<PageProps>().props;
 
-    // Form handling
     const { data, setData, post, processing, errors, reset } = useForm({
         scan_id: result?.scan_id || '',
         correct_breed: '',
@@ -62,7 +61,55 @@ export default function ReviewDog() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Review Scan" />
 
-            {/* CHANGED: Adjusted padding (p-4 for mobile, md:p-8 for desktop) */}
+            {/* Full-screen loading overlay */}
+            {processing && (
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/10 bg-white px-10 py-8 shadow-2xl dark:bg-neutral-900">
+                        {/* Spinner */}
+                        <div className="relative flex h-16 w-16 items-center justify-center">
+                            <div className="absolute inset-0 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600 dark:border-blue-900 dark:border-t-blue-400" />
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                className="h-6 w-6 text-blue-600 dark:text-blue-400"
+                            >
+                                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 14.93V15a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 13H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 16.93Z" />
+                            </svg>
+                        </div>
+
+                        {/* Text */}
+                        <div className="text-center">
+                            <p className="text-base font-bold text-gray-900 dark:text-white">
+                                Teaching the System…
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                Updating memory with{' '}
+                                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                    "{data.correct_breed}"
+                                </span>
+                            </p>
+                        </div>
+
+                        {/* Animated progress bar */}
+                        <div className="h-1.5 w-56 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+                            <div className="h-full w-1/2 animate-[slide_1.2s_ease-in-out_infinite] rounded-full bg-blue-600 dark:bg-blue-400" />
+                        </div>
+
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                            This may take a few seconds…
+                        </p>
+                    </div>
+
+                    <style>{`
+                        @keyframes slide {
+                            0%   { transform: translateX(-100%); }
+                            100% { transform: translateX(300%); }
+                        }
+                    `}</style>
+                </div>
+            )}
+
             <div className="flex h-full w-full flex-col gap-6 p-4 md:p-8">
                 {/* Header Section */}
                 <div>
@@ -75,23 +122,20 @@ export default function ReviewDog() {
                     </p>
                 </div>
 
-                {/* Main Content Layout: Stack on mobile, Side-by-side on Large screens */}
+                {/* Main Content Layout */}
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                     {/* LEFT: Image Preview */}
-                    {/* CHANGED: Removed fixed height, added width logic */}
                     <Card className="flex w-full flex-col p-6 lg:w-1/2 xl:w-[45%] dark:bg-neutral-900">
                         <h1 className="text-lg font-medium">Image Preview</h1>
 
-                        {/* Image Container - Responsive sizing */}
                         <div className="mt-6 flex flex-1 items-center justify-center rounded-lg bg-gray-50 py-8 dark:bg-black/20">
                             <img
                                 src={result?.image}
                                 alt="Scanned Dog"
                                 className="max-h-[300px] w-auto rounded-lg object-contain shadow-md lg:max-h-[400px]"
-                        />
+                            />
                         </div>
 
-                        {/* Metadata Section */}
                         <div className="mt-6 space-y-3 px-2 md:px-4">
                             <div className="flex items-center justify-between border-b border-gray-100 pb-2 dark:border-gray-800">
                                 <p className="text-sm text-gray-600 dark:text-white/70">
@@ -225,6 +269,7 @@ export default function ReviewDog() {
                                         }
                                         placeholder="Type correct breed here..."
                                         className="w-full focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-white/20 dark:bg-white/5"
+                                        disabled={processing}
                                     />
                                     {errors.correct_breed && (
                                         <span className="text-sm font-medium text-red-500">
@@ -254,8 +299,9 @@ export default function ReviewDog() {
                                                 Impact on Model:
                                             </span>
                                             Submitting this will instantly
-                                            update the system's memory. The system
-                                            will recognize this specific dog as
+                                            update the system's memory. The
+                                            system will recognize this specific
+                                            dog as
                                             <span className="mx-1 font-bold">
                                                 "{data.correct_breed || '...'}"
                                             </span>
@@ -265,12 +311,36 @@ export default function ReviewDog() {
                                 </Card>
 
                                 <Button
-                                    className="mt-6 h-11 w-full bg-blue-600 text-white hover:bg-blue-700"
+                                    className="mt-6 h-11 w-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-70"
                                     disabled={processing}
                                 >
-                                    {processing
-                                        ? 'Learning from correction...'
-                                        : 'Submit Correction'}
+                                    {processing ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg
+                                                className="h-4 w-4 animate-spin"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                                />
+                                            </svg>
+                                            Teaching the system…
+                                        </span>
+                                    ) : (
+                                        'Submit Correction'
+                                    )}
                                 </Button>
                             </form>
                         </Card>
