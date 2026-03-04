@@ -134,9 +134,12 @@ const ViewSimulation: React.FC<Props> = ({
                     {label}
                 </span>
             </div>
-            <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-[#0D1117]">
+            {/* ✅ FIX: removed aspect-square / fixed aspectRatio.
+                Uses min-h-[340px] + flex-1 so the card grows to fit the full image.
+                object-contain replaces object-cover so nothing is cropped. */}
+            <div className="relative min-h-[340px] flex-1 overflow-hidden bg-slate-100 dark:bg-[#0D1117]">
                 {isLoading ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-4">
+                    <div className="flex h-full min-h-[340px] flex-col items-center justify-center gap-4">
                         <div className="relative">
                             <Loader2
                                 size={36}
@@ -158,7 +161,7 @@ const ViewSimulation: React.FC<Props> = ({
                         <img
                             src={getImageUrl(src)}
                             alt={label}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain"
                             key={`${label}-${lastUpdate}`}
                             onError={(e) => {
                                 e.currentTarget.src = '/dogpic.jpg';
@@ -184,7 +187,7 @@ const ViewSimulation: React.FC<Props> = ({
                         </div>
                     </>
                 ) : (
-                    <div className="flex h-full items-center justify-center">
+                    <div className="flex h-full min-h-[340px] items-center justify-center">
                         <p className="text-sm text-slate-400 dark:text-slate-600">
                             No image available
                         </p>
@@ -225,6 +228,10 @@ const ViewSimulation: React.FC<Props> = ({
                     .vs-tab { transition:all .18s; }
                     .vs-tab-active { background:white;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,.1); }
                     .dark .vs-tab-active { background:#131720;color:white;box-shadow:0 1px 3px rgba(0,0,0,.4); }
+                    /* ✅ FIX: ensure both image cards in the grid row share the same height */
+                    .vs-img-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1.25rem; align-items:stretch; }
+                    .vs-img-grid > * { display:flex; flex-direction:column; }
+                    @media(max-width:639px){ .vs-img-grid { grid-template-columns:1fr; } }
                 `}</style>
 
             <div className="vs-root flex min-h-screen flex-col bg-slate-50 dark:bg-[#080B0F]">
@@ -457,8 +464,10 @@ const ViewSimulation: React.FC<Props> = ({
                                     </span>
                                 </div>
 
-                                {/* Image comparison */}
-                                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                                {/* ✅ FIX: replaced grid grid-cols-1 gap-5 sm:grid-cols-2 with
+                                    custom vs-img-grid class that stretches both cards to equal height,
+                                    so the image containers grow to their natural image dimensions. */}
+                                <div className="vs-img-grid">
                                     {/* Current */}
                                     <div className="relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
                                         <div className="vs-imgcard absolute top-0 right-0 left-0 h-[1.5px]" />
@@ -470,16 +479,14 @@ const ViewSimulation: React.FC<Props> = ({
                                                 Current Appearance
                                             </span>
                                         </div>
-                                        <div
-                                            className="relative overflow-hidden bg-slate-100 dark:bg-[#0D1117]"
-                                            style={{ aspectRatio: '1' }}
-                                        >
+                                        {/* ✅ FIX: flex-1 + object-contain so original image shows fully */}
+                                        <div className="relative min-h-[340px] flex-1 overflow-hidden bg-slate-100 dark:bg-[#0D1117]">
                                             <img
                                                 src={getImageUrl(
                                                     currentOriginalImage,
                                                 )}
                                                 alt="Current"
-                                                className="h-full w-full object-cover"
+                                                className="h-full w-full object-contain"
                                                 key={`orig-${lastUpdate}`}
                                                 onError={(e) => {
                                                     e.currentTarget.src =

@@ -44,7 +44,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
     const [filter, setFilter] = useState<'all' | 'verified' | 'pending'>('all');
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
-    // ✅ Now accepts event to stop propagation
     const handleDelete = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
         setDeletingId(id);
@@ -58,7 +57,6 @@ export default function ScanHistory({ mockScans, user }: Props) {
         });
     };
 
-    // ✅ New: navigate to scan results page for this scan
     const handleCardClick = (id: number) => {
         router.visit(`/scan-results/${id}`);
     };
@@ -445,13 +443,15 @@ export default function ScanHistory({ mockScans, user }: Props) {
                         </div>
                     )}
 
-                    {/* SCAN GRID */}
+                    {/* ✅ FIX: Replaced CSS `columns` (fills top-to-bottom) with CSS Grid
+                        (fills left-to-right row by row). Cards now render in reading order:
+                        item 1 → item 2 → item 3 on row 1, then item 4 → item 5 → item 6, etc. */}
                     {filtered.length > 0 && (
-                        <div className="columns-1 gap-[18px] sm:columns-2 lg:columns-3">
+                        <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
                             {filtered.map((scan, idx) => (
                                 <div
                                     key={scan.id}
-                                    className="sh-card sh-fade-up group mb-[18px] inline-block w-full overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/[.07] dark:border-white/[.07] dark:bg-white/[.025] dark:shadow-none"
+                                    className="sh-card sh-fade-up group overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/[.07] dark:border-white/[.07] dark:bg-white/[.025] dark:shadow-none"
                                     style={{ animationDelay: `${idx * 0.04}s` }}
                                     onClick={() => handleCardClick(scan.id)}
                                 >
