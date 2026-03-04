@@ -637,13 +637,7 @@ scansLastWeek = 0,
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {(
                         [
-                           {
-    label: 'Most Scanned Breed',
-    val: mostScannedBreed,
-    sub: 'Most frequent prediction',
-    Icon: Database,
-    a: '#8b5cf6',
-},
+                           
                             {
                                 label: 'High Confidence Rate',
                                 val: `${highConfidenceRate.toFixed(1)}%`,
@@ -657,6 +651,13 @@ scansLastWeek = 0,
     sub: 'Daily scanning activity',
     Icon: BarChart3,
     a: '#3b82f6',
+},
+{
+    label: 'Most Scanned Breed',
+    val: mostScannedBreed,
+    sub: 'Most frequent prediction',
+    Icon: Database,
+    a: '#8b5cf6',
 },
                         ] as const
                     ).map(({ label, val, sub, Icon, a }) => (
