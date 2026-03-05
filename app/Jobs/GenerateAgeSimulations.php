@@ -23,9 +23,10 @@ class GenerateAgeSimulations implements ShouldQueue
   public $backoff    = [20, 60, 120];
 
   private const MODEL_PRIORITY = [
-    'gemini-2.0-flash-exp-image-generation',
-    'gemini-2.5-flash-preview-05-20',
-    'gemini-2.5-flash-image',
+    'gemini-3-pro-image-preview',          // Nano Banana Pro (best)
+    'gemini-3.1-flash-image-preview',      // Nano Banana 2
+    'gemini-2.5-flash-image',              // Nano Banana (original)
+    'gemini-2.0-flash-exp-image-generation', // fallback
   ];
 
   private const SEND_SIZE = 1024;
@@ -75,8 +76,14 @@ class GenerateAgeSimulations implements ShouldQueue
       $currentAgeStage = $this->detectAgeStage($imageData);
       Log::info("🔍 Detected age stage: {$currentAgeStage}");
 
-      $breedProfile                       = $this->getBreedProfile($this->breed);
-      $breedProfile['detected_age_stage'] = $currentAgeStage;
+      // ── Detect exact coat markings from the actual photo ──────────
+      // This prevents the model from losing white patches, blazes, etc.
+      $detectedMarkings = $this->detectCoatMarkings($imageData);
+      Log::info("🎨 Detected markings: {$detectedMarkings}");
+
+      $breedProfile                        = $this->getBreedProfile($this->breed);
+      $breedProfile['detected_age_stage']  = $currentAgeStage;
+      $breedProfile['detected_markings']   = $detectedMarkings;
 
       $selectedModel = $this->selectBestModel();
       Log::info("🤖 Using model: {$selectedModel}");
@@ -130,7 +137,7 @@ class GenerateAgeSimulations implements ShouldQueue
   {
     try {
       $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-      $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={$apiKey}";
+      $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
 
       $payload = [
         'contents' => [[
@@ -189,6 +196,55 @@ class GenerateAgeSimulations implements ShouldQueue
     } catch (\Exception $e) {
       Log::warning('Age detection failed, defaulting to adult: ' . $e->getMessage());
       return 'adult';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  //  COAT MARKINGS DETECTION
+  //  Uses a vision call to precisely describe the dog's color pattern.
+  //  This description is then injected into the generation prompt to
+  //  prevent the model from losing/changing the markings.
+  // ─────────────────────────────────────────────────────────────────────
+
+  private function detectCoatMarkings(array $imageData): string
+  {
+    try {
+      $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+      $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+
+      $payload = [
+        'contents' => [[
+          'parts' => [
+            [
+              'text' =>
+              'Describe this dog\'s coat color and markings in precise detail. ' .
+                'Be specific about: (1) the base coat color, (2) every white or lighter area and exactly where it is (muzzle, blaze, chest, belly, paws, tail tip etc), ' .
+                '(3) any darker patches and where they are, (4) any other distinctive color patterns. ' .
+                'Write 2-3 sentences maximum. Be factual and specific. Example: ' .
+                '"The dog has a tan/golden-brown coat on the back and sides. It has a distinct white blaze running from the forehead down the muzzle, white chest and belly, and white lower legs and paws. The tail tip is white."',
+            ],
+            [
+              'inlineData' => [
+                'mimeType' => $imageData['mimeType'],
+                'data'     => $imageData['base64'],
+              ],
+            ],
+          ],
+        ]],
+        'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 150],
+      ];
+
+      $client   = new Client(['timeout' => 20]);
+      $response = $client->post($endpoint, [
+        'json'    => $payload,
+        'headers' => ['Content-Type' => 'application/json'],
+      ]);
+      $data = json_decode($response->getBody()->getContents(), true);
+      $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
+      return $text ?: 'same coat color and markings as in the photo';
+    } catch (\Exception $e) {
+      Log::warning('Markings detection failed: ' . $e->getMessage());
+      return 'same coat color and markings as in the photo';
     }
   }
 
@@ -271,9 +327,9 @@ class GenerateAgeSimulations implements ShouldQueue
         ],
       ]],
       'generationConfig' => [
-        'temperature'        => 0.4,
+        'temperature'        => 0.2,
         'topK'               => 32,
-        'topP'               => 0.95,
+        'topP'               => 0.85,
         'maxOutputTokens'    => 8192,
         'responseModalities' => ['IMAGE', 'TEXT'],
       ],
@@ -365,52 +421,49 @@ class GenerateAgeSimulations implements ShouldQueue
 
   private function buildAgingPrompt(array $profile, int $targetYears): string
   {
-    $breed     = $profile['breed'];
-    $ageStage  = $profile['detected_age_stage'] ?? 'adult';
-    $isPuppy   = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
-    $isYoung   = ($ageStage === 'young_adult');
-    $isSenior  = ($ageStage === 'senior');
-    $isAdult   = !$isPuppy && !$isYoung && !$isSenior;
+    $breed            = $profile['breed'];
+    $ageStage         = $profile['detected_age_stage']  ?? 'adult';
+    $detectedMarkings = $profile['detected_markings']   ?? 'same coat color and markings as in the photo';
 
-    $size      = $profile['size_category']   ?? 'medium';
-    $coat      = $profile['coat_type']        ?? 'short';
-    $isBrachy  = $profile['brachycephalic']   ?? false;
-    $bodyShape = $profile['body_shape']       ?? 'standard';
-    $heightChg = $profile['height_change']    ?? 'moderate_increase';
+    $isPuppy  = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
+    $isYoung  = ($ageStage === 'young_adult');
+    $isSenior = ($ageStage === 'senior');
+    $isAdult  = !$isPuppy && !$isYoung && !$isSenior;
 
-    // ── Build the aging description — concise, natural language ───────
     $agingDesc = $this->buildNaturalAgingDescription($profile, $ageStage, $targetYears);
+    $guardrail = $this->buildBreedGuardrail($profile);
 
-    // ── PROMPT: conversational + precise, no heavy ASCII formatting ───
-    // Gemini image gen responds much better to clear, natural instructions
-    // than structured document-style prompts which cause hallucination/blur.
+    // ── Core strategy: minimal-edit framing + explicit markings lock ──
+    // Gemini image gen works best when told it's doing a SMALL, specific
+    // edit to a photo — not regenerating it. The more we anchor the
+    // unchanged elements (especially the exact markings), the less it drifts.
 
-    $prompt  = "Edit this photo to show the same {$breed} dog aged forward by {$targetYears} year(s). ";
-    $prompt .= "This is a photo editing task — keep everything identical except the dog's age-related appearance.\n\n";
+    $prompt  = "You are editing a dog photo. Make ONLY the age-related changes listed below. ";
+    $prompt .= "Everything else in the photo must remain pixel-perfect identical.\n\n";
 
-    $prompt .= "KEEP UNCHANGED (copy exactly from the photo):\n";
-    $prompt .= "- The entire background, floor, and environment\n";
-    $prompt .= "- The dog's exact coat color pattern and all markings (every patch, stripe, blaze — identical)\n";
-    $prompt .= "- The dog's eye color\n";
-    $prompt .= "- The dog's pose and body position\n";
-    $prompt .= "- The photo's camera angle and framing\n";
-    $prompt .= "- Photo quality and lighting style\n\n";
+    $prompt .= "THIS DOG'S EXACT COAT MARKINGS (you MUST preserve all of these perfectly):\n";
+    $prompt .= "{$detectedMarkings}\n";
+    $prompt .= "Do NOT change, remove, or alter ANY of the above markings. ";
+    $prompt .= "If the dog has a white chest — keep the white chest. ";
+    $prompt .= "If the dog has a white blaze — keep the white blaze. ";
+    $prompt .= "Every color patch must appear in exactly the same location as in the original photo.\n\n";
 
-    $prompt .= "CHANGE ONLY THESE AGE-RELATED FEATURES:\n";
+    $prompt .= "ALSO KEEP UNCHANGED:\n";
+    $prompt .= "- Background, floor, walls, environment (identical)\n";
+    $prompt .= "- Dog's pose and body position (identical)\n";
+    $prompt .= "- Camera angle and framing (identical)\n";
+    $prompt .= "- Eye color (identical)\n";
+    $prompt .= "- Photo sharpness and quality level (identical — NOT blurry, NOT painterly)\n\n";
+
+    $prompt .= "AGE-RELATED CHANGES TO MAKE (for a {$breed} aged +{$targetYears} year(s)):\n";
     $prompt .= $agingDesc . "\n\n";
 
-    // Breed-specific anatomy guardrail
-    $guardrail = $this->buildBreedGuardrail($profile);
     if ($guardrail) {
-      $prompt .= "IMPORTANT BREED ANATOMY:\n";
-      $prompt .= $guardrail . "\n\n";
+      $prompt .= "BREED NOTE: {$guardrail}\n\n";
     }
 
-    $prompt .= "QUALITY REQUIREMENTS:\n";
-    $prompt .= "- Photorealistic — must look like a real photograph, not a painting or illustration\n";
-    $prompt .= "- Sharp and clear — same sharpness/quality as the input photo\n";
-    $prompt .= "- The aging changes must be clearly visible and noticeable\n";
-    $prompt .= "- Output only the edited photo, nothing else\n";
+    $prompt .= "OUTPUT: A sharp, photorealistic photo — the same dog, same scene, aged by {$targetYears} year(s). ";
+    $prompt .= "Not a painting. Not blurry. A real-looking photograph with clear aging differences visible.";
 
     return $prompt;
   }
