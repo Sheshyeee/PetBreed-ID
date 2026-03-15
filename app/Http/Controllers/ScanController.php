@@ -17,7 +17,7 @@ class ScanController extends Controller
             ->where('breed', '!=', '')
             ->groupBy('breed')
             ->orderByDesc('scan_count')
-            ->limit(5)
+            ->limit(3)
             ->get()
             ->map(fn($r) => [
                 'breed'          => $r->breed,
