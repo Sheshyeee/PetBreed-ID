@@ -1,5 +1,5 @@
 import Header from '@/components/header';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import {
     CalendarDays,
     CheckCircle2,
@@ -9,6 +9,7 @@ import {
     History,
     Scan as ScanIcon,
     Stethoscope,
+    Trash2,
     User,
     XCircle,
 } from 'lucide-react';
@@ -56,7 +57,7 @@ type PageProps = {
     globalStats?: GlobalStats;
 };
 
-// ── Panel (matches scan page) ─────────────────────────────────────────────────
+// ── Panel ─────────────────────────────────────────────────────────────────────
 const Panel = ({
     icon,
     title,
@@ -107,6 +108,8 @@ const statusConfig = {
 // ── Appointment Card ──────────────────────────────────────────────────────────
 function AppointmentCard({ appt }: { appt: Appointment }) {
     const [showRejectForm, setShowRejectForm] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
         status: '' as 'accepted' | 'rejected',
@@ -125,12 +128,30 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
         });
     };
 
+    // Delete is only allowed once a decision has been made (not pending)
+    const canDelete = appt.status !== 'pending';
+
+    const handleDelete = () => {
+        if (!canDelete) return;
+        if (!confirmDelete) {
+            setConfirmDelete(true);
+            // Auto-cancel confirm after 4s if user ignores
+            setTimeout(() => setConfirmDelete(false), 4000);
+            return;
+        }
+        setDeleting(true);
+        router.delete(`/appointments/${appt.id}`, {
+            onFinish: () => setDeleting(false),
+        });
+    };
+
     const cfg = statusConfig[appt.status];
     const StatusIcon = cfg.Icon;
 
     return (
         <div className="sc-appt-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
             {/* Accent top bar */}
+            <div className={`h-[2px] w-full ${cfg.barColor} opacity-60`} />
 
             {/* Card header */}
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-white/[.05]">
@@ -158,14 +179,57 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                     </div>
                 </div>
 
-                {/* Status badge */}
-                <span
-                    className={`inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 font-mono text-[10px] font-semibold tracking-[.08em] uppercase sm:self-auto ${cfg.badge}`}
-                >
-                    <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                    {cfg.label}
-                </span>
+                {/* Right side: status badge + delete button */}
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                    {/* Status badge */}
+                    <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10px] font-semibold tracking-[.08em] uppercase ${cfg.badge}`}
+                    >
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                    </span>
+
+                    {/* Delete button — only usable after a decision */}
+                    {canDelete ? (
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            title="Delete appointment"
+                            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+                                confirmDelete
+                                    ? 'border-red-400/60 bg-red-500 text-white shadow-md shadow-red-500/25 hover:bg-red-600'
+                                    : 'border-slate-200 bg-slate-50 text-slate-400 hover:border-red-300 hover:bg-red-50 hover:text-red-500 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-500 dark:hover:border-red-400/40 dark:hover:bg-red-500/[.08] dark:hover:text-red-400'
+                            }`}
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    ) : (
+                        /* Disabled state when still pending */
+                        <button
+                            disabled
+                            title="Make a decision first to enable delete"
+                            className="flex h-7 w-7 flex-shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200/60 bg-slate-50/60 text-slate-300 dark:border-white/[.04] dark:bg-white/[.02] dark:text-slate-700"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Confirm delete banner — appears when first click happens */}
+            {confirmDelete && (
+                <div className="flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-2.5 dark:border-red-500/15 dark:bg-red-500/[.07]">
+                    <p className="text-[12px] font-semibold text-red-700 dark:text-red-400">
+                        Click the <Trash2 size={11} className="inline" /> again to confirm deletion.
+                    </p>
+                    <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="font-mono text-[10px] font-bold text-red-400 hover:text-red-600 dark:text-red-500"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
 
             {/* Details grid */}
             <div className="grid grid-cols-2 gap-2 p-3.5 sm:grid-cols-4">
@@ -173,44 +237,25 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                     {
                         icon: <CalendarDays size={10} />,
                         label: 'Date',
-                        value: new Date(
-                            appt.appointment_date,
-                        ).toLocaleDateString('en-US', {
+                        value: new Date(appt.appointment_date).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric',
                         }),
                     },
-                    {
-                        icon: <Clock size={10} />,
-                        label: 'Time',
-                        value: appt.appointment_time,
-                    },
-                    {
-                        icon: <User size={10} />,
-                        label: 'Vet',
-                        value: appt.vet_name,
-                    },
-                    {
-                        icon: <Stethoscope size={10} />,
-                        label: 'Reason',
-                        value: appt.reason,
-                    },
+                    { icon: <Clock size={10} />, label: 'Time', value: appt.appointment_time },
+                    { icon: <User size={10} />, label: 'Vet', value: appt.vet_name },
+                    { icon: <Stethoscope size={10} />, label: 'Reason', value: appt.reason },
                 ].map((item, i) => (
                     <div
                         key={i}
                         className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
                     >
                         <p className="mb-0.5 flex items-center gap-1 font-mono text-[9px] font-medium tracking-[.08em] text-slate-400 uppercase dark:text-slate-500">
-                            <span className="text-emerald-500/70">
-                                {item.icon}
-                            </span>
+                            <span className="text-emerald-500/70">{item.icon}</span>
                             {item.label}
                         </p>
-                        <p
-                            className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-200"
-                            title={item.value}
-                        >
+                        <p className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-200" title={item.value}>
                             {item.value}
                         </p>
                     </div>
@@ -224,9 +269,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                         <p className="mb-0.5 font-mono text-[9px] font-semibold tracking-[.1em] text-emerald-600 uppercase dark:text-emerald-500">
                             Clinic Notes
                         </p>
-                        <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                            {appt.notes}
-                        </p>
+                        <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">{appt.notes}</p>
                     </div>
                 </div>
             )}
@@ -238,14 +281,12 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                         <p className="mb-0.5 font-mono text-[9px] font-semibold tracking-[.1em] text-red-500 uppercase dark:text-red-400">
                             Your Reason
                         </p>
-                        <p className="text-[12px] leading-relaxed text-red-700 dark:text-red-300">
-                            {appt.rejection_reason}
-                        </p>
+                        <p className="text-[12px] leading-relaxed text-red-700 dark:text-red-300">{appt.rejection_reason}</p>
                     </div>
                 </div>
             )}
 
-            {/* Action buttons */}
+            {/* Action buttons — pending only */}
             {appt.status === 'pending' && (
                 <div className="border-t border-slate-100 px-3.5 py-3 dark:border-white/[.05]">
                     {!showRejectForm ? (
@@ -272,29 +313,21 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                             </p>
                             <textarea
                                 value={data.rejection_reason}
-                                onChange={(e) =>
-                                    setData('rejection_reason', e.target.value)
-                                }
+                                onChange={(e) => setData('rejection_reason', e.target.value)}
                                 placeholder="e.g. Schedule conflict, will reschedule soon…"
                                 rows={2}
-                                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-800 transition-all outline-none focus:border-red-400/60 focus:ring-2 focus:ring-red-400/20 dark:border-white/[.08] dark:bg-white/[.04] dark:text-white dark:placeholder-white/20"
+                                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-800 outline-none transition-all focus:border-red-400/60 focus:ring-2 focus:ring-red-400/20 dark:border-white/[.08] dark:bg-white/[.04] dark:text-white dark:placeholder-white/20"
                             />
                             {errors.rejection_reason && (
-                                <p className="font-mono text-[10px] text-red-500">
-                                    {errors.rejection_reason}
-                                </p>
+                                <p className="font-mono text-[10px] text-red-500">{errors.rejection_reason}</p>
                             )}
                             <div className="flex gap-2.5">
                                 <button
-                                    onClick={() =>
-                                        post(`/appointments/${appt.id}/status`)
-                                    }
+                                    onClick={() => post(`/appointments/${appt.id}/status`)}
                                     disabled={processing}
                                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-[12px] font-bold text-white transition-all hover:bg-red-400 disabled:opacity-50"
                                 >
-                                    {processing
-                                        ? 'Sending…'
-                                        : 'Confirm Decline'}
+                                    {processing ? 'Sending…' : 'Confirm Decline'}
                                 </button>
                                 <button
                                     onClick={() => setShowRejectForm(false)}
@@ -314,11 +347,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UserAppointments() {
-    const {
-        appointments,
-        topBreeds = [],
-        globalStats,
-    } = usePage<PageProps>().props;
+    const { appointments, topBreeds = [], globalStats } = usePage<PageProps>().props;
 
     const stats: GlobalStats = globalStats ?? {
         total_scans: '—',
@@ -365,109 +394,70 @@ export default function UserAppointments() {
             `}</style>
 
             <div className="sc-root flex h-screen flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-[#080B0F]">
-                {/* Ambient glows */}
                 <div className="pointer-events-none fixed top-[-140px] left-[-70px] z-0 h-[260px] w-[460px] rounded-full bg-emerald-400/[.042] blur-[85px]" />
                 <div className="pointer-events-none fixed top-[-90px] right-[-40px] z-0 h-[210px] w-[340px] rounded-full bg-cyan-400/[.028] blur-[85px]" />
                 <div className="sc-dotgrid" />
 
-                {/* Header */}
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
 
-                {/* Main content */}
                 <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-hidden p-3 px-4">
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
-                            {/* ── LEFT SIDEBAR (desktop only) ── */}
+
+                            {/* ── LEFT SIDEBAR ── */}
                             <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-start lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
-                                <Panel
-                                    icon={<ScanIcon size={11} />}
-                                    title="Navigation"
-                                >
+                                <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
-                                        <Link
-                                            href="/scan"
-                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
-                                        >
-                                            <ScanIcon size={13} />
-                                            <span>New Scan</span>
+                                        <Link href="/scan" className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
+                                            <ScanIcon size={13} /><span>New Scan</span>
                                         </Link>
-                                        <Link
-                                            href="/scanhistory"
-                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
-                                        >
-                                            <History size={13} />
-                                            <span>Scan History</span>
+                                        <Link href="/scanhistory" className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
+                                            <History size={13} /><span>Scan History</span>
                                         </Link>
-                                        <Link
-                                            href="/appointments"
-                                            className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2 text-[11px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400"
-                                        >
-                                            <CalendarDays size={13} />
-                                            <span>Appointments</span>
-                                            <ChevronRight
-                                                size={11}
-                                                className="ml-auto opacity-40"
-                                            />
+                                        <Link href="/appointments" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2 text-[11px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400">
+                                            <CalendarDays size={13} /><span>Appointments</span>
+                                            <ChevronRight size={11} className="ml-auto opacity-40" />
                                         </Link>
                                     </div>
                                 </Panel>
 
-                                <Panel
-                                    icon={<FileText size={11} />}
-                                    title="What to Expect"
-                                >
+                                <Panel icon={<FileText size={11} />} title="What to Expect">
                                     <div className="flex flex-col p-3">
                                         {[
-                                            {
-                                                n: '01',
-                                                t: "Clinic reviews your dog's breed scan",
-                                            },
-                                            {
-                                                n: '02',
-                                                t: 'They schedule a consultation and notify you',
-                                            },
-                                            {
-                                                n: '03',
-                                                t: 'Accept or decline with an optional reason',
-                                            },
-                                            {
-                                                n: '04',
-                                                t: 'Attend your appointment for expert advice',
-                                            },
+                                            { n: '01', t: "Clinic reviews your dog's breed scan" },
+                                            { n: '02', t: 'They schedule a consultation and notify you' },
+                                            { n: '03', t: 'Accept or decline with an optional reason' },
+                                            { n: '04', t: 'Attend your appointment for expert advice' },
                                         ].map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
-                                            >
-                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">
-                                                    {s.n}
-                                                </span>
-                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                    {s.t}
-                                                </p>
+                                            <div key={i} className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}>
+                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">{s.n}</span>
+                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">{s.t}</p>
                                             </div>
                                         ))}
+                                    </div>
+                                </Panel>
+
+                                {/* Delete info hint */}
+                                <Panel icon={<Trash2 size={11} />} title="Delete Rule">
+                                    <div className="p-3">
+                                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
+                                            You can delete an appointment only after you have <span className="font-semibold text-slate-700 dark:text-slate-300">accepted or declined</span> it. Pending appointments cannot be deleted until a response is made.
+                                        </p>
                                     </div>
                                 </Panel>
                             </div>
 
                             {/* ── CENTER ── */}
                             <div className="sc-fu flex min-h-0 flex-1 flex-col gap-3">
-                                {/* Page title */}
                                 <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <h1 className="text-lg leading-none font-extrabold tracking-tight text-slate-900 sm:text-xl dark:text-white">
-                                            My Appointments
-                                        </h1>
+                                        <h1 className="text-lg leading-none font-extrabold tracking-tight text-slate-900 sm:text-xl dark:text-white">My Appointments</h1>
                                         <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                                            Appointments scheduled by your vet
-                                            clinic based on scan results.
+                                            Appointments scheduled by your vet clinic based on scan results.
                                         </p>
                                     </div>
-
-                                    {/* Pending count badge */}
                                     {pending.length > 0 && (
                                         <div className="inline-flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/[.07] px-3.5 py-2">
                                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
@@ -478,91 +468,48 @@ export default function UserAppointments() {
                                     )}
                                 </div>
 
-                                {/* Terminal bar card wrapping the list */}
                                 <div className="sc-panel-line relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
-                                    {/* Scrollable content */}
                                     <div className="sc-nsb flex-1 overflow-y-auto p-4">
                                         {appointments.length === 0 ? (
-                                            /* Empty state */
                                             <div className="flex flex-col items-center justify-center gap-4 py-20">
                                                 <div className="relative flex h-16 w-16 items-center justify-center">
-                                                    <div
-                                                        className="absolute inset-0 rounded-full border border-emerald-500/20 opacity-60"
-                                                        style={{
-                                                            animation:
-                                                                'sc-dpulse 2.6s ease-out infinite',
-                                                        }}
-                                                    />
+                                                    <div className="absolute inset-0 rounded-full border border-emerald-500/20 opacity-60" style={{ animation: 'sc-dpulse 2.6s ease-out infinite' }} />
                                                     <div className="flex h-full w-full items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/[.08]">
-                                                        <CalendarDays
-                                                            size={22}
-                                                            className="text-emerald-500/70"
-                                                        />
+                                                        <CalendarDays size={22} className="text-emerald-500/70" />
                                                     </div>
                                                 </div>
                                                 <div className="text-center">
-                                                    <p className="text-[14px] font-bold text-slate-700 dark:text-slate-300">
-                                                        No appointments yet
-                                                    </p>
-                                                    <p className="sc-mono mt-1 text-[10px] tracking-[.1em] text-slate-400 dark:text-slate-600">
-                                                        THE CLINIC WILL NOTIFY
-                                                        YOU HERE
-                                                    </p>
+                                                    <p className="text-[14px] font-bold text-slate-700 dark:text-slate-300">No appointments yet</p>
+                                                    <p className="sc-mono mt-1 text-[10px] tracking-[.1em] text-slate-400 dark:text-slate-600">THE CLINIC WILL NOTIFY YOU HERE</p>
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-6">
-                                                {/* Pending section */}
                                                 {pending.length > 0 && (
                                                     <section>
                                                         <div className="mb-3 flex items-center gap-2.5">
                                                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400 shadow-[0_0_5px_#f59e0b]" />
                                                             <span className="sc-mono text-[10px] font-bold tracking-[.12em] text-amber-600 uppercase dark:text-amber-400">
-                                                                Action Required
-                                                                —{' '}
-                                                                {pending.length}
+                                                                Action Required — {pending.length}
                                                             </span>
                                                             <div className="h-px flex-1 bg-amber-400/20" />
                                                         </div>
                                                         <div className="flex flex-col gap-3">
-                                                            {pending.map(
-                                                                (a) => (
-                                                                    <AppointmentCard
-                                                                        key={
-                                                                            a.id
-                                                                        }
-                                                                        appt={a}
-                                                                    />
-                                                                ),
-                                                            )}
+                                                            {pending.map((a) => <AppointmentCard key={a.id} appt={a} />)}
                                                         </div>
                                                     </section>
                                                 )}
-
-                                                {/* Responded section */}
                                                 {responded.length > 0 && (
                                                     <section>
                                                         <div className="mb-3 flex items-center gap-2.5">
                                                             <span className="h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-600" />
                                                             <span className="sc-mono text-[10px] font-bold tracking-[.12em] text-slate-500 uppercase dark:text-slate-500">
-                                                                Responded —{' '}
-                                                                {
-                                                                    responded.length
-                                                                }
+                                                                Responded — {responded.length}
                                                             </span>
                                                             <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.05]" />
                                                         </div>
                                                         <div className="flex flex-col gap-3">
-                                                            {responded.map(
-                                                                (a) => (
-                                                                    <AppointmentCard
-                                                                        key={
-                                                                            a.id
-                                                                        }
-                                                                        appt={a}
-                                                                    />
-                                                                ),
-                                                            )}
+                                                            {responded.map((a) => <AppointmentCard key={a.id} appt={a} />)}
                                                         </div>
                                                     </section>
                                                 )}
@@ -571,6 +518,55 @@ export default function UserAppointments() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* ── RIGHT SIDEBAR (kept minimal, matches layout) ── */}
+                            <div className="sc-fu hidden flex-col gap-3 lg:flex lg:min-h-0 lg:justify-start lg:overflow-x-hidden lg:overflow-y-auto">
+                                {/* Appointment summary counts */}
+                                <Panel icon={<CalendarDays size={11} />} title="Summary">
+                                    <div className="flex flex-col gap-1.5 p-2.5">
+                                        {[
+                                            { l: 'Total',     v: String(appointments.length),                                         color: 'text-slate-800 dark:text-slate-200' },
+                                            { l: 'Pending',   v: String(pending.length),                                              color: 'text-amber-600 dark:text-amber-300' },
+                                            { l: 'Confirmed', v: String(appointments.filter(a => a.status === 'accepted').length),    color: 'text-emerald-600 dark:text-emerald-400' },
+                                            { l: 'Declined',  v: String(appointments.filter(a => a.status === 'rejected').length),    color: 'text-red-500 dark:text-red-400' },
+                                        ].map((s, i) => (
+                                            <div key={i} className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]">
+                                                <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">{s.l}</span>
+                                                <span className={`font-mono text-[12px] font-bold ${s.color}`}>{s.v}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Panel>
+
+                                {/* Status legend */}
+                                <Panel icon={<CheckCircle2 size={11} />} title="Status Guide">
+                                    <div className="flex flex-col p-3">
+                                        {[
+                                            { dot: 'bg-amber-400 shadow-[0_0_5px_#f59e0b]', label: 'Pending',   desc: 'Awaiting your accept or decline.' },
+                                            { dot: 'bg-emerald-500 shadow-[0_0_5px_#10b981]', label: 'Confirmed', desc: 'You accepted. See you at the clinic.' },
+                                            { dot: 'bg-red-500 shadow-[0_0_5px_#ef4444]',    label: 'Declined',  desc: 'You declined. Contact clinic to reschedule.' },
+                                        ].map((s, i, arr) => (
+                                            <div key={i} className={`flex items-start gap-2.5 py-2.5 ${i < arr.length - 1 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}>
+                                                <span className={`mt-[5px] h-1.5 w-1.5 flex-shrink-0 rounded-full ${s.dot}`} />
+                                                <div>
+                                                    <p className="sc-mono text-[10px] font-bold tracking-[.08em] text-slate-700 uppercase dark:text-slate-300">{s.label}</p>
+                                                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">{s.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Panel>
+
+                                {/* Delete rule reminder */}
+                                <Panel icon={<Trash2 size={11} />} title="Delete Rule">
+                                    <div className="p-3">
+                                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
+                                            The <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">🗑</span> button on each card is only active after you have <span className="font-semibold text-slate-700 dark:text-slate-300">accepted or declined</span>. Pending appointments must be responded to first.
+                                        </p>
+                                    </div>
+                                </Panel>
+                            </div>
+
                         </div>
                     </div>
                 </div>

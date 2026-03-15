@@ -766,31 +766,31 @@ class ScanResultController extends Controller
     }
 
     public function preview($id)
-    {
-        $result = Results::findOrFail($id);
+{
+    $result = Results::findOrFail($id);
 
-        // Build base URL from object storage
-        $baseUrl = config('filesystems.disks.object-storage.url');
-        $result->image = $baseUrl . '/' . $result->image;
+    $baseUrl = config('filesystems.disks.object-storage.url');
+    $result->image = $baseUrl . '/' . $result->image;
 
-        // Parse JSON fields so the frontend receives proper arrays/objects
-        $result->health_risks = is_string($result->health_risks)
-            ? json_decode($result->health_risks, true)
-            : $result->health_risks;
+    $result->health_risks = is_string($result->health_risks)
+        ? json_decode($result->health_risks, true)
+        : $result->health_risks;
 
-        $result->origin_history = is_string($result->origin_history)
-            ? json_decode($result->origin_history, true)
-            : $result->origin_history;
+    $result->origin_history = is_string($result->origin_history)
+        ? json_decode($result->origin_history, true)
+        : $result->origin_history;
 
-        // Fetch existing appointment for this scan (if any)
-        $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
+    $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
 
-        return inertia('model/review-dog', [
-            'result'      => $result,
-            'appointment' => $appointment,
-        ]);
-    }
+    // Check if a correction already exists for this scan
+    $alreadyCorrected = \App\Models\BreedCorrection::where('scan_id', $result->scan_id)->exists();
 
+    return inertia('model/review-dog', [
+        'result'            => $result,
+        'appointment'       => $appointment,
+        'already_corrected' => $alreadyCorrected,
+    ]);
+}
 
     public function index(Request $request)
     {

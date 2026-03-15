@@ -85,6 +85,7 @@ type Result = {
 type PageProps = {
     result?: Result;
     appointment?: Appointment | null;
+    already_corrected?: boolean;
 };
 
 const riskColor = (level: string) => {
@@ -116,7 +117,7 @@ function parseField<T>(field: T | string | undefined): T | undefined {
 }
 
 export default function ReviewDog() {
-    const { result, appointment } = usePage<PageProps>().props;
+    const { result, appointment, already_corrected } = usePage<PageProps>().props;
 
     // ── Correction form ──────────────────────────────────────────────────────
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -138,10 +139,10 @@ export default function ReviewDog() {
     // ── UI state ─────────────────────────────────────────────────────────────
     const [summaryOpen, setSummaryOpen]               = useState(true);
     const [apptOpen, setApptOpen]                     = useState(true);
-    const [showApptModal, setShowApptModal]           = useState(false);
+    const [showApptModal, setShowApptModal]           = useState(false);    
     const [showSuccessAlert, setShowSuccessAlert]     = useState(false);
     const [correctedBreedName, setCorrectedBreedName] = useState('');
-    const [corrected, setCorrected]                   = useState(false);
+    const [corrected, setCorrected] = useState(already_corrected ?? false);
 
     // ── Correction submit — stay on page, show prompt ────────────────────────
     const submitCorrection: FormEventHandler = (e) => {
