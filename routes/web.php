@@ -44,10 +44,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
 
+
+    Route::post('/appointments/request', [AppointmentController::class, 'userRequest'])
+    ->name('appointments.request');
     // Admin / Vet — create appointment (in your existing admin route group)
     Route::post('/model/appointments', [AppointmentController::class, 'store'])
         ->name('appointments.store');
-    Route::get('/model/appointmentspage', [AppointmentController::class, 'show']);
+    Route::get('/model/appointmentspage', [AppointmentController::class, 'adminIndex']);
 
     // Normal user — view their appointments
     Route::get('/appointments', [AppointmentController::class, 'userIndex'])
@@ -56,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Normal user — accept or reject an appointment
     Route::post('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
         ->name('appointments.status');
+
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])
+    ->name('appointments.destroy');
 
     // Admin appointment-response notifications (polled by the bell icon)
     Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])

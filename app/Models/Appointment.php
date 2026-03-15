@@ -12,6 +12,7 @@ class Appointment extends Model
         'result_id',
         'user_id',
         'created_by',
+        'initiated_by',       // 'clinic' | 'user'
         'appointment_date',
         'appointment_time',
         'vet_name',
@@ -40,8 +41,9 @@ class Appointment extends Model
         return $this->belongsTo(\App\Models\User::class, 'created_by');
     }
 
-    // ── Scopes ────────────────────────────────────────────────────────────────
-    public function scopePending($query)    { return $query->where('status', 'pending'); }
-    public function scopeAccepted($query)   { return $query->where('status', 'accepted'); }
-    public function scopeRejected($query)   { return $query->where('status', 'rejected'); }
+    public function scopePending($query)       { return $query->where('status', 'pending'); }
+    public function scopeAccepted($query)      { return $query->where('status', 'accepted'); }
+    public function scopeRejected($query)      { return $query->where('status', 'rejected'); }
+    public function scopeClinicCreated($query) { return $query->where('initiated_by', 'clinic'); }
+    public function scopeUserCreated($query)   { return $query->where('initiated_by', 'user'); }
 }

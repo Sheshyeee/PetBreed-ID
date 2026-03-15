@@ -19,7 +19,7 @@ return new class extends Migration
 
             // Appointment details
             $table->date('appointment_date');
-            $table->string('appointment_time');
+            $table->string('appointment_time'); 
             $table->string('vet_name');
             $table->string('reason');
             $table->text('notes')->nullable();
