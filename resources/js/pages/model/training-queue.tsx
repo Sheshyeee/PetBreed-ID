@@ -201,6 +201,18 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
                                                         className="text-red-600"
                                                     />
                                                 </Link>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="secondary"
+                                                >
+                                                    <Link
+                                                        href={`/model/review-dog/${item.id}`}
+                                                    >
+                                                        Review
+                                                    </Link>
+                                                </Button>
+                                                
                                             </TableCell>
                                         </TableRow>
                                     ))}

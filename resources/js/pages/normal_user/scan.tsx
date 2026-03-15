@@ -663,9 +663,9 @@ export default function Scan() {
                 {/* ── MAIN CONTENT ── */}
            <div className="relative z-10 min-h-0 flex-1 overflow-y-auto p-3 px-4">
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
-                        <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
+                      <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR — desktop only ── */}
-                            <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-end lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
+                       <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-end lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-2">
                                 <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link
@@ -926,7 +926,7 @@ export default function Scan() {
                             </div>
 
                             {/* ── RIGHT SIDEBAR ── */}
-                            <div className="sc-fu flex flex-col gap-3 lg:min-h-0 lg:justify-end lg:overflow-x-hidden lg:overflow-y-auto">
+                          <div className="sc-fu flex flex-col gap-3 lg:min-h-0 lg:justify-end lg:overflow-x-hidden lg:overflow-y-auto lg:pb-2">
                                 <Panel icon={<Eye size={11} />} title="How It Works">
                                     <div className="flex flex-col p-3">
                                         {[
