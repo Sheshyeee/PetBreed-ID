@@ -22,6 +22,9 @@ import {
     X,
     XCircle,
     Zap,
+    Stethoscope,
+    Clock,
+    ArrowRight,
 } from 'lucide-react';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
@@ -364,86 +367,121 @@ export default function Scan() {
     const GlobalStatsContent = () => (
         <div className="flex flex-col gap-1.5 p-2.5">
             {[
-                {
-                    l: 'Total Scans',
-                    v: globalStats.total_scans,
-                    icon: <Target size={10} />,
-                },
-                {
-                    l: 'Verified',
-                    v: globalStats.verified,
-                    icon: <Shield size={10} />,
-                },
-                {
-                    l: 'Avg Score',
-                    v: globalStats.avg_score,
-                    icon: <Activity size={10} />,
-                },
-                {
-                    l: 'Uptime',
-                    v: globalStats.uptime,
-                    icon: <Wifi size={10} />,
-                },
+                { l: 'Total Scans', v: globalStats.total_scans, icon: <Target size={10} /> },
+                { l: 'Verified',    v: globalStats.verified,    icon: <Shield size={10} /> },
+                { l: 'Avg Score',   v: globalStats.avg_score,   icon: <Activity size={10} /> },
+                { l: 'Uptime',      v: globalStats.uptime,      icon: <Wifi size={10} /> },
             ].map((s, i) => (
                 <div
                     key={i}
                     className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
                 >
                     <div className="flex items-center gap-2">
-                        <span className="text-slate-500 dark:text-slate-600">
-                            {s.icon}
-                        </span>
-                        <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">
-                            {s.l}
-                        </span>
+                        <span className="text-slate-500 dark:text-slate-600">{s.icon}</span>
+                        <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">{s.l}</span>
                     </div>
-                    <span className="font-mono text-[12px] font-bold text-slate-800 dark:text-slate-200">
-                        {s.v}
-                    </span>
+                    <span className="font-mono text-[12px] font-bold text-slate-800 dark:text-slate-200">{s.v}</span>
                 </div>
             ))}
         </div>
     );
 
+    /* ─────────────────────────────────────────────────────────────────────────
+       APPOINTMENT BANNER  — multi-colour card design
+    ───────────────────────────────────────────────────────────────────────── */
     const AppointmentBanner = () => {
         if (pendingAppointments.length === 0) return null;
         const next = pendingAppointments[0];
         const count = pendingAppointments.length;
+
         return (
             <Link
                 href="/appointments"
-                className="sc-banner relative z-20 mx-4 mt-2 flex flex-shrink-0 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 no-underline transition-all hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-400/[.06] dark:hover:bg-amber-400/[.10]"
+                className="appt-banner group relative z-20 mx-4 mt-2 flex flex-shrink-0 items-stretch overflow-hidden rounded-2xl no-underline"
+                style={{
+                    boxShadow:
+                        '0 2px 18px 0 rgba(99,102,241,.14), 0 1px 4px 0 rgba(0,0,0,.06)',
+                }}
             >
-                {/* Left: icon + text */}
-                <div className="flex items-center gap-3">
-                    {/* Icon blob */}
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-400/[.12]">
-                        <CalendarDays
-                            size={15}
-                            className="text-amber-600 dark:text-amber-400"
-                        />
+                {/* ── Left colour strip ───────────────────────────────────── */}
+                <div
+                    className="appt-strip relative flex w-[54px] flex-shrink-0 flex-col items-center justify-center gap-1.5 overflow-hidden"
+                    style={{
+                        background:
+                            'linear-gradient(170deg,#6366f1 0%,#8b5cf6 45%,#ec4899 100%)',
+                    }}
+                >
+                    {/* decorative concentric rings */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <div className="h-14 w-14 rounded-full border border-white/20" />
+                        <div className="absolute h-22 w-22 rounded-full border border-white/10" />
                     </div>
-
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            {/* Pulse dot */}
-                            <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-amber-500" />
-                            <p className="text-[13px] leading-tight font-bold text-amber-900 dark:text-amber-200">
-                                {count === 1
-                                    ? `Appointment scheduled — ${next.breed}`
-                                    : `${count} appointments awaiting your response`}
-                            </p>
-                        </div>
-                        <p className="mt-0.5 font-mono text-[10px] text-amber-700/70 dark:text-amber-400/60">
-                            {next.appointment_date} · {next.appointment_time} ·{' '}
-                            {next.vet_name}
-                        </p>
-                    </div>
+                    <CalendarDays size={18} className="relative z-10 text-white drop-shadow-sm" />
+                    {count > 1 && (
+                        <span
+                            className="relative z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[9px] font-black"
+                            style={{ color: '#6366f1' }}
+                        >
+                            {count}
+                        </span>
+                    )}
                 </div>
 
-                {/* Right: pill CTA */}
-                <div className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/[.08] dark:text-amber-300">
-                    View <ChevronRight size={12} />
+                {/* ── Main body ───────────────────────────────────────────── */}
+                <div className="flex flex-1 items-center justify-between gap-3 border border-l-0 border-slate-200 bg-white px-4 py-3 transition-colors group-hover:bg-slate-50/80 dark:border-white/[.07] dark:bg-[#131720] dark:group-hover:bg-white/[.03]">
+
+                    {/* Left: text */}
+                    <div className="min-w-0 flex-1">
+                        {/* Tag row */}
+                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                            <span
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+                                style={{ background: 'rgba(99,102,241,.10)', color: '#6366f1' }}
+                            >
+                                <span className="h-1 w-1 animate-pulse rounded-full bg-current" />
+                                Action needed
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-md bg-pink-50 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-pink-500 dark:bg-pink-500/[.10]">
+                                <Stethoscope size={8} />
+                                Vet appt
+                            </span>
+                        </div>
+
+                        {/* Primary headline */}
+                        <p className="truncate text-[13px] font-bold leading-snug text-slate-900 dark:text-white">
+                            {count === 1
+                                ? `${next.breed} — appointment scheduled`
+                                : `${count} appointments awaiting your response`}
+                        </p>
+
+                        {/* Meta chips */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-400/20 dark:bg-violet-500/[.08] dark:text-violet-300">
+                                <CalendarDays size={9} />
+                                {next.appointment_date}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-400/20 dark:bg-sky-500/[.08] dark:text-sky-300">
+                                <Clock size={9} />
+                                {next.appointment_time}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/[.08] dark:text-rose-300">
+                                <Stethoscope size={9} />
+                                {next.vet_name}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Right: CTA button */}
+                    <div
+                        className="appt-cta flex flex-shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold text-white"
+                        style={{
+                            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                            boxShadow: '0 2px 8px rgba(99,102,241,.35)',
+                        }}
+                    >
+                        View
+                        <ArrowRight size={12} />
+                    </div>
                 </div>
             </Link>
         );
@@ -468,6 +506,8 @@ export default function Scan() {
                 @keyframes sc-huddim  { 0%,88%,100%{opacity:1} 94%{opacity:.12} }
                 @keyframes sc-particle{ from{transform:translate(-50%,-50%) scale(1);opacity:1} to{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0} }
                 @keyframes sc-ticker  { from{opacity:.26} to{opacity:1} }
+                @keyframes appt-in    { from{opacity:0;transform:translateY(-7px) scale(.985)} to{opacity:1;transform:translateY(0) scale(1)} }
+                @keyframes appt-shimmer{ from{left:-80%} to{left:130%} }
 
                 .sc-root { font-family:'Plus Jakarta Sans',sans-serif; }
                 .sc-root * { box-sizing:border-box; }
@@ -501,9 +541,6 @@ export default function Scan() {
                 .sc-hbl { bottom:7px; left:7px; border-width:0 0 2px 2px; }
                 .sc-hbr { bottom:7px; right:7px; border-width:0 2px 2px 0; }
                 .sc-cambeam { position:absolute; left:0; top:-3px; width:100%; height:3px; background:linear-gradient(90deg,transparent,#10b981,transparent); filter:blur(2px); animation:sc-camline 2s linear infinite; pointer-events:none; z-index:3; }
-                .sc-camh { position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(16,185,129,.35); transform:translateY(-50%); }
-                .sc-camv { position:absolute; top:0; bottom:0; left:50%; width:1px; background:rgba(16,185,129,.35); transform:translateX(-50%); }
-                .sc-camdot { position:absolute; top:50%; left:50%; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 10px #10b981; animation:sc-camdot 1.6s ease-in-out infinite; }
                 .sc-pt { position:absolute; width:3px; height:3px; border-radius:50%; background:#10b981; box-shadow:0 0 4px #10b981; top:50%; left:50%; animation:sc-particle .75s ease-out forwards; }
                 .sc-shim { position:relative; overflow:hidden; }
                 .sc-shim::before { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent); transform:skewX(-18deg); transition:left .5s; }
@@ -518,7 +555,28 @@ export default function Scan() {
                 .sc-nsb::-webkit-scrollbar { display:none; }
                 .sc-nsb { scrollbar-width:none; }
 
-                .sc-banner { animation:sc-slidein .32s ease both; }
+                /* ── Banner ── */
+                .appt-banner { animation: appt-in .38s cubic-bezier(.16,1,.3,1) both; }
+
+                .appt-strip { transition: filter .22s; }
+                .appt-banner:hover .appt-strip { filter: brightness(1.07) saturate(1.1); }
+
+                /* shimmer sweep on hover */
+                .appt-strip::after {
+                    content:''; position:absolute; top:0; left:-80%; width:38%; height:100%;
+                    background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+                    transform:skewX(-16deg); pointer-events:none; opacity:0; transition:opacity .15s;
+                }
+                .appt-banner:hover .appt-strip::after {
+                    opacity:1; animation:appt-shimmer .55s ease forwards;
+                }
+
+                /* CTA button lift */
+                .appt-cta { transition: box-shadow .2s, transform .2s; }
+                .appt-banner:hover .appt-cta {
+                    box-shadow: 0 4px 16px rgba(99,102,241,.48);
+                    transform: translateX(2px);
+                }
             `}</style>
 
             <div className="sc-root flex h-screen flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-[#080B0F]">
@@ -530,7 +588,7 @@ export default function Scan() {
                     <Header />
                 </div>
 
-                {/* Appointment banner — sits between header and main content */}
+                {/* ── Appointment Banner ── */}
                 <div className="relative z-20 flex-shrink-0 px-4 pt-2">
                     <AppointmentBanner />
                 </div>
@@ -557,10 +615,7 @@ export default function Scan() {
                             </button>
                             <div className="mb-5 text-center">
                                 <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10">
-                                    <Smartphone
-                                        size={20}
-                                        className="text-emerald-500"
-                                    />
+                                    <Smartphone size={20} className="text-emerald-500" />
                                 </div>
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                                     Install Mobile App
@@ -571,32 +626,16 @@ export default function Scan() {
                             </div>
                             <div className="mb-5 flex justify-center">
                                 <div className="rounded-xl bg-white p-2.5 shadow-lg">
-                                    <img
-                                        src="/qr-DogLens.png"
-                                        alt="QR"
-                                        className="block h-32 w-32"
-                                    />
+                                    <img src="/qr-DogLens.png" alt="QR" className="block h-32 w-32" />
                                 </div>
                             </div>
                             <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 dark:border-white/[.07]">
                                 {[
-                                    {
-                                        icon: <Download size={12} />,
-                                        t: 'Fast & Easy Installation',
-                                    },
-                                    {
-                                        icon: <Smartphone size={12} />,
-                                        t: 'Available on Android',
-                                    },
-                                    {
-                                        icon: <Camera size={12} />,
-                                        t: 'All Features On-The-Go',
-                                    },
+                                    { icon: <Download size={12} />, t: 'Fast & Easy Installation' },
+                                    { icon: <Smartphone size={12} />, t: 'Available on Android' },
+                                    { icon: <Camera size={12} />, t: 'All Features On-The-Go' },
                                 ].map((f, i) => (
-                                    <div
-                                        key={i}
-                                        className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 last:border-none dark:border-white/[.05] dark:bg-white/[.02] dark:text-slate-400"
-                                    >
+                                    <div key={i} className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 last:border-none dark:border-white/[.05] dark:bg-white/[.02] dark:text-slate-400">
                                         <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500">
                                             {f.icon}
                                         </div>
@@ -622,15 +661,12 @@ export default function Scan() {
                 </button>
 
                 {/* ── MAIN CONTENT ── */}
-                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-hidden p-3 px-4">
+           <div className="relative z-10 min-h-0 flex-1 overflow-y-auto p-3 px-4">
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR — desktop only ── */}
                             <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-end lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
-                                <Panel
-                                    icon={<ScanIcon size={11} />}
-                                    title="Navigation"
-                                >
+                                <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link
                                             href="/scan"
@@ -638,10 +674,7 @@ export default function Scan() {
                                         >
                                             <ScanIcon size={13} />
                                             <span>New Scan</span>
-                                            <ChevronRight
-                                                size={11}
-                                                className="ml-auto opacity-40"
-                                            />
+                                            <ChevronRight size={11} className="ml-auto opacity-40" />
                                         </Link>
                                         <Link
                                             href="/scanhistory"
@@ -659,16 +692,10 @@ export default function Scan() {
                                         </Link>
                                     </div>
                                 </Panel>
-                                <Panel
-                                    icon={<TrendingUp size={11} />}
-                                    title="Top Breeds"
-                                >
+                                <Panel icon={<TrendingUp size={11} />} title="Top Breeds">
                                     <TopBreedsContent />
                                 </Panel>
-                                <Panel
-                                    icon={<Activity size={11} />}
-                                    title="Global Stats"
-                                >
+                                <Panel icon={<Activity size={11} />} title="Global Stats">
                                     <GlobalStatsContent />
                                 </Panel>
                             </div>
@@ -681,10 +708,7 @@ export default function Scan() {
                                         <div className="mb-1.5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.08] px-2.5 py-1">
                                             <span
                                                 className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'sc-dpulse 2s ease-in-out infinite',
-                                                }}
+                                                style={{ animation: 'sc-dpulse 2s ease-in-out infinite' }}
                                             />
                                             <span className="sc-mono text-[10px] font-semibold tracking-[.12em] text-emerald-700 uppercase dark:text-emerald-400">
                                                 Breed Detection
@@ -694,8 +718,7 @@ export default function Scan() {
                                             Scan Your Dog
                                         </h1>
                                         <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                                            Upload a photo or use your camera to
-                                            identify your dog's breed.
+                                            Upload a photo or use your camera to identify your dog's breed.
                                         </p>
                                     </div>
                                     <Link
@@ -704,10 +727,7 @@ export default function Scan() {
                                     >
                                         <History size={14} />
                                         Scan History
-                                        <ChevronRight
-                                            size={12}
-                                            className="opacity-35"
-                                        />
+                                        <ChevronRight size={12} className="opacity-35" />
                                     </Link>
                                 </div>
 
@@ -715,15 +735,10 @@ export default function Scan() {
                                 {localError && showLocalError && (
                                     <div className="sc-alertin flex-shrink-0 rounded-2xl border border-red-200 bg-red-50 p-3.5 dark:border-red-500/20 dark:bg-red-500/[.07]">
                                         <div className="flex items-start gap-3">
-                                            <XCircle
-                                                size={15}
-                                                className="mt-0.5 flex-shrink-0 text-red-500"
-                                            />
+                                            <XCircle size={15} className="mt-0.5 flex-shrink-0 text-red-500" />
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-[13px] font-bold text-red-600 dark:text-red-400">
-                                                    {localError.not_a_dog
-                                                        ? 'Not a Dog '
-                                                        : 'Analysis Error'}
+                                                    {localError.not_a_dog ? 'Not a Dog ' : 'Analysis Error'}
                                                 </p>
                                                 <p className="mt-0.5 text-xs text-red-600/80 dark:text-red-500/75">
                                                     {localError.message}
@@ -743,17 +758,10 @@ export default function Scan() {
                                 {cameraError && (
                                     <div className="flex-shrink-0 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 dark:border-amber-500/20 dark:bg-amber-500/[.06]">
                                         <div className="flex items-start gap-2.5">
-                                            <CircleAlert
-                                                size={15}
-                                                className="mt-0.5 flex-shrink-0 text-amber-500"
-                                            />
+                                            <CircleAlert size={15} className="mt-0.5 flex-shrink-0 text-amber-500" />
                                             <div>
-                                                <p className="text-[13px] font-bold text-amber-700 dark:text-amber-400">
-                                                    Camera Error
-                                                </p>
-                                                <p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-500/75">
-                                                    {cameraError}
-                                                </p>
+                                                <p className="text-[13px] font-bold text-amber-700 dark:text-amber-400">Camera Error</p>
+                                                <p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-500/75">{cameraError}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -761,133 +769,61 @@ export default function Scan() {
 
                                 {/* SCAN CARD */}
                                 <div className="sc-maincard relative flex flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:min-h-0 lg:flex-1 dark:border-white/[.07] dark:bg-[#131720]">
-                                    {/* Terminal bar */}
                                     <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
                                         <span className="sc-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">
                                             doglens://scan
                                         </span>
                                         <div className="sc-mono ml-auto flex items-center gap-1.5 text-[10px] text-emerald-600 select-none dark:text-emerald-400">
-                                            <span
-                                                className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'sc-dpulse 2s infinite',
-                                                }}
-                                            />
-                                            {processing
-                                                ? 'PROCESSING'
-                                                : preview
-                                                  ? 'IMAGE LOADED'
-                                                  : showCamera
-                                                    ? 'CAMERA ACTIVE'
-                                                    : 'AWAITING INPUT'}
+                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"
+                                                style={{ animation: 'sc-dpulse 2s infinite' }} />
+                                            {processing ? 'PROCESSING' : preview ? 'IMAGE LOADED' : showCamera ? 'CAMERA ACTIVE' : 'AWAITING INPUT'}
                                         </div>
                                     </div>
 
-                                    <form
-                                        onSubmit={handleSubmit}
-                                        className="flex flex-col gap-4 overflow-y-auto p-4 lg:h-full lg:p-5"
-                                    >
+                                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 overflow-y-auto p-4 lg:h-full lg:p-5">
                                         {/* STATE A: Drop zone */}
                                         {!preview && !showCamera && (
                                             <div className="flex flex-col gap-3">
                                                 <div
                                                     className={`sc-dz flex min-h-[250px] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-8 transition-all lg:min-h-[310px] ${isDragging ? 'sc-dz-on border-emerald-500 bg-emerald-500/[.04] dark:bg-emerald-500/[.06]' : 'border-slate-300 hover:border-emerald-400 hover:bg-emerald-500/[.02] dark:border-white/[.09] dark:hover:border-emerald-500/50'}`}
-                                                    onClick={() =>
-                                                        fileInputRef.current?.click()
-                                                    }
-                                                    onDragOver={(e) => {
-                                                        e.preventDefault();
-                                                        setIsDragging(true);
-                                                    }}
-                                                    onDragLeave={() =>
-                                                        setIsDragging(false)
-                                                    }
-                                                    onDrop={(e) => {
-                                                        e.preventDefault();
-                                                        setIsDragging(false);
-                                                        const f =
-                                                            e.dataTransfer
-                                                                .files?.[0];
-                                                        if (f) processFile(f);
-                                                    }}
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                                    onDragLeave={() => setIsDragging(false)}
+                                                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files?.[0]; if (f) processFile(f); }}
                                                 >
                                                     <div className="sc-dzbeam" />
-                                                    <div
-                                                        className="sc-dzedge"
-                                                        style={{ left: 0 }}
-                                                    />
-                                                    <div
-                                                        className="sc-dzedge"
-                                                        style={{ right: 0 }}
-                                                    />
-                                                    <input
-                                                        ref={fileInputRef}
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={(
-                                                            e: ChangeEvent<HTMLInputElement>,
-                                                        ) => {
-                                                            const f =
-                                                                e.target
-                                                                    .files?.[0];
-                                                            if (f)
-                                                                processFile(f);
-                                                        }}
-                                                    />
+                                                    <div className="sc-dzedge" style={{ left: 0 }} />
+                                                    <div className="sc-dzedge" style={{ right: 0 }} />
+                                                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                                                        onChange={(e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) processFile(f); }} />
                                                     <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center">
                                                         <div className="sc-ring1" />
                                                         <div className="sc-ring2" />
                                                         <div className="relative flex h-full w-full items-center justify-center rounded-full border-2 border-emerald-500/30 bg-emerald-500/[.09]">
-                                                            <Upload
-                                                                size={22}
-                                                                className="text-emerald-500"
-                                                            />
+                                                            <Upload size={22} className="text-emerald-500" />
                                                         </div>
                                                     </div>
                                                     <div className="text-center select-none">
-                                                        <p className="text-[15px] font-bold text-slate-800 dark:text-slate-100">
-                                                            Drop your dog image
-                                                            here
-                                                        </p>
+                                                        <p className="text-[15px] font-bold text-slate-800 dark:text-slate-100">Drop your dog image here</p>
                                                         <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-500">
-                                                            or{' '}
-                                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                                                click to browse
-                                                            </span>
+                                                            or <span className="font-bold text-emerald-600 dark:text-emerald-400">click to browse</span>
                                                         </p>
                                                     </div>
-                                                    <p className="sc-mono text-[9px] tracking-[.14em] text-slate-500 select-none dark:text-slate-600">
-                                                        ALL FORMATS · MAX 10MB
-                                                    </p>
+                                                    <p className="sc-mono text-[9px] tracking-[.14em] text-slate-500 select-none dark:text-slate-600">ALL FORMATS · MAX 10MB</p>
                                                 </div>
 
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
-                                                    <span className="sc-mono text-[9px] font-medium tracking-[.14em] text-slate-500 uppercase select-none dark:text-slate-600">
-                                                        or use camera
-                                                    </span>
+                                                    <span className="sc-mono text-[9px] font-medium tracking-[.14em] text-slate-500 uppercase select-none dark:text-slate-600">or use camera</span>
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
                                                 </div>
 
-                                                <button
-                                                    type="button"
-                                                    onClick={startCamera}
-                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-bold text-emerald-700 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/[.05] dark:border-emerald-500/25 dark:bg-white/[.03] dark:text-emerald-400"
-                                                >
-                                                    <Camera size={15} />{' '}
-                                                    Activate Camera
+                                                <button type="button" onClick={startCamera}
+                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-bold text-emerald-700 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/[.05] dark:border-emerald-500/25 dark:bg-white/[.03] dark:text-emerald-400">
+                                                    <Camera size={15} /> Activate Camera
                                                 </button>
-                                                <p className="sc-mono text-center text-[9px] tracking-[.12em] text-slate-500 select-none dark:text-slate-600">
-                                                    CHROME · EDGE · SAFARI ·
-                                                    FIREFOX
-                                                </p>
-                                                {errors.image && (
-                                                    <p className="text-center text-xs text-red-500">
-                                                        {errors.image}
-                                                    </p>
-                                                )}
+                                                <p className="sc-mono text-center text-[9px] tracking-[.12em] text-slate-500 select-none dark:text-slate-600">CHROME · EDGE · SAFARI · FIREFOX</p>
+                                                {errors.image && <p className="text-center text-xs text-red-500">{errors.image}</p>}
                                             </div>
                                         )}
 
@@ -895,67 +831,31 @@ export default function Scan() {
                                         {showCamera && !preview && (
                                             <div className="flex flex-col gap-4">
                                                 <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 shadow-md shadow-emerald-500/5">
-                                                    <video
-                                                        ref={videoRef}
-                                                        autoPlay
-                                                        playsInline
-                                                        muted
+                                                    <video ref={videoRef} autoPlay playsInline muted
                                                         className="block w-full bg-black object-cover"
-                                                        style={{
-                                                            maxHeight: '55vh',
-                                                            minHeight: 240,
-                                                        }}
-                                                    />
-                                                    <canvas
-                                                        ref={canvasRef}
-                                                        className="hidden"
-                                                    />
+                                                        style={{ maxHeight: '55vh', minHeight: 240 }} />
+                                                    <canvas ref={canvasRef} className="hidden" />
                                                     <div className="pointer-events-none absolute inset-0 z-[3]">
                                                         <div className="sc-cambeam" />
-                                                        {[
-                                                            'tl',
-                                                            'tr',
-                                                            'bl',
-                                                            'br',
-                                                        ].map((p) => (
-                                                            <div
-                                                                key={p}
-                                                                className={`sc-hc sc-h${p}`}
-                                                            />
+                                                        {['tl', 'tr', 'bl', 'br'].map((p) => (
+                                                            <div key={p} className={`sc-hc sc-h${p}`} />
                                                         ))}
                                                         <div className="sc-mono sc-ticker absolute bottom-3 left-3 rounded border border-emerald-500/20 bg-black/60 px-2 py-0.5 text-[9px] font-semibold tracking-[.14em] text-emerald-400 uppercase backdrop-blur-sm">
-                                                            ● REC ·{' '}
-                                                            {facingMode ===
-                                                            'environment'
-                                                                ? 'REAR'
-                                                                : 'FRONT'}{' '}
-                                                            CAM
+                                                            ● REC · {facingMode === 'environment' ? 'REAR' : 'FRONT'} CAM
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={switchCamera}
-                                                        className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/55 text-white backdrop-blur-sm transition-all hover:border-emerald-500/40 hover:bg-emerald-500/20"
-                                                    >
-                                                        <SwitchCamera
-                                                            size={15}
-                                                        />
+                                                    <button type="button" onClick={switchCamera}
+                                                        className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/55 text-white backdrop-blur-sm transition-all hover:border-emerald-500/40 hover:bg-emerald-500/20">
+                                                        <SwitchCamera size={15} />
                                                     </button>
                                                 </div>
                                                 <div className="flex gap-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={capturePhoto}
-                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
-                                                    >
-                                                        <ScanIcon size={15} />{' '}
-                                                        Capture & Scan
+                                                    <button type="button" onClick={capturePhoto}
+                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
+                                                        <ScanIcon size={15} /> Capture & Scan
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={stopCamera}
-                                                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-[13px] font-semibold text-slate-600 transition-all hover:bg-slate-200 dark:border-white/[.08] dark:bg-white/[.05] dark:text-slate-400 dark:hover:bg-white/10"
-                                                    >
+                                                    <button type="button" onClick={stopCamera}
+                                                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-[13px] font-semibold text-slate-600 transition-all hover:bg-slate-200 dark:border-white/[.08] dark:bg-white/[.05] dark:text-slate-400 dark:hover:bg-white/10">
                                                         <X size={13} /> Cancel
                                                     </button>
                                                 </div>
@@ -968,103 +868,44 @@ export default function Scan() {
                                                 <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 shadow-md shadow-emerald-500/[.06]">
                                                     {particleActive && (
                                                         <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-                                                            {[...Array(12)].map(
-                                                                (_, i) => {
-                                                                    const a =
-                                                                            (i /
-                                                                                12) *
-                                                                            360,
-                                                                        d =
-                                                                            60 +
-                                                                            Math.random() *
-                                                                                55;
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className="sc-pt"
-                                                                            style={
-                                                                                {
-                                                                                    '--dx': `${Math.cos((a * Math.PI) / 180) * d}px`,
-                                                                                    '--dy': `${Math.sin((a * Math.PI) / 180) * d}px`,
-                                                                                } as any
-                                                                            }
-                                                                        />
-                                                                    );
-                                                                },
-                                                            )}
+                                                            {[...Array(12)].map((_, i) => {
+                                                                const a = (i / 12) * 360, d = 60 + Math.random() * 55;
+                                                                return (
+                                                                    <div key={i} className="sc-pt"
+                                                                        style={{ '--dx': `${Math.cos((a * Math.PI) / 180) * d}px`, '--dy': `${Math.sin((a * Math.PI) / 180) * d}px` } as any} />
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
-                                                    <img
-                                                        src={preview}
-                                                        alt="Preview"
+                                                    <img src={preview} alt="Preview"
                                                         className="block w-full bg-slate-100 object-contain dark:bg-[#0D1117]"
-                                                        style={{
-                                                            maxHeight: 360,
-                                                        }}
-                                                    />
+                                                        style={{ maxHeight: 360 }} />
                                                     <div className="pointer-events-none absolute inset-0">
                                                         <div className="sc-imglines" />
                                                         <div className="sc-imgsweep" />
-                                                        {[
-                                                            'tl',
-                                                            'tr',
-                                                            'bl',
-                                                            'br',
-                                                        ].map((p) => (
-                                                            <div
-                                                                key={p}
-                                                                className={`sc-hc sc-h${p}`}
-                                                                style={{
-                                                                    opacity: 0.9,
-                                                                }}
-                                                            />
+                                                        {['tl', 'tr', 'bl', 'br'].map((p) => (
+                                                            <div key={p} className={`sc-hc sc-h${p}`} style={{ opacity: 0.9 }} />
                                                         ))}
                                                         <div className="absolute right-2.5 bottom-2.5 left-2.5 z-[5] flex items-center justify-between">
-                                                            <span className="sc-mono rounded border border-emerald-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-emerald-400 backdrop-blur-sm">
-                                                                IMAGE LOADED
-                                                            </span>
+                                                            <span className="sc-mono rounded border border-emerald-500/20 bg-black/65 px-2 py-0.5 text-[9px] font-medium tracking-[.1em] text-emerald-400 backdrop-blur-sm">IMAGE LOADED</span>
                                                             {fileInfo && (
                                                                 <span className="sc-mono max-w-[180px] truncate rounded border border-emerald-500/15 bg-black/65 px-2 py-0.5 text-[8px] text-emerald-400 backdrop-blur-sm">
-                                                                    {fileInfo
-                                                                        .split(
-                                                                            '·',
-                                                                        )
-                                                                        .slice(
-                                                                            1,
-                                                                        )
-                                                                        .join(
-                                                                            '·',
-                                                                        )
-                                                                        .trim()}
+                                                                    {fileInfo.split('·').slice(1).join('·').trim()}
                                                                 </span>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
                                                 {fileInfo && (
-                                                    <p className="sc-mono truncate text-center text-[9px] tracking-wide text-slate-500 dark:text-slate-600">
-                                                        {fileInfo}
-                                                    </p>
+                                                    <p className="sc-mono truncate text-center text-[9px] tracking-wide text-slate-500 dark:text-slate-600">{fileInfo}</p>
                                                 )}
                                                 <div className="flex gap-3">
-                                                    <button
-                                                        type="submit"
-                                                        disabled={processing}
-                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-                                                    >
-                                                        <ScanIcon size={15} />{' '}
-                                                        {processing
-                                                            ? 'Analyzing…'
-                                                            : 'Analyze Image'}
+                                                    <button type="submit" disabled={processing}
+                                                        className="sc-shim flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-[13px] font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+                                                        <ScanIcon size={15} /> {processing ? 'Analyzing…' : 'Analyze Image'}
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleReset}
-                                                        disabled={processing}
-                                                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-[13px] font-semibold text-slate-600 transition-all hover:bg-slate-200 disabled:opacity-40 dark:border-white/[.08] dark:bg-white/[.05] dark:text-slate-400 dark:hover:bg-white/10"
-                                                    >
+                                                    <button type="button" onClick={handleReset} disabled={processing}
+                                                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-[13px] font-semibold text-slate-600 transition-all hover:bg-slate-200 disabled:opacity-40 dark:border-white/[.08] dark:bg-white/[.05] dark:text-slate-400 dark:hover:bg-white/10">
                                                         <X size={13} /> Reset
                                                     </button>
                                                 </div>
@@ -1075,16 +916,10 @@ export default function Scan() {
 
                                 {/* MOBILE-ONLY panels */}
                                 <div className="flex flex-col gap-3 lg:hidden">
-                                    <Panel
-                                        icon={<TrendingUp size={11} />}
-                                        title="Top Breeds"
-                                    >
+                                    <Panel icon={<TrendingUp size={11} />} title="Top Breeds">
                                         <TopBreedsContent />
                                     </Panel>
-                                    <Panel
-                                        icon={<Activity size={11} />}
-                                        title="Global Stats"
-                                    >
+                                    <Panel icon={<Activity size={11} />} title="Global Stats">
                                         <GlobalStatsContent />
                                     </Panel>
                                 </div>
@@ -1092,59 +927,27 @@ export default function Scan() {
 
                             {/* ── RIGHT SIDEBAR ── */}
                             <div className="sc-fu flex flex-col gap-3 lg:min-h-0 lg:justify-end lg:overflow-x-hidden lg:overflow-y-auto">
-                                <Panel
-                                    icon={<Eye size={11} />}
-                                    title="How It Works"
-                                >
+                                <Panel icon={<Eye size={11} />} title="How It Works">
                                     <div className="flex flex-col p-3">
                                         {[
-                                            {
-                                                n: '01',
-                                                t: 'Upload or capture a clear photo of your dog',
-                                            },
-                                            {
-                                                n: '02',
-                                                t: 'System analyzes visual breed features',
-                                            },
-                                            {
-                                                n: '03',
-                                                t: 'Results ranked by confidence score',
-                                            },
-                                            {
-                                                n: '04',
-                                                t: 'Optional vet verification for extra accuracy',
-                                            },
+                                            { n: '01', t: 'Upload or capture a clear photo of your dog' },
+                                            { n: '02', t: 'System analyzes visual breed features' },
+                                            { n: '03', t: 'Results ranked by confidence score' },
+                                            { n: '04', t: 'Optional vet verification for extra accuracy' },
                                         ].map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
-                                            >
-                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">
-                                                    {s.n}
-                                                </span>
-                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                    {s.t}
-                                                </p>
+                                            <div key={i} className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}>
+                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">{s.n}</span>
+                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">{s.t}</p>
                                             </div>
                                         ))}
                                     </div>
                                 </Panel>
-                                <Panel
-                                    icon={<Zap size={11} />}
-                                    title="Capture Tips"
-                                >
+                                <Panel icon={<Zap size={11} />} title="Capture Tips">
                                     <div className="flex flex-col p-3">
                                         {captureTips.map((tip, i) => (
-                                            <div
-                                                key={i}
-                                                className={`flex items-start gap-2.5 py-2 ${i < captureTips.length - 1 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
-                                            >
-                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/70 dark:text-emerald-500/55">
-                                                    0{i + 1}
-                                                </span>
-                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                    {tip.text}
-                                                </p>
+                                            <div key={i} className={`flex items-start gap-2.5 py-2 ${i < captureTips.length - 1 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}>
+                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/70 dark:text-emerald-500/55">0{i + 1}</span>
+                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">{tip.text}</p>
                                             </div>
                                         ))}
                                     </div>

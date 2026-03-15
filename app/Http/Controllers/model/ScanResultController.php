@@ -2897,10 +2897,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                         'breed' => $learnResult['breed']
                     ]);
 
-                    return redirect('/model/scan-results')->with(
-                        'success',
-                        "✓ Correction saved! ML Status: {$learnResult['message']}"
-                    );
+                   return redirect()->back()->with('success', "✓ Correction saved!");
                 } else {
                     Log::warning('ML API learning failed (correction still saved)', [
                         'scan_id' => $result->scan_id,
@@ -2911,10 +2908,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                         'status' => 'Saved (ML Error)'
                     ]);
 
-                    return redirect('/model/scan-results')->with(
-                        'warning',
-                        'Correction saved, but ML learning failed. System will retry later.'
-                    );
+                    return redirect()->back();
                 }
             } catch (\Exception $e) {
                 Log::error('❌ ML API learning exception', [
@@ -2927,10 +2921,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                     'status' => 'Saved (ML Error)'
                 ]);
 
-                return redirect('/model/scan-results')->with(
-                    'warning',
-                    'Correction saved, but ML learning encountered an error: ' . $e->getMessage()
-                );
+                return redirect()->back();
             }
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Scan result not found', [

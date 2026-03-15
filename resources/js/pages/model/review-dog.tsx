@@ -21,6 +21,7 @@ import {
     Shield,
     Stethoscope,
     User,
+    X,
     XCircle,
 } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
@@ -86,7 +87,6 @@ type PageProps = {
     appointment?: Appointment | null;
 };
 
-// ─── risk level color helper ────────────────────────────────────────────────
 const riskColor = (level: string) => {
     if (level?.toLowerCase().includes('high'))
         return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
@@ -108,7 +108,6 @@ const riskValue = (level: string) => {
     return 25;
 };
 
-// ─── parse JSON field if stored as string ───────────────────────────────────
 function parseField<T>(field: T | string | undefined): T | undefined {
     if (!field) return undefined;
     if (typeof field === 'string') {
@@ -130,11 +129,6 @@ export default function ReviewDog() {
         correct_breed: '',
     });
 
-    const submitCorrection: FormEventHandler = (e) => {
-        e.preventDefault();
-        post('/model/correct', { onSuccess: () => reset('correct_breed') });
-    };
-
     // ── Appointment form ─────────────────────────────────────────────────────
     const apptForm = useForm({
         scan_id: result?.scan_id || '',
@@ -146,33 +140,49 @@ export default function ReviewDog() {
         notes: '',
     });
 
+    // ── UI state ─────────────────────────────────────────────────────────────
+    const [summaryOpen, setSummaryOpen] = useState(true);
+    const [apptOpen, setApptOpen] = useState(false);
+    const [showApptModal, setShowApptModal] = useState(false);
+    const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+    const [correctedBreedName, setCorrectedBreedName] = useState('');
+
+    // ── Correction submit — stay on page, show prompt ────────────────────────
+    const submitCorrection: FormEventHandler = (e) => {
+        e.preventDefault();
+        const breedBeforeReset = data.correct_breed;
+        post('/model/correct', {
+            onSuccess: () => {
+                setCorrectedBreedName(breedBeforeReset);
+                reset('correct_breed');
+                setShowApptModal(true);
+            },
+        });
+    };
+
+    // ── Appointment submit — show success alert ──────────────────────────────
     const submitAppointment: FormEventHandler = (e) => {
         e.preventDefault();
         apptForm.post('/model/appointments', {
             onSuccess: () => {
                 setApptOpen(false);
+                setShowSuccessAlert(true);
             },
         });
     };
 
-    // ── UI state ─────────────────────────────────────────────────────────────
-    const [summaryOpen, setSummaryOpen] = useState(true);
-    const [apptOpen, setApptOpen] = useState(false);
-
-    // ── Parse stored JSON data ───────────────────────────────────────────────
+    // ── Parse stored JSON ────────────────────────────────────────────────────
     const healthRisks = parseField<HealthRisks>(result?.health_risks);
     const origin = parseField<OriginHistory>(result?.origin_history);
-
     const concerns = healthRisks?.concerns ?? [];
     const screenings = healthRisks?.screenings ?? [];
     const careTips = healthRisks?.care_tips ?? [];
 
-    // normalise weight / height — AI may return { male, female } or a plain string
     const weightStr = (() => {
         const w = healthRisks?.weight;
         if (!w) return null;
         if (typeof w === 'string') return w;
-        const parts = [];
+        const parts: string[] = [];
         if (w.male) parts.push(`Male: ${w.male}`);
         if (w.female) parts.push(`Female: ${w.female}`);
         return parts.join(' · ') || null;
@@ -182,13 +192,12 @@ export default function ReviewDog() {
         const h = healthRisks?.height;
         if (!h) return null;
         if (typeof h === 'string') return h;
-        const parts = [];
+        const parts: string[] = [];
         if (h.male) parts.push(`Male: ${h.male}`);
         if (h.female) parts.push(`Female: ${h.female}`);
         return parts.join(' · ') || null;
     })();
 
-    // ── Appointment status display ───────────────────────────────────────────
     const apptStatusBadge = () => {
         if (!appointment) return null;
         if (appointment.status === 'accepted')
@@ -214,7 +223,7 @@ export default function ReviewDog() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Review Scan" />
 
-            {/* ── Full-screen teaching overlay ─────────────────────────────── */}
+            {/* ── Teaching overlay ─────────────────────────────────────────── */}
             {processing && (
                 <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/10 bg-white px-10 py-8 shadow-2xl dark:bg-neutral-900">
@@ -251,8 +260,176 @@ export default function ReviewDog() {
                 </div>
             )}
 
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* MODAL 1 — Post-correction: schedule appointment?               */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {showApptModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900">
+                        {/* Header */}
+                        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4 dark:border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30">
+                                    <CalendarDays
+                                        size={20}
+                                        className="text-indigo-600 dark:text-indigo-400"
+                                    />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900 dark:text-white">
+                                        Schedule a Consultation?
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Breed correction saved successfully.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowApptModal(false)}
+                                className="ml-4 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10"
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
+                        {/* Body */}
+                        <div className="px-6 py-5">
+                            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
+                                <p className="text-sm text-green-700 dark:text-green-400">
+                                    ✓ The breed has been corrected to{' '}
+                                    <span className="font-bold">
+                                        "{correctedBreedName || result?.breed}"
+                                    </span>{' '}
+                                    and the system has been updated.
+                                </p>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Would you like to schedule a clinic consultation
+                                for this dog based on the corrected breed?
+                            </p>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex gap-3 border-t border-gray-100 px-6 py-4 dark:border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowApptModal(false);
+                                    setApptOpen(true);
+                                    setTimeout(() => {
+                                        document
+                                            .getElementById('appointment-card')
+                                            ?.scrollIntoView({
+                                                behavior: 'smooth',
+                                                block: 'start',
+                                            });
+                                    }, 150);
+                                }}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                            >
+                                <CalendarDays size={15} /> Yes, Schedule
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowApptModal(false);
+                                    window.location.href =
+                                        '/model/scan-results';
+                                }}
+                                className="flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
+                            >
+                                No, Go Back
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* MODAL 2 — Appointment created success                          */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {showSuccessAlert && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900">
+                        {/* Icon + title */}
+                        <div className="flex flex-col items-center px-6 pt-8 pb-4 text-center">
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                                <CheckCircle2
+                                    size={32}
+                                    className="text-green-600 dark:text-green-400"
+                                />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                Appointment Scheduled!
+                            </h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                The consultation has been created and the dog
+                                owner has been notified. They can accept or
+                                decline from their portal.
+                            </p>
+                        </div>
+                        {/* Summary */}
+                        <div className="mx-6 mb-5 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-white/[.06] dark:bg-white/[.03]">
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Date
+                                    </span>
+                                    <span className="font-medium text-gray-800 dark:text-white">
+                                        {apptForm.data.appointment_date}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Time
+                                    </span>
+                                    <span className="font-medium text-gray-800 dark:text-white">
+                                        {apptForm.data.appointment_time}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Vet
+                                    </span>
+                                    <span className="font-medium text-gray-800 dark:text-white">
+                                        {apptForm.data.vet_name}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Status
+                                    </span>
+                                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                        Awaiting Owner Response
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex gap-3 border-t border-gray-100 px-6 py-4 dark:border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => setShowSuccessAlert(false)}
+                                className="flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
+                            >
+                                Stay on Page
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.location.href =
+                                        '/model/scan-results';
+                                }}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                            >
+                                Go to Scan Results
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex h-full w-full flex-col gap-6 p-4 md:p-8">
-                {/* ── Page header ──────────────────────────────────────────── */}
+                {/* Page header */}
                 <div>
                     <h1 className="text-xl font-bold dark:text-white">
                         Scan Review & Correction
@@ -263,7 +440,7 @@ export default function ReviewDog() {
                     </p>
                 </div>
 
-                {/* ── Main two-column layout ───────────────────────────────── */}
+                {/* Main two-column layout */}
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                     {/* LEFT: Image Preview */}
                     <Card className="flex w-full flex-col p-6 lg:w-1/2 xl:w-[45%] dark:bg-neutral-900">
@@ -468,7 +645,6 @@ export default function ReviewDog() {
                 {/* BREED SUMMARY CARD                                         */}
                 {/* ══════════════════════════════════════════════════════════ */}
                 <Card className="overflow-hidden dark:bg-neutral-900">
-                    {/* Collapsible header */}
                     <button
                         type="button"
                         onClick={() => setSummaryOpen((o) => !o)}
@@ -495,9 +671,7 @@ export default function ReviewDog() {
 
                     {summaryOpen && (
                         <div className="border-t border-gray-100 px-6 pb-6 dark:border-gray-800">
-                            {/* ── Quick stats row ─────────────────────────── */}
                             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                {/* Origin */}
                                 {origin?.country && (
                                     <div className="flex items-start gap-2 rounded-lg bg-gray-50 p-3 dark:bg-neutral-800/50">
                                         <MapPin
@@ -519,7 +693,6 @@ export default function ReviewDog() {
                                         </div>
                                     </div>
                                 )}
-                                {/* Lifespan */}
                                 {healthRisks?.lifespan && (
                                     <div className="flex items-start gap-2 rounded-lg bg-gray-50 p-3 dark:bg-neutral-800/50">
                                         <Heart
@@ -536,7 +709,6 @@ export default function ReviewDog() {
                                         </div>
                                     </div>
                                 )}
-                                {/* Weight */}
                                 {weightStr && (
                                     <div className="flex items-start gap-2 rounded-lg bg-gray-50 p-3 dark:bg-neutral-800/50">
                                         <Scale
@@ -553,7 +725,6 @@ export default function ReviewDog() {
                                         </div>
                                     </div>
                                 )}
-                                {/* Height */}
                                 {heightStr && (
                                     <div className="flex items-start gap-2 rounded-lg bg-gray-50 p-3 dark:bg-neutral-800/50">
                                         <Ruler
@@ -572,7 +743,6 @@ export default function ReviewDog() {
                                 )}
                             </div>
 
-                            {/* ── Health Concerns ─────────────────────────── */}
                             {concerns.length > 0 && (
                                 <div className="mt-6">
                                     <div className="mb-3 flex items-center gap-2">
@@ -623,7 +793,6 @@ export default function ReviewDog() {
                                 </div>
                             )}
 
-                            {/* ── Recommended Screenings ──────────────────── */}
                             {screenings.length > 0 && (
                                 <div className="mt-6">
                                     <div className="mb-3 flex items-center gap-2">
@@ -653,7 +822,6 @@ export default function ReviewDog() {
                                 </div>
                             )}
 
-                            {/* ── Care Tips ───────────────────────────────── */}
                             {careTips.length > 0 && (
                                 <div className="mt-6">
                                     <h3 className="mb-2 text-sm font-semibold text-gray-800 dark:text-white">
@@ -678,11 +846,14 @@ export default function ReviewDog() {
                 {/* ══════════════════════════════════════════════════════════ */}
                 {/* APPOINTMENT SCHEDULING                                      */}
                 {/* ══════════════════════════════════════════════════════════ */}
-                <Card className="overflow-hidden dark:bg-neutral-900">
+                <Card
+                    id="appointment-card"
+                    className="overflow-hidden dark:bg-neutral-900"
+                >
                     <button
                         type="button"
                         onClick={() => setApptOpen((o) => !o)}
-                        className="flex w-full flex-col items-center justify-between px-6 py-4 text-left"
+                        className="flex w-full items-center justify-between px-6 py-4 text-left"
                     >
                         <div className="flex items-center gap-2">
                             <CalendarDays
@@ -696,8 +867,15 @@ export default function ReviewDog() {
                                 <div className="ml-2">{apptStatusBadge()}</div>
                             )}
                         </div>
+                        {apptOpen ? (
+                            <ChevronUp size={18} className="text-gray-400" />
+                        ) : (
+                            <ChevronDown size={18} className="text-gray-400" />
+                        )}
+                    </button>
+
+                    {apptOpen && (
                         <div className="border-t border-gray-100 px-6 pb-6 dark:border-gray-800">
-                            {/* ── Existing appointment status display ─────── */}
                             {appointment ? (
                                 <div className="mt-5 space-y-4">
                                     <div className="flex items-center justify-between">
@@ -706,7 +884,6 @@ export default function ReviewDog() {
                                         </h3>
                                         {apptStatusBadge()}
                                     </div>
-
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="rounded-lg bg-gray-50 p-3 dark:bg-neutral-800/50">
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -745,8 +922,6 @@ export default function ReviewDog() {
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Rejection reason if declined */}
                                     {appointment.status === 'rejected' &&
                                         appointment.rejection_reason && (
                                             <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/30 dark:bg-red-900/10">
@@ -761,7 +936,6 @@ export default function ReviewDog() {
                                                 </p>
                                             </div>
                                         )}
-
                                     {appointment.status === 'accepted' && (
                                         <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
                                             <p className="text-sm font-semibold text-green-700 dark:text-green-400">
@@ -770,7 +944,6 @@ export default function ReviewDog() {
                                             </p>
                                         </div>
                                     )}
-
                                     {appointment.status === 'pending' && (
                                         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900/30 dark:bg-yellow-900/10">
                                             <p className="text-sm text-yellow-700 dark:text-yellow-400">
@@ -782,7 +955,6 @@ export default function ReviewDog() {
                                     )}
                                 </div>
                             ) : (
-                                /* ── New Appointment Form ─────────────────── */
                                 <form
                                     onSubmit={submitAppointment}
                                     className="mt-5 space-y-4"
@@ -792,9 +964,7 @@ export default function ReviewDog() {
                                         The owner will be notified and can
                                         confirm or decline the appointment.
                                     </p>
-
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                        {/* Date */}
                                         <div className="space-y-1.5">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 <CalendarDays size={13} />{' '}
@@ -830,8 +1000,6 @@ export default function ReviewDog() {
                                                 </p>
                                             )}
                                         </div>
-
-                                        {/* Time */}
                                         <div className="space-y-1.5">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 <Clock size={13} /> Appointment
@@ -862,8 +1030,6 @@ export default function ReviewDog() {
                                                 </p>
                                             )}
                                         </div>
-
-                                        {/* Vet Name */}
                                         <div className="space-y-1.5">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 <User size={13} /> Attending Vet
@@ -886,8 +1052,6 @@ export default function ReviewDog() {
                                                 </p>
                                             )}
                                         </div>
-
-                                        {/* Reason */}
                                         <div className="space-y-1.5">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 <Stethoscope size={13} /> Reason
@@ -912,8 +1076,6 @@ export default function ReviewDog() {
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Notes */}
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Additional Notes{' '}
@@ -934,8 +1096,6 @@ export default function ReviewDog() {
                                             className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/20 dark:bg-white/5 dark:text-white dark:placeholder-white/30"
                                         />
                                     </div>
-
-                                    {/* Info banner */}
                                     <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-900/40 dark:bg-indigo-900/10">
                                         <p className="text-xs leading-relaxed text-indigo-800 dark:text-indigo-300">
                                             <span className="font-bold">
@@ -950,7 +1110,6 @@ export default function ReviewDog() {
                                             response.
                                         </p>
                                     </div>
-
                                     <Button
                                         type="submit"
                                         disabled={apptForm.processing}
@@ -989,7 +1148,7 @@ export default function ReviewDog() {
                                 </form>
                             )}
                         </div>
-                    </button>
+                    )}
                 </Card>
             </div>
         </AppLayout>
