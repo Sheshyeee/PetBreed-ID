@@ -1,16 +1,10 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
-import AppearanceToggleDropdown from './appearance-dropdown';
 import { router } from '@inertiajs/react';
-import {
-    Bell,
-    CalendarCheck,
-    CalendarX,
-    CheckCircle2,
-    XCircle,
-} from 'lucide-react';
+import { Bell, CalendarCheck, CalendarX, CheckCircle2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import AppearanceToggleDropdown from './appearance-dropdown';
 
 // ─── types ───────────────────────────────────────────────────────────────────
 type AdminNotification = {
@@ -20,6 +14,7 @@ type AdminNotification = {
     breed: string;
     scan_id: string;
     appointment_date: string;
+    result_id?: number;
     appointment_time: string;
     vet_name: string;
     rejection_reason?: string;
@@ -42,7 +37,11 @@ function NotifRow({
             type="button"
             onClick={() => {
                 onRead(notif.id);
-                router.visit(`/model/scan-results`);
+                if (notif.result_id) {
+                    router.visit(`/model/review-dog/${notif.result_id}`);
+                } else {
+                    router.visit(`/model/scan-results`);
+                }
             }}
             className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
                 !notif.is_read ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''
@@ -57,16 +56,24 @@ function NotifRow({
                             : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                     }`}
                 >
-                    {isAccepted ? <CalendarCheck size={15} /> : <CalendarX size={15} />}
+                    {isAccepted ? (
+                        <CalendarCheck size={15} />
+                    ) : (
+                        <CalendarX size={15} />
+                    )}
                 </div>
 
                 {/* text */}
                 <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                        {isAccepted ? '✓ Appointment Accepted' : '✕ Appointment Declined'}
+                        {isAccepted
+                            ? '✓ Appointment Accepted'
+                            : '✕ Appointment Declined'}
                     </p>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{notif.breed}</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {notif.breed}
+                        </span>
                         {' · '}
                         {notif.appointment_date} at {notif.appointment_time}
                     </p>
@@ -74,7 +81,7 @@ function NotifRow({
                         Vet: {notif.vet_name}
                     </p>
                     {!isAccepted && notif.rejection_reason && (
-                        <p className="mt-1 rounded bg-red-50 px-2 py-0.5 text-xs italic text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <p className="mt-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-600 italic dark:bg-red-900/20 dark:text-red-400">
                             "{notif.rejection_reason}"
                         </p>
                     )}
@@ -128,7 +135,10 @@ function AdminNotificationBell() {
     // close on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+            if (
+                panelRef.current &&
+                !panelRef.current.contains(e.target as Node)
+            ) {
                 setOpen(false);
             }
         };
@@ -142,8 +152,11 @@ function AdminNotificationBell() {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN':
-                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                            ?.content ?? '',
+                        (
+                            document.querySelector(
+                                'meta[name="csrf-token"]',
+                            ) as HTMLMetaElement
+                        )?.content ?? '',
                     Accept: 'application/json',
                 },
             });
@@ -162,12 +175,17 @@ function AdminNotificationBell() {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN':
-                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                            ?.content ?? '',
+                        (
+                            document.querySelector(
+                                'meta[name="csrf-token"]',
+                            ) as HTMLMetaElement
+                        )?.content ?? '',
                     Accept: 'application/json',
                 },
             });
-            setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+            setNotifications((prev) =>
+                prev.map((n) => ({ ...n, is_read: true })),
+            );
             setUnread(0);
         } catch {
             // silent
@@ -193,19 +211,17 @@ function AdminNotificationBell() {
 
             {/* Dropdown panel */}
             {open && (
-                <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-neutral-900">
+                <div className="absolute top-11 right-0 z-50 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-neutral-900">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/10">
                         <div className="flex items-center gap-2">
-                            <Bell size={14} className="text-gray-500 dark:text-gray-400" />
+                            <Bell
+                                size={14}
+                                className="text-gray-500 dark:text-gray-400"
+                            />
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                 Appointment Responses
                             </span>
-                            {unread > 0 && (
-                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                                    {unread} new
-                                </span>
-                            )}
                         </div>
                         {unread > 0 && (
                             <button
@@ -222,17 +238,25 @@ function AdminNotificationBell() {
                     <div className="max-h-80 divide-y divide-gray-100 overflow-y-auto dark:divide-white/5">
                         {notifications.length === 0 ? (
                             <div className="flex flex-col items-center gap-2 py-10 text-center">
-                                <CheckCircle2 size={28} className="text-gray-300 dark:text-gray-600" />
+                                <CheckCircle2
+                                    size={28}
+                                    className="text-gray-300 dark:text-gray-600"
+                                />
                                 <p className="text-xs text-gray-400 dark:text-gray-500">
                                     No responses yet
                                 </p>
                                 <p className="text-[10px] text-gray-300 dark:text-gray-600">
-                                    You'll be notified when owners respond to appointments.
+                                    You'll be notified when owners respond to
+                                    appointments.
                                 </p>
                             </div>
                         ) : (
                             notifications.map((n) => (
-                                <NotifRow key={n.id} notif={n} onRead={markRead} />
+                                <NotifRow
+                                    key={n.id}
+                                    notif={n}
+                                    onRead={markRead}
+                                />
                             ))
                         )}
                     </div>
@@ -278,4 +302,4 @@ export function AppSidebarHeader({
             </div>
         </header>
     );
-}   
+}

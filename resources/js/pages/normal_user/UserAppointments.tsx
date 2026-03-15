@@ -131,7 +131,6 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
     return (
         <div className="sc-appt-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
             {/* Accent top bar */}
-            <div className={`h-[2px] w-full ${cfg.barColor} opacity-60`} />
 
             {/* Card header */}
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-white/[.05]">
@@ -381,7 +380,7 @@ export default function UserAppointments() {
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR (desktop only) ── */}
-                            <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-end lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
+                            <div className="hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-start lg:gap-3 lg:overflow-x-hidden lg:overflow-y-auto">
                                 <Panel
                                     icon={<ScanIcon size={11} />}
                                     title="Navigation"
@@ -455,19 +454,10 @@ export default function UserAppointments() {
                             </div>
 
                             {/* ── CENTER ── */}
-                            <div className="sc-fu flex min-h-0 flex-col flex-1 gap-3">
+                            <div className="sc-fu flex min-h-0 flex-1 flex-col gap-3">
                                 {/* Page title */}
                                 <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <div className="mb-1.5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.08] px-2.5 py-1">
-                                            <span
-                                                className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'sc-dpulse 2s ease-in-out infinite',
-                                                }}
-                                            />
-                                        </div>
                                         <h1 className="text-lg leading-none font-extrabold tracking-tight text-slate-900 sm:text-xl dark:text-white">
                                             My Appointments
                                         </h1>

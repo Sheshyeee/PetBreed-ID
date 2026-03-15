@@ -60,11 +60,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])
         ->name('admin.notifications.index');
 
-    Route::post('/admin/notifications/{id}/read', [AdminNotificationController::class, 'markRead'])
-        ->name('admin.notifications.markRead');
-
     Route::post('/admin/notifications/mark-all-read', [AdminNotificationController::class, 'markAllRead'])
         ->name('admin.notifications.markAllRead');
+    Route::post('/admin/notifications/{id}/read', [AdminNotificationController::class, 'markRead'])
+        ->name('admin.notifications.markRead');
 
 
 

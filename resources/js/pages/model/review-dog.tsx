@@ -509,10 +509,6 @@ export default function ReviewDog() {
                             <h2 className="font-semibold text-gray-900 dark:text-white">Schedule Consultation</h2>
                             {appointment && <div className="ml-2">{apptStatusBadge()}</div>}
                         </div>
-                        {apptOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-                    </button>
-
-                    {apptOpen && (
                         <div className="border-t border-gray-100 px-6 pb-6 dark:border-gray-800">
 
                             {/* ── Existing appointment status display ─────── */}
@@ -694,7 +690,11 @@ export default function ReviewDog() {
                                 </form>
                             )}
                         </div>
-                    )}
+                    </button>
+
+                    
+                        
+                    
                 </Card>
             </div>
         </AppLayout>
