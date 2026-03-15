@@ -557,16 +557,31 @@ export default function AdminAppointments() {
                                                             </button>
                                                         </>
                                                     ) : (
-                                                        <span className="text-xs text-gray-400 italic dark:text-gray-600">
-                                                            {appt.status ===
-                                                                'rejected' &&
-                                                            appt.rejection_reason
-                                                                ? `"${appt.rejection_reason.substring(0, 30)}…"`
-                                                                : appt.status ===
-                                                                    'accepted'
-                                                                  ? `Vet: ${appt.vet_name}`
-                                                                  : '—'}
-                                                        </span>
+                                                        <>
+                                                            <span className="text-xs text-gray-400 italic dark:text-gray-600">
+                                                                {appt.status ===
+                                                                    'rejected' &&
+                                                                appt.rejection_reason
+                                                                    ? `"${appt.rejection_reason.substring(0, 30)}…"`
+                                                                    : appt.status ===
+                                                                        'accepted'
+                                                                      ? `Vet: ${appt.vet_name}`
+                                                                      : '—'}
+                                                            </span>
+                                                            <button
+                                                                onClick={() =>
+                                                                    deleteAppointment(
+                                                                        appt.id,
+                                                                    )
+                                                                }
+                                                                className="ml-6px flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2
+                                                                    size={15}
+                                                                />
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </td>
                                             </tr>
@@ -787,7 +802,7 @@ export default function AdminAppointments() {
                                                             </p>
                                                         )}
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="flex gap-1 px-4 py-3">
                                                     {appt.status !==
                                                     'pending' ? (
                                                         <button
