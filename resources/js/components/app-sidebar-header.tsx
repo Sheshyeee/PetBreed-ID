@@ -2,14 +2,23 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import { router } from '@inertiajs/react';
-import { Bell, CalendarCheck, CalendarX, CheckCircle2 } from 'lucide-react';
+import {
+    Bell,
+    CalendarCheck,
+    CalendarDays,
+    CalendarX,
+    CheckCircle2,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import AppearanceToggleDropdown from './appearance-dropdown';
 
-// ─── types ───────────────────────────────────────────────────────────────────
 type AdminNotification = {
     id: number;
-    type: 'appointment_accepted' | 'appointment_rejected';
+    type:
+        | 'appointment_accepted'
+        | 'appointment_rejected'
+        | 'user_appointment_request';
     message: string;
     breed: string;
     scan_id: string;
@@ -22,7 +31,6 @@ type AdminNotification = {
     created_at: string;
 };
 
-// ─── read XSRF-TOKEN cookie (what Laravel actually checks) ───────────────────
 function getCsrf(): string {
     return decodeURIComponent(
         document.cookie
@@ -32,84 +40,122 @@ function getCsrf(): string {
     );
 }
 
-// ─── single notification row ──────────────────────────────────────────────────
 function NotifRow({
     notif,
     onRead,
+    onDelete,
 }: {
     notif: AdminNotification;
     onRead: (id: number) => void;
+    onDelete: (id: number) => void;
 }) {
     const isAccepted = notif.type === 'appointment_accepted';
+    const isRejected = notif.type === 'appointment_rejected';
+    const isUserReq = notif.type === 'user_appointment_request';
+
+    const iconBg = isAccepted
+        ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+        : isRejected
+          ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
+
+    const IconEl = isAccepted
+        ? CalendarCheck
+        : isRejected
+          ? CalendarX
+          : CalendarDays;
+
+    const title = isAccepted
+        ? '✓ Appointment Accepted'
+        : isRejected
+          ? '✕ Appointment Declined'
+          : '📋 New Appointment Request';
+
+    const handleClick = () => {
+        onRead(notif.id);
+        if (isUserReq) {
+            router.visit('/model/appointmentspage');
+        } else if (notif.result_id) {
+            router.visit(`/model/review-dog/${notif.result_id}`);
+        } else {
+            router.visit('/model/scan-results');
+        }
+    };
 
     return (
-        <button
-            type="button"
-            onClick={() => {
-                onRead(notif.id);
-                if (notif.result_id) {
-                    router.visit(`/model/review-dog/${notif.result_id}`);
-                } else {
-                    router.visit('/model/scan-results');
-                }
-            }}
-            className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
-                !notif.is_read ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''
-            }`}
+        <div
+            className={`group relative flex w-full items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${!notif.is_read ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}
         >
-            <div className="flex items-start gap-3">
-                {/* icon */}
+            {/* Clickable area */}
+            <button
+                type="button"
+                onClick={handleClick}
+                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+            >
                 <div
-                    className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
-                        isAccepted
-                            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                    }`}
+                    className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${iconBg}`}
                 >
-                    {isAccepted ? (
-                        <CalendarCheck size={15} />
-                    ) : (
-                        <CalendarX size={15} />
-                    )}
+                    <IconEl size={15} />
                 </div>
-
-                {/* text */}
                 <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                        {isAccepted
-                            ? '✓ Appointment Accepted'
-                            : '✕ Appointment Declined'}
+                        {title}
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">
-                            {notif.breed}
-                        </span>
-                        {' · '}
-                        {notif.appointment_date} at {notif.appointment_time}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Vet: {notif.vet_name}
-                    </p>
-                    {!isAccepted && notif.rejection_reason && (
-                        <p className="mt-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-600 italic dark:bg-red-900/20 dark:text-red-400">
-                            "{notif.rejection_reason}"
-                        </p>
+                    {isUserReq ? (
+                        <>
+                            <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
+                                {notif.message}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                                Preferred: {notif.appointment_date} at{' '}
+                                {notif.appointment_time}
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">
+                                    {notif.breed}
+                                </span>
+                                {' · '}
+                                {notif.appointment_date} at{' '}
+                                {notif.appointment_time}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                                Vet: {notif.vet_name}
+                            </p>
+                            {isRejected && notif.rejection_reason && (
+                                <p className="mt-1 rounded bg-red-50 px-2 py-0.5 text-xs text-red-600 italic dark:bg-red-900/20 dark:text-red-400">
+                                    "{notif.rejection_reason}"
+                                </p>
+                            )}
+                        </>
                     )}
                     <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-600">
                         {new Date(notif.created_at).toLocaleString()}
                     </p>
                 </div>
-
-                {/* unread dot */}
                 {!notif.is_read && (
                     <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
                 )}
-            </div>
-        </button>
+            </button>
+
+            {/* Delete button */}
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(notif.id);
+                }}
+                className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                title="Delete notification"
+            >
+                <Trash2 size={12} />
+            </button>
+        </div>
     );
 }
 
-// ─── notification bell ────────────────────────────────────────────────────────
 function AdminNotificationBell() {
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
@@ -127,11 +173,10 @@ function AdminNotificationBell() {
             setNotifications(data.notifications ?? []);
             setUnread(data.unread_count ?? 0);
         } catch {
-            // silent
+            /* silent */
         }
     };
 
-    // poll every 30 s
     useEffect(() => {
         fetchNotifications();
         intervalRef.current = setInterval(fetchNotifications, 30_000);
@@ -140,15 +185,13 @@ function AdminNotificationBell() {
         };
     }, []);
 
-    // close on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (
                 panelRef.current &&
                 !panelRef.current.contains(e.target as Node)
-            ) {
+            )
                 setOpen(false);
-            }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -173,7 +216,7 @@ function AdminNotificationBell() {
                 setUnread((c) => Math.max(0, c - 1));
             }
         } catch {
-            // silent
+            /* silent */
         }
     };
 
@@ -194,13 +237,33 @@ function AdminNotificationBell() {
                 setUnread(0);
             }
         } catch {
-            // silent
+            /* silent */
+        }
+    };
+
+    const deleteNotif = async (id: number) => {
+        try {
+            const res = await fetch(`/admin/notifications/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-XSRF-TOKEN': getCsrf(),
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (res.ok) {
+                const removed = notifications.find((n) => n.id === id);
+                setNotifications((prev) => prev.filter((n) => n.id !== id));
+                if (removed && !removed.is_read)
+                    setUnread((c) => Math.max(0, c - 1));
+            }
+        } catch {
+            /* silent */
         }
     };
 
     return (
         <div ref={panelRef} className="relative">
-            {/* Bell button */}
             <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}
@@ -215,10 +278,8 @@ function AdminNotificationBell() {
                 )}
             </button>
 
-            {/* Dropdown panel */}
             {open && (
                 <div className="absolute top-11 right-0 z-50 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-neutral-900">
-                    {/* Header */}
                     <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/10">
                         <div className="flex items-center gap-2">
                             <Bell
@@ -226,8 +287,13 @@ function AdminNotificationBell() {
                                 className="text-gray-500 dark:text-gray-400"
                             />
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                Appointment Responses
+                                Notifications
                             </span>
+                            {unread > 0 && (
+                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                    {unread} new
+                                </span>
+                            )}
                         </div>
                         {unread > 0 && (
                             <button
@@ -240,7 +306,6 @@ function AdminNotificationBell() {
                         )}
                     </div>
 
-                    {/* List */}
                     <div className="max-h-80 divide-y divide-gray-100 overflow-y-auto dark:divide-white/5">
                         {notifications.length === 0 ? (
                             <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -249,11 +314,7 @@ function AdminNotificationBell() {
                                     className="text-gray-300 dark:text-gray-600"
                                 />
                                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                                    No responses yet
-                                </p>
-                                <p className="text-[10px] text-gray-300 dark:text-gray-600">
-                                    You'll be notified when owners respond to
-                                    appointments.
+                                    No notifications yet
                                 </p>
                             </div>
                         ) : (
@@ -262,23 +323,23 @@ function AdminNotificationBell() {
                                     key={n.id}
                                     notif={n}
                                     onRead={markRead}
+                                    onDelete={deleteNotif}
                                 />
                             ))
                         )}
                     </div>
 
-                    {/* Footer */}
                     {notifications.length > 0 && (
                         <div className="border-t border-gray-100 px-4 py-2.5 dark:border-white/10">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setOpen(false);
-                                    router.visit('/model/scan-results');
+                                    router.visit('/model/appointmentspage');
                                 }}
                                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                             >
-                                View all scan results →
+                                View all appointments →
                             </button>
                         </div>
                     )}
@@ -288,7 +349,6 @@ function AdminNotificationBell() {
     );
 }
 
-// ─── main export ──────────────────────────────────────────────────────────────
 export function AppSidebarHeader({
     breadcrumbs = [],
 }: {

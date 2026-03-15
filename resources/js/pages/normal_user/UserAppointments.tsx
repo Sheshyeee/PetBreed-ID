@@ -1,5 +1,5 @@
 import Header from '@/components/header';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
     CheckCircle2,
@@ -11,10 +11,10 @@ import {
     LandmarkIcon,
     MapPin,
     Navigation,
-    Phone,
     Plus,
     Scan as ScanIcon,
     Stethoscope,
+    Trash2,
     User,
     X,
     XCircle,
@@ -112,6 +112,24 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
             onSuccess: () => setShowRejectForm(false),
         });
     };
+    const [confirmDelete, setConfirmDelete] = useState(false);
+
+    // User can delete their own requests anytime.
+    // For clinic-created: only after responding.
+    const canDelete =
+        appt.initiated_by === 'user' ||
+        (appt.initiated_by === 'clinic' && appt.status !== 'pending');
+
+    const handleDelete = () => {
+        if (!confirmDelete) {
+            setConfirmDelete(true);
+            setTimeout(() => setConfirmDelete(false), 4000);
+            return;
+        }
+        router.delete(`/appointments/${appt.id}`, {
+            preserveScroll: true,
+        });
+    };
 
     const cfg = statusConfig[appt.status];
     const isClinicCreated = appt.initiated_by === 'clinic';
@@ -161,6 +179,23 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                         />
                         {cfg.label}
                     </span>
+                    {canDelete && (
+                        <button
+                            onClick={handleDelete}
+                            title={
+                                confirmDelete
+                                    ? 'Click again to confirm'
+                                    : 'Delete'
+                            }
+                            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border transition-all ${
+                                confirmDelete
+                                    ? 'border-red-400/60 bg-red-500 text-white shadow-md hover:bg-red-600'
+                                    : 'border-slate-200 bg-slate-50 text-slate-400 hover:border-red-300 hover:bg-red-50 hover:text-red-500 dark:border-white/[.07] dark:bg-white/[.03] dark:text-slate-500 dark:hover:border-red-400/40 dark:hover:bg-red-500/[.08] dark:hover:text-red-400'
+                            }`}
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -861,7 +896,6 @@ export default function UserAppointments() {
                                 <ClinicLocationPanel />
 
                                 {/* Contact info */}
-                                
                             </div>
                         </div>
                     </div>
