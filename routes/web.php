@@ -8,6 +8,7 @@ use App\Http\Controllers\model\ScanResultController;
 use App\Http\Controllers\model\TrainingQueueController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ResultController;
+use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\SimulationController;
 use App\Http\Controllers\NotificationController;
@@ -41,6 +42,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
     Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+
+    // Admin / Vet — create appointment (in your existing admin route group)
+    Route::post('/model/appointments', [AppointmentController::class, 'store'])
+        ->name('appointments.store');
+
+    // Normal user — view their appointments
+    Route::get('/appointments', [AppointmentController::class, 'userIndex'])
+        ->name('appointments.index');
+
+    // Normal user — accept or reject an appointment
+    Route::post('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
+        ->name('appointments.status');
+
 
 
     Route::get('/model/scan-results', [ScanResultController::class, "index"]);
