@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Appointment;
 use App\Models\Results;
 use Illuminate\Http\Request;
@@ -14,7 +15,6 @@ class AppointmentController extends Controller
 {
     /**
      * Admin/Vet creates an appointment for a scanned dog.
-     * Notifies the normal user (dog owner).
      */
     public function store(Request $request)
     {
@@ -28,14 +28,13 @@ class AppointmentController extends Controller
             'notes'            => 'nullable|string|max:1000',
         ]);
 
-        // Fetch the result to get the dog owner's user_id
         $result = Results::findOrFail($validated['result_id']);
 
         $appointment = Appointment::create([
             'scan_id'          => $validated['scan_id'],
             'result_id'        => $validated['result_id'],
-            'user_id'          => $result->user_id,       // dog owner
-            'created_by'       => Auth::id(),              // admin/vet
+            'user_id'          => $result->user_id,
+            'created_by'       => Auth::id(),
             'appointment_date' => $validated['appointment_date'],
             'appointment_time' => $validated['appointment_time'],
             'vet_name'         => $validated['vet_name'],
@@ -47,24 +46,21 @@ class AppointmentController extends Controller
         Log::info('✓ Appointment created', [
             'appointment_id' => $appointment->id,
             'scan_id'        => $appointment->scan_id,
-            'user_id'        => $appointment->user_id,
-            'date'           => $appointment->appointment_date,
         ]);
 
-        // Redirect back to the review page so the status card shows up
         return redirect("/model/review-dog/{$result->id}")
             ->with('success', 'Appointment scheduled. The owner has been notified.');
     }
 
     /**
-     * Normal user updates the appointment status (accepted / rejected).
-     * The vet/admin side will see the updated status on the review page.
+     * Normal user accepts or rejects an appointment.
+     * Fires an AdminNotification so the bell icon updates.
      */
     public function updateStatus(Request $request, Appointment $appointment)
     {
-        // Ensure the request is from the dog owner
+        // Only the dog owner can respond
         if ($appointment->user_id !== Auth::id()) {
-            abort(403, 'You are not authorised to respond to this appointment.');
+            abort(403);
         }
 
         $validated = $request->validate([
@@ -79,10 +75,31 @@ class AppointmentController extends Controller
                 : null,
         ]);
 
-        Log::info('✓ Appointment status updated by owner', [
+        // ── Fire admin notification ───────────────────────────────────────────
+        $breed = optional($appointment->result)->breed ?? 'Unknown Breed';
+
+        AdminNotification::create([
+            'type'             => $validated['status'] === 'accepted'
+                ? 'appointment_accepted'
+                : 'appointment_rejected',
+            'message'          => $validated['status'] === 'accepted'
+                ? "The owner confirmed the appointment for their {$breed}."
+                : "The owner declined the appointment for their {$breed}.",
+            'breed'            => $breed,
+            'scan_id'          => $appointment->scan_id,
+            'appointment_id'   => $appointment->id,
+            'appointment_date' => $appointment->appointment_date,
+            'appointment_time' => $appointment->appointment_time,
+            'vet_name'         => $appointment->vet_name,
+            'rejection_reason' => $validated['status'] === 'rejected'
+                ? ($validated['rejection_reason'] ?? null)
+                : null,
+            'is_read'          => false,
+        ]);
+
+        Log::info('✓ Appointment status updated + admin notified', [
             'appointment_id' => $appointment->id,
             'status'         => $validated['status'],
-            'user_id'        => Auth::id(),
         ]);
 
         return redirect()->back()->with(
@@ -94,7 +111,7 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Normal user: list all appointments for their scans.
+     * Normal user — list their appointments.
      */
     public function userIndex()
     {
@@ -110,7 +127,7 @@ class AppointmentController extends Controller
                 return $appt;
             });
 
-        return Inertia::render('normal_user/UserAppointments', [
+        return Inertia::render('normal_user/appointments', [
             'appointments' => $appointments,
         ]);
     }

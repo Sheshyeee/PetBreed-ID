@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\HealthRiskController;
 use App\Http\Controllers\HistoryController;
@@ -54,6 +55,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Normal user — accept or reject an appointment
     Route::post('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])
         ->name('appointments.status');
+
+    // Admin appointment-response notifications (polled by the bell icon)
+    Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])
+        ->name('admin.notifications.index');
+
+    Route::post('/admin/notifications/{id}/read', [AdminNotificationController::class, 'markRead'])
+        ->name('admin.notifications.markRead');
+
+    Route::post('/admin/notifications/mark-all-read', [AdminNotificationController::class, 'markAllRead'])
+        ->name('admin.notifications.markAllRead');
 
 
 
