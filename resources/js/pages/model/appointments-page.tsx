@@ -545,7 +545,7 @@ export default function AdminAppointments() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className="flex gap-6  items-center justify-center">
+                                                            <div className="flex gap-6  items-center ">
                                                                 <span className="text-xs text-gray-400 italic dark:text-gray-600">
                                                                     {appt.status ===
                                                                         'rejected' &&
