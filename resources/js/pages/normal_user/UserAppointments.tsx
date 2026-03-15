@@ -455,7 +455,7 @@ export default function UserAppointments() {
                             </div>
 
                             {/* ── CENTER ── */}
-                            <div className="sc-fu flex min-h-0 flex-col gap-3">
+                            <div className="sc-fu flex min-h-0 flex-col flex-1 gap-3">
                                 {/* Page title */}
                                 <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                     <div>
