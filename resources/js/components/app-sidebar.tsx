@@ -11,7 +11,7 @@ import {
 import { dashboard } from '@/routes';
 import { SharedData, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid, Logs, Scan } from 'lucide-react';
+import { LayoutGrid, Logs, Scan, Calendar } from 'lucide-react';
 import AppLogo from './app-logo';
 import { UserMenuContent } from './user-menu-content';
 
@@ -27,15 +27,16 @@ const mainNavItems: NavItem[] = [
         icon: Scan,
     },
     {
+        title: 'Appointments',
+        href: '/model/appointmentspage',
+        icon: Calendar,
+    },
+    {
         title: 'Learning Feed',
         href: '/model/training-queue',
         icon: Logs,
     },
-    {
-        title: 'Appointments',
-        href: '/model/appointmentspage',
-        icon: Logs,
-    },
+    
 ];
 
 export function AppSidebar() {
