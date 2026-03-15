@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\AdminNotification;
 use App\Models\Appointment;
+use App\Models\Notification;
 use App\Models\Results;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +15,8 @@ use Inertia\Inertia;
 class AppointmentController extends Controller
 {
     /**
-     * Admin/Vet creates an appointment for a scanned dog.
+     * Admin/Vet creates an appointment.
+     * Fires a Notification to the dog owner so the bell badge appears.
      */
     public function store(Request $request)
     {
@@ -43,9 +45,34 @@ class AppointmentController extends Controller
             'status'           => 'pending',
         ]);
 
-        Log::info('✓ Appointment created', [
+        // ── Notify the dog owner via the existing Notification system ─────────
+        $breed = $result->breed ?? 'your dog';
+        $baseUrl = config('filesystems.disks.object-storage.url');
+        $imageUrl = $result->image ? $baseUrl . '/' . $result->image : null;
+
+        Notification::create([
+            'user_id' => $result->user_id,
+            'type'    => 'appointment_scheduled',
+            'title'   => 'Clinic Appointment Scheduled',
+            'message' => "Your {$breed} has been scheduled for a consultation on {$validated['appointment_date']} at {$validated['appointment_time']} with {$validated['vet_name']}.",
+            'data'    => [
+                'scan_id'          => $validated['scan_id'],
+                'appointment_id'   => $appointment->id,
+                'breed'            => $breed,
+                'appointment_date' => $validated['appointment_date'],
+                'appointment_time' => $validated['appointment_time'],
+                'vet_name'         => $validated['vet_name'],
+                'reason'           => $validated['reason'],
+                'image'            => $imageUrl,
+                'link'             => '/appointments',
+            ],
+            'read'    => false,
+        ]);
+
+        Log::info('✓ Appointment created + owner notified', [
             'appointment_id' => $appointment->id,
             'scan_id'        => $appointment->scan_id,
+            'user_id'        => $result->user_id,
         ]);
 
         return redirect("/model/review-dog/{$result->id}")
@@ -53,12 +80,11 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Normal user accepts or rejects an appointment.
-     * Fires an AdminNotification so the bell icon updates.
+     * Normal user accepts or rejects.
+     * Fires an AdminNotification so the admin bell updates.
      */
     public function updateStatus(Request $request, Appointment $appointment)
     {
-        // Only the dog owner can respond
         if ($appointment->user_id !== Auth::id()) {
             abort(403);
         }

@@ -51,12 +51,21 @@ interface GlobalStats {
     avg_score: string;
     uptime: string;
 }
+interface PendingAppointment {
+    id: number;
+    breed: string;
+    appointment_date: string;
+    appointment_time: string;
+    vet_name: string;
+    reason: string;
+}
 interface PageProps {
     flash?: { success?: SuccessFlash; error?: ErrorFlash };
     success?: SuccessFlash;
     error?: ErrorFlash;
     topBreeds?: TopBreed[];
     globalStats?: GlobalStats;
+    pendingAppointments?: PendingAppointment[];
     [key: string]: any;
 }
 
@@ -75,6 +84,7 @@ export default function Scan() {
         avg_score: '—',
         uptime: '99.9%',
     };
+    const pendingAppointments = pageProps.pendingAppointments ?? [];
 
     const { data, setData, post, processing, errors, reset } = useForm({
         image: null as File | null,
@@ -402,6 +412,41 @@ export default function Scan() {
         </div>
     );
 
+    const AppointmentBanner = () => {
+        if (pendingAppointments.length === 0) return null;
+        const next = pendingAppointments[0];
+        const count = pendingAppointments.length;
+        return (
+            <Link
+                href="/appointments"
+                className="sc-alertin relative z-20 mx-4 mt-2 flex flex-shrink-0 items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/[.08] px-4 py-2.5 no-underline transition-all hover:bg-emerald-500/[.12] dark:border-emerald-500/20 dark:bg-emerald-500/[.07]"
+            >
+                <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                        <CalendarDays
+                            size={14}
+                            className="text-emerald-600 dark:text-emerald-400"
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[13px] leading-tight font-semibold text-emerald-800 dark:text-emerald-300">
+                            {count === 1
+                                ? `Appointment scheduled for ${next.breed}`
+                                : `${count} appointments awaiting your response`}
+                        </p>
+                        <p className="font-mono text-[10px] text-emerald-700/70 dark:text-emerald-400/70">
+                            {next.appointment_date} · {next.appointment_time} ·{' '}
+                            {next.vet_name}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-1 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    View <ChevronRight size={13} />
+                </div>
+            </Link>
+        );
+    };
+
     return (
         <>
             <style>{`
@@ -480,6 +525,7 @@ export default function Scan() {
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
+                <AppointmentBanner />
                 <div className="relative z-30">
                     <AnalysisLoadingDialog isOpen={showLoading} />
                 </div>
@@ -600,10 +646,15 @@ export default function Scan() {
 
                                         <Link
                                             href="/appointments"
-                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                            className="..."
                                         >
                                             <CalendarDays size={13} />
                                             <span>Appointments</span>
+                                            {pendingAppointments.length > 0 && (
+                                                <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
+                                                    {pendingAppointments.length}
+                                                </span>
+                                            )}
                                         </Link>
                                     </div>
                                 </Panel>

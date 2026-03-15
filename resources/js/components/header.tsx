@@ -183,7 +183,12 @@ export default function Header() {
     const page = usePage();
 
     // Check if user is admin
-    const allowedEmails = ['modeltraining2000@gmail.com', 'jrbd2022-8800-57025@bicol-u.edu.ph', 'dmbc2022-2141-53989@bicol-u.edu.ph', 'asvermudo@gmail.com'];
+    const allowedEmails = [
+        'modeltraining2000@gmail.com',
+        'jrbd2022-8800-57025@bicol-u.edu.ph',
+        'dmbc2022-2141-53989@bicol-u.edu.ph',
+        'asvermudo@gmail.com',
+    ];
     const isAdmin = auth.user && allowedEmails.includes(auth.user.email);
 
     const handleLogout = () => {
@@ -192,18 +197,20 @@ export default function Header() {
 
     // Handle notification click - mark as read and navigate
     const handleNotificationClick = (notification: Notification) => {
-        // Mark as read if unread (non-blocking)
-        if (!notification.read) {
-            markAsRead(notification.id);
-        }
-
-        // Small delay to let user see the state change, then navigate
+        if (!notification.read) markAsRead(notification.id);
         setTimeout(() => {
-            setDropdownOpen(false); // Close dropdown
-            router.visit('/scanhistory');
+            setDropdownOpen(false);
+            const appointmentTypes = [
+                'appointment_scheduled',
+                'appointment_reminder',
+            ];
+            router.visit(
+                appointmentTypes.includes(notification.type)
+                    ? '/appointments'
+                    : '/scanhistory',
+            );
         }, 150);
     };
-
     return (
         <div className="px-4 py-5 sm:px-6 lg:px-25">
             <Card className="w-full border-2 p-2 px-4 sm:px-8 lg:px-12">
