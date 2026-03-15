@@ -793,7 +793,7 @@ export default function AdminAppointments() {
                                                             </p>
                                                         )}
                                                 </td>
-                                                <td className="flex gap-1 px-4 py-3">
+                                                <td className="flex gap-6 px-4 py-3 items-center justify-center">
                                                     <button
                                                         onClick={() =>
                                                             deleteAppointment(
