@@ -157,4 +157,33 @@ class AppointmentController extends Controller
             'appointments' => $appointments,
         ]);
     }
+
+    public function show(){
+         {
+        $baseUrl = config('filesystems.disks.object-storage.url');
+ 
+        $appointments = Appointment::with('result:id,scan_id,breed,image')
+            ->latest()
+            ->paginate(15);
+ 
+        $appointments->getCollection()->transform(function ($appt) use ($baseUrl) {
+            if ($appt->result?->image) {
+                $appt->result->image = $baseUrl . '/' . $appt->result->image;
+            }
+            return $appt;
+        });
+ 
+        $stats = [
+            'total'    => Appointment::count(),
+            'pending'  => Appointment::where('status', 'pending')->count(),
+            'accepted' => Appointment::where('status', 'accepted')->count(),
+            'rejected' => Appointment::where('status', 'rejected')->count(),
+        ];
+ 
+        return inertia('model/appointments-page', [
+            'appointments' => $appointments,
+            'stats'        => $stats,
+        ]);
+    }
+    }
 }

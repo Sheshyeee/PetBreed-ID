@@ -31,6 +31,11 @@ const mainNavItems: NavItem[] = [
         href: '/model/training-queue',
         icon: Logs,
     },
+    {
+        title: 'Appointments',
+        href: '/model/appointmentspage',
+        icon: Logs,
+    },
 ];
 
 export function AppSidebar() {

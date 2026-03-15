@@ -47,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Admin / Vet — create appointment (in your existing admin route group)
     Route::post('/model/appointments', [AppointmentController::class, 'store'])
         ->name('appointments.store');
+    Route::get('/model/appointmentspage', [AppointmentController::class, 'show']);
 
     // Normal user — view their appointments
     Route::get('/appointments', [AppointmentController::class, 'userIndex'])

@@ -536,7 +536,7 @@ export default function Scan() {
                 </button>
 
                 {/* ── 3. Main content (flex-1 min-h-0 = fills remaining space exactly) ── */}
-                <div className="relative z-10 min-h-0 flex-1 overflow-y-auto">
+                <div className="relative mt-[-20px] z-10 min-h-0 flex-1 overflow-y-auto">
                     <div className="sc-nsb mx-auto max-w-[1360px] overflow-x-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:p-4 lg:pb-16 xl:grid-cols-[224px_1fr_232px]">
 
@@ -548,14 +548,14 @@ export default function Scan() {
                             <div className="sc-nsb hidden lg:flex lg:flex-col lg:gap-3 lg:py-4">
                                 <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
-                                        <Link href="/scan" className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400">
+                                        <Link href="/scan" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2 text-[12px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400">
                                             <ScanIcon size={13} /><span>New Scan</span>
                                             <ChevronRight size={11} className="ml-auto opacity-40" />
                                         </Link>
-                                        <Link href="/scanhistory" className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
+                                        <Link href="/scanhistory" className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[12px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
                                             <History size={13} /><span>Scan History</span>
                                         </Link>
-                                        <Link href="/appointments" className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
+                                        <Link href="/appointments" className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[12px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200">
                                             <CalendarDays size={13} /><span>Appointments</span>
                                         </Link>
                                     </div>
