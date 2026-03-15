@@ -153,7 +153,7 @@ class AppointmentController extends Controller
                 return $appt;
             });
 
-        return Inertia::render('normal_user/appointments', [
+        return Inertia::render('normal_user/UserAppointments', [
             'appointments' => $appointments,
         ]);
     }

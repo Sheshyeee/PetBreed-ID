@@ -525,7 +525,10 @@ export default function Scan() {
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
-                <AppointmentBanner />
+                <div className="px-4">
+                    <AppointmentBanner />
+                </div>
+
                 <div className="relative z-30">
                     <AnalysisLoadingDialog isOpen={showLoading} />
                 </div>
