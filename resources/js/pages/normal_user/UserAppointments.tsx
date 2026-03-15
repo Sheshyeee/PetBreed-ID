@@ -118,7 +118,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
 
     return (
         <div className="sc-appt-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
-            {/* Card header — breed + status badge */}
+            {/* Card header */}
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-white/[.05]">
                 <div className="flex items-center gap-3">
                     {appt.result?.image ? (
@@ -145,7 +145,6 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
-                    {/* Initiated-by tag */}
                     <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider uppercase ${isClinicCreated ? 'bg-blue-50 text-blue-600 dark:bg-blue-400/[.10] dark:text-blue-300' : 'bg-purple-50 text-purple-600 dark:bg-purple-400/[.10] dark:text-purple-300'}`}
                     >
@@ -154,7 +153,6 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                         />
                         {isClinicCreated ? 'From Clinic' : 'Your Request'}
                     </span>
-                    {/* Status badge */}
                     <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10px] font-semibold tracking-[.08em] uppercase ${cfg.badge}`}
                     >
@@ -310,7 +308,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                 </div>
             )}
 
-            {/* Waiting state — user-initiated pending */}
+            {/* Waiting — user-initiated pending */}
             {appt.status === 'pending' && !isClinicCreated && (
                 <div className="border-t border-slate-100 px-3.5 py-3 dark:border-white/[.05]">
                     <p className="text-center font-mono text-[10px] tracking-[.1em] text-slate-400 uppercase dark:text-slate-600">
@@ -322,54 +320,41 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
     );
 }
 
-// ── Clinic Location Panel (inline, for right sidebar) ─────────────────────────
+// ── Clinic Location Panel ─────────────────────────────────────────────────────
 function ClinicLocationPanel() {
     const mapsUrl = 'https://maps.google.com/?q=13.2929132,123.4886336';
 
     return (
         <Panel icon={<MapPin size={11} />} title="Clinic Location">
-            <div className="flex flex-col gap-0 divide-y divide-slate-100 dark:divide-white/[.05]">
-                {/* Static map thumbnail via Google Maps Static API */}
-                <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative block h-[110px] overflow-hidden bg-slate-100 dark:bg-white/[.04]"
-                >
-                    <img
-                        src={`https://maps.googleapis.com/maps/api/staticmap?center=13.2929132,123.4886336&zoom=17&size=400x220&scale=2&markers=color:0x10b981%7C13.2929132,123.4886336&style=feature:poi|visibility:simplified&style=feature:transit|visibility:off&key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY`}
-                        alt="Clinic map"
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => {
-                            // Fallback: hide broken image, show placeholder
-                            (e.target as HTMLImageElement).style.display =
-                                'none';
-                        }}
+            <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/[.05]">
+                {/* OpenStreetMap iframe — real interactive map, no API key needed */}
+                <div className="relative h-[140px] overflow-hidden">
+                    <iframe
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=123.4876%2C13.2919%2C123.4897%2C13.2940&layer=mapnik&marker=13.2929132%2C123.4886336"
+                        className="h-full w-full border-0"
+                        loading="lazy"
+                        title="Polangui Veterinary Clinic Location"
+                        style={{ pointerEvents: 'none' }}
                     />
-                    {/* Map overlay hint */}
-                    <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                        <span className="flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                    {/* Transparent clickable overlay — opens Google Maps on tap */}
+                    <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group absolute inset-0 flex items-end justify-end p-2"
+                    >
+                        <span className="flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-[10px] font-semibold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
                             <ExternalLink size={9} /> Open Maps
                         </span>
-                    </div>
-                    {/* Pin marker overlay */}
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-lg shadow-emerald-500/40">
-                            <MapPin
-                                size={10}
-                                className="text-white"
-                                fill="white"
-                            />
-                        </div>
-                    </div>
-                </a>
+                    </a>
+                </div>
 
                 {/* Clinic name + address */}
                 <div className="px-3 py-3">
                     <p className="text-[12px] leading-tight font-bold text-slate-900 dark:text-white">
                         Polangui Veterinary Clinic & Grooming Center
                     </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
                         Centro Oriental, Polangui, Albay
                     </p>
                 </div>
@@ -865,7 +850,7 @@ export default function UserAppointments() {
                                     </div>
                                 </div>
 
-                                {/* Mobile: clinic location below the list */}
+                                {/* Mobile: clinic location below list */}
                                 <div className="flex-shrink-0 lg:hidden">
                                     <ClinicLocationPanel />
                                 </div>
@@ -875,7 +860,7 @@ export default function UserAppointments() {
                             <div className="sc-nsb hidden lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:py-4">
                                 <ClinicLocationPanel />
 
-                                {/* Quick contact info */}
+                                {/* Contact info */}
                                 <Panel
                                     icon={<Phone size={11} />}
                                     title="Contact"
