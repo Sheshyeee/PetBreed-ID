@@ -861,39 +861,7 @@ export default function UserAppointments() {
                                 <ClinicLocationPanel />
 
                                 {/* Contact info */}
-                                <Panel
-                                    icon={<Phone size={11} />}
-                                    title="Contact"
-                                >
-                                    <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/[.05]">
-                                        {[
-                                            {
-                                                label: 'Clinic Name',
-                                                value: 'Polangui Vet & Grooming',
-                                            },
-                                            {
-                                                label: 'Address',
-                                                value: 'Centro Oriental, Polangui, Albay',
-                                            },
-                                            {
-                                                label: 'Near',
-                                                value: 'Palawan Pawnshop / Landbank',
-                                            },
-                                        ].map((row, i) => (
-                                            <div
-                                                key={i}
-                                                className="px-3 py-2.5"
-                                            >
-                                                <p className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-400 uppercase dark:text-slate-600">
-                                                    {row.label}
-                                                </p>
-                                                <p className="mt-0.5 text-[12px] font-semibold text-slate-800 dark:text-slate-200">
-                                                    {row.value}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
+                                
                             </div>
                         </div>
                     </div>
