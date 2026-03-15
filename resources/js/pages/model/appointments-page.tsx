@@ -545,7 +545,7 @@ export default function AdminAppointments() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className='flex gap-1'>
+                                                            <div className="flex gap-1">
                                                                 <span className="text-xs text-gray-400 italic dark:text-gray-600">
                                                                     {appt.status ===
                                                                         'rejected' &&
@@ -794,28 +794,18 @@ export default function AdminAppointments() {
                                                         )}
                                                 </td>
                                                 <td className="flex gap-1 px-4 py-3">
-                                                    {appt.status !==
-                                                    'pending' ? (
-                                                        <button
-                                                            onClick={() =>
-                                                                deleteAppointment(
-                                                                    appt.id,
-                                                                )
-                                                            }
-                                                            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={15} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            disabled
-                                                            title="Wait for owner response before deleting"
-                                                            className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-md text-gray-200 dark:text-gray-700"
-                                                        >
-                                                            <Trash2 size={15} />
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        onClick={() =>
+                                                            deleteAppointment(
+                                                                appt.id,
+                                                            )
+                                                        }
+                                                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+
                                                     <Button
                                                         asChild
                                                         size="sm"
