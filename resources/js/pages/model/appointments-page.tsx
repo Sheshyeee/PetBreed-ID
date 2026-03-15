@@ -545,7 +545,7 @@ export default function AdminAppointments() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className="flex gap-1">
+                                                            <div className="flex gap-6  items-center justify-center">
                                                                 <span className="text-xs text-gray-400 italic dark:text-gray-600">
                                                                     {appt.status ===
                                                                         'rejected' &&
@@ -793,7 +793,7 @@ export default function AdminAppointments() {
                                                             </p>
                                                         )}
                                                 </td>
-                                                <td className="flex gap-6 px-4 py-3 items-center justify-center">
+                                                <td className="flex gap-1 px-4 py-3">
                                                     <button
                                                         onClick={() =>
                                                             deleteAppointment(
