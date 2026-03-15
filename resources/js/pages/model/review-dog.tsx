@@ -137,7 +137,7 @@ export default function ReviewDog() {
 
     // ── UI state ─────────────────────────────────────────────────────────────
     const [summaryOpen, setSummaryOpen]               = useState(true);
-    const [apptOpen, setApptOpen]                     = useState(false);
+    const [apptOpen, setApptOpen]                     = useState(true);
     const [showApptModal, setShowApptModal]           = useState(false);
     const [showSuccessAlert, setShowSuccessAlert]     = useState(false);
     const [correctedBreedName, setCorrectedBreedName] = useState('');

@@ -42,6 +42,7 @@ interface Correction {
     confidence: number;
     created_at: string;
     status: string;
+    result_id?: number;
 }
 
 interface PaginationLink {
@@ -152,6 +153,7 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
                                         <TableHead>Correction</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Status</TableHead>
+                                        <TableHead>Review</TableHead>
                                         <TableHead className="pr-6 text-right">
                                             Action
                                         </TableHead>
@@ -188,6 +190,24 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
                                                     {item.status}
                                                 </Badge>
                                             </TableCell>
+                                            <TableCell>
+                                                <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                                                        <svg
+                                                            className="mr-1 h-3 w-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M5 13l4 4L19 7"
+                                                            />
+                                                        </svg>
+                                                        Verified
+                                                    </Badge>
+                                            </TableCell>
                                             <TableCell className="pr-6 text-right">
                                                 <Link
                                                     href={`/model-correction/${item.id}`}
@@ -206,9 +226,7 @@ export default function Dashboard({ corrections, stats }: DashboardProps) {
                                                     size="sm"
                                                     variant="secondary"
                                                 >
-                                                    <Link
-                                                        href={`/model/review-dog/${item.id}`}
-                                                    >
+                                                    <Link href={item.result_id ? `/model/review-dog/${item.result_id}` : '#'}>
                                                         Review
                                                     </Link>
                                                 </Button>

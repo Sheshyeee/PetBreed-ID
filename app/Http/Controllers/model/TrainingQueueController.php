@@ -31,9 +31,16 @@ class TrainingQueueController extends Controller
 
         // Transform corrections to include full image URLs
         $corrections->getCollection()->transform(function ($correction) use ($baseUrl) {
-            $correction->image_path = $baseUrl . '/' . $correction->image_path;
-            return $correction;
-        });
+    $correction->image_path = $baseUrl . '/' . $correction->image_path;
+
+    // Resolve the Results id so the frontend can link to /model/review-dog/{result_id}
+    $result = Results::where('scan_id', $correction->scan_id)
+        ->select('id')
+        ->first();
+    $correction->result_id = $result?->id;
+
+    return $correction;
+});
 
         $stats = [
             'pending' => $totalPendingCount,
