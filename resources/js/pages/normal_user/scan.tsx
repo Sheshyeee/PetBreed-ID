@@ -3,6 +3,7 @@ import Header from '@/components/header';
 import { Link, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
+    CalendarDays,
     Camera,
     ChevronRight,
     CircleAlert,
