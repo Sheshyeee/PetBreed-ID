@@ -216,16 +216,18 @@ export default function Header() {
             <Card className="w-full border-2 p-2 px-4 sm:px-8 lg:px-12">
                 <nav className="flex items-center justify-between gap-2 sm:gap-4">
                     {/* Logo Section */}
-                    <div className="flex min-w-0 flex-shrink items-center gap-1">
-                        <div className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                            <PawPrint className="size-4 fill-current text-white dark:text-black" />
+                    <Link href="/scan">
+                        <div className="flex min-w-0 flex-shrink items-center gap-1">
+                            <div className="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                                <PawPrint className="size-4 fill-current text-white dark:text-black" />
+                            </div>
+                            <div className="ml-1 grid min-w-0 flex-1 text-left">
+                                <span className="mb-0.5 truncate text-sm leading-tight font-semibold sm:text-base">
+                                    DogLens
+                                </span>
+                            </div>
                         </div>
-                        <div className="ml-1 grid min-w-0 flex-1 text-left">
-                            <span className="mb-0.5 truncate text-sm leading-tight font-semibold sm:text-base">
-                                DogLens
-                            </span>
-                        </div>
-                    </div>
+                    </Link>
 
                     {/* Navigation menu for non-logged-in users */}
                     {!auth.user && (
