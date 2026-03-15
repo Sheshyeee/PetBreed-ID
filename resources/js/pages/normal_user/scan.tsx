@@ -525,7 +525,7 @@ export default function Scan() {
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
-                <div className="px-4">
+                <div className="px-10">
                     <AppointmentBanner />
                 </div>
 
@@ -646,18 +646,12 @@ export default function Scan() {
                                             <History size={13} />
                                             <span>Scan History</span>
                                         </Link>
-
                                         <Link
                                             href="/appointments"
-                                            className="..."
+                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
                                         >
                                             <CalendarDays size={13} />
                                             <span>Appointments</span>
-                                            {pendingAppointments.length > 0 && (
-                                                <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
-                                                    {pendingAppointments.length}
-                                                </span>
-                                            )}
                                         </Link>
                                     </div>
                                 </Panel>
