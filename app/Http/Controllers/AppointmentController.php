@@ -284,9 +284,7 @@ class AppointmentController extends Controller
      */
     public function destroy(Appointment $appointment)
     {
-        if ($appointment->status === 'pending') {
-            return redirect()->back()->with('error', 'Cannot delete a pending appointment.');
-        }
+        
         $appointment->delete();
         return redirect()->back()->with('success', 'Appointment deleted.');
     }

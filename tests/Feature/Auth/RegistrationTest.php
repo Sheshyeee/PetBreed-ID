@@ -1,3 +1,4 @@
+
 <?php
 
 test('registration screen can be rendered', function () {
