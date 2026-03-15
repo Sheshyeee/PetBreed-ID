@@ -154,7 +154,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
                     )}
                     <div>
                         <p className="text-[13px] font-bold text-slate-900 dark:text-white">
-                            {appt.result?.breed ?? 'Unknown Breed'}
+                            {appt.result?.breed ?? 'Your Request'}
                         </p>
                         <p className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
                             #{appt.scan_id}
