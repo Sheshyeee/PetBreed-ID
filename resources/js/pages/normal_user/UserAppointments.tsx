@@ -1,8 +1,6 @@
 import Header from '@/components/header';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
-    Activity,
-    AlertCircle,
     CalendarDays,
     CheckCircle2,
     ChevronRight,
@@ -10,12 +8,8 @@ import {
     FileText,
     History,
     Scan as ScanIcon,
-    Shield,
     Stethoscope,
-    Target,
-    TrendingUp,
     User,
-    Wifi,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -421,88 +415,39 @@ export default function UserAppointments() {
                                     </div>
                                 </Panel>
 
-                                {/* Top Breeds */}
                                 <Panel
-                                    icon={<TrendingUp size={11} />}
-                                    title="Top Breeds"
+                                    icon={<FileText size={11} />}
+                                    title="What to Expect"
                                 >
-                                    <div className="flex flex-col gap-0.5 p-2.5">
-                                        {topBreeds.length === 0 ? (
-                                            <p className="py-3 text-center font-mono text-[10px] text-slate-400 dark:text-slate-600">
-                                                No scan data yet
-                                            </p>
-                                        ) : (
-                                            topBreeds.map((b, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="group flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/[.03]"
-                                                >
-                                                    <span className="w-4 flex-shrink-0 font-mono text-[9px] text-slate-500 group-hover:text-emerald-500/70 dark:text-slate-600">
-                                                        #{i + 1}
-                                                    </span>
-                                                    <span
-                                                        className="flex-1 truncate text-[12px] font-medium text-slate-700 dark:text-slate-300"
-                                                        title={b.breed}
-                                                    >
-                                                        {b.breed}
-                                                    </span>
-                                                    <div className="h-[3px] w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-white/[.07]">
-                                                        <div
-                                                            className="h-full rounded-full bg-emerald-500/60"
-                                                            style={{
-                                                                width: `${b.bar_width}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </Panel>
-
-                                {/* Global Stats */}
-                                <Panel
-                                    icon={<Activity size={11} />}
-                                    title="Global Stats"
-                                >
-                                    <div className="flex flex-col gap-1.5 p-2.5">
+                                    <div className="flex flex-col p-3">
                                         {[
                                             {
-                                                l: 'Total Scans',
-                                                v: stats.total_scans,
-                                                icon: <Target size={10} />,
+                                                n: '01',
+                                                t: "Clinic reviews your dog's breed scan",
                                             },
                                             {
-                                                l: 'Verified',
-                                                v: stats.verified,
-                                                icon: <Shield size={10} />,
+                                                n: '02',
+                                                t: 'They schedule a consultation and notify you',
                                             },
                                             {
-                                                l: 'Avg Score',
-                                                v: stats.avg_score,
-                                                icon: <Activity size={10} />,
+                                                n: '03',
+                                                t: 'Accept or decline with an optional reason',
                                             },
                                             {
-                                                l: 'Uptime',
-                                                v: stats.uptime,
-                                                icon: <Wifi size={10} />,
+                                                n: '04',
+                                                t: 'Attend your appointment for expert advice',
                                             },
                                         ].map((s, i) => (
                                             <div
                                                 key={i}
-                                                className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
+                                                className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-500 dark:text-slate-600">
-                                                        {s.icon}
-                                                    </span>
-                                                    <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">
-                                                        {s.l}
-                                                    </span>
-                                                </div>
-                                                <span className="font-mono text-[12px] font-bold text-slate-800 dark:text-slate-200">
-                                                    {s.v}
+                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">
+                                                    {s.n}
                                                 </span>
+                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                    {s.t}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
@@ -548,26 +493,7 @@ export default function UserAppointments() {
 
                                 {/* Terminal bar card wrapping the list */}
                                 <div className="sc-panel-line relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
-                                    {/* Terminal top bar */}
-                                    <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
-                                        <span className="sc-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">
-                                            doglens://appointments
-                                        </span>
-                                        <div className="sc-mono ml-auto flex items-center gap-1.5 text-[10px] text-emerald-600 select-none dark:text-emerald-400">
-                                            <span
-                                                className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"
-                                                style={{
-                                                    animation:
-                                                        'sc-dpulse 2s infinite',
-                                                }}
-                                            />
-                                            {appointments.length === 0
-                                                ? 'NO RECORDS'
-                                                : pending.length > 0
-                                                  ? 'ACTION REQUIRED'
-                                                  : 'ALL RESPONDED'}
-                                        </div>
-                                    </div>
+                                   
 
                                     {/* Scrollable content */}
                                     <div className="sc-nsb flex-1 overflow-y-auto p-4">
@@ -659,153 +585,6 @@ export default function UserAppointments() {
                                         )}
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* ── RIGHT SIDEBAR ── */}
-                            <div className="sc-fu flex flex-col gap-3 lg:min-h-0 lg:justify-end lg:overflow-x-hidden lg:overflow-y-auto">
-                                <Panel
-                                    icon={<AlertCircle size={11} />}
-                                    title="Status Guide"
-                                >
-                                    <div className="flex flex-col p-3">
-                                        {[
-                                            {
-                                                dot: 'bg-amber-400 shadow-[0_0_5px_#f59e0b]',
-                                                label: 'Pending',
-                                                desc: 'Clinic has scheduled an appointment — please accept or decline.',
-                                            },
-                                            {
-                                                dot: 'bg-emerald-500 shadow-[0_0_5px_#10b981]',
-                                                label: 'Confirmed',
-                                                desc: 'You accepted the appointment. See you at the clinic!',
-                                            },
-                                            {
-                                                dot: 'bg-red-500 shadow-[0_0_5px_#ef4444]',
-                                                label: 'Declined',
-                                                desc: 'You declined this appointment. Contact the clinic to reschedule.',
-                                            },
-                                        ].map((s, i, arr) => (
-                                            <div
-                                                key={i}
-                                                className={`flex items-start gap-2.5 py-2.5 ${i < arr.length - 1 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
-                                            >
-                                                <span
-                                                    className={`mt-[5px] h-1.5 w-1.5 flex-shrink-0 rounded-full ${s.dot}`}
-                                                />
-                                                <div>
-                                                    <p className="sc-mono text-[10px] font-bold tracking-[.08em] text-slate-700 uppercase dark:text-slate-300">
-                                                        {s.label}
-                                                    </p>
-                                                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
-                                                        {s.desc}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
-
-                                <Panel
-                                    icon={<FileText size={11} />}
-                                    title="What to Expect"
-                                >
-                                    <div className="flex flex-col p-3">
-                                        {[
-                                            {
-                                                n: '01',
-                                                t: "Clinic reviews your dog's breed scan",
-                                            },
-                                            {
-                                                n: '02',
-                                                t: 'They schedule a consultation and notify you',
-                                            },
-                                            {
-                                                n: '03',
-                                                t: 'Accept or decline with an optional reason',
-                                            },
-                                            {
-                                                n: '04',
-                                                t: 'Attend your appointment for expert advice',
-                                            },
-                                        ].map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className={`flex items-start gap-2.5 py-2.5 ${i < 3 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}
-                                            >
-                                                <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">
-                                                    {s.n}
-                                                </span>
-                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
-                                                    {s.t}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
-
-                                {/* Appointment summary */}
-                                <Panel
-                                    icon={<CalendarDays size={11} />}
-                                    title="Summary"
-                                >
-                                    <div className="flex flex-col gap-1.5 p-2.5">
-                                        {[
-                                            {
-                                                l: 'Total',
-                                                v: String(appointments.length),
-                                                icon: (
-                                                    <CalendarDays size={10} />
-                                                ),
-                                            },
-                                            {
-                                                l: 'Pending',
-                                                v: String(pending.length),
-                                                icon: <Clock size={10} />,
-                                            },
-                                            {
-                                                l: 'Confirmed',
-                                                v: String(
-                                                    appointments.filter(
-                                                        (a) =>
-                                                            a.status ===
-                                                            'accepted',
-                                                    ).length,
-                                                ),
-                                                icon: (
-                                                    <CheckCircle2 size={10} />
-                                                ),
-                                            },
-                                            {
-                                                l: 'Declined',
-                                                v: String(
-                                                    appointments.filter(
-                                                        (a) =>
-                                                            a.status ===
-                                                            'rejected',
-                                                    ).length,
-                                                ),
-                                                icon: <XCircle size={10} />,
-                                            },
-                                        ].map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-500 dark:text-slate-600">
-                                                        {s.icon}
-                                                    </span>
-                                                    <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">
-                                                        {s.l}
-                                                    </span>
-                                                </div>
-                                                <span className="font-mono text-[12px] font-bold text-slate-800 dark:text-slate-200">
-                                                    {s.v}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
                             </div>
                         </div>
                     </div>
