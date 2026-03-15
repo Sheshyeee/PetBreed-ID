@@ -536,16 +536,16 @@ export default function Scan() {
                 </button>
 
                 {/* ── 3. Main content (flex-1 min-h-0 = fills remaining space exactly) ── */}
-                <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
-                    <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
-                        <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:p-4 lg:pb-0 xl:grid-cols-[224px_1fr_232px]">
+                <div className="relative z-10 min-h-0 flex-1 overflow-y-auto">
+                    <div className="sc-nsb mx-auto max-w-[1360px] overflow-x-hidden">
+                        <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:p-4 lg:pb-16 xl:grid-cols-[224px_1fr_232px]">
 
                             {/* ── LEFT SIDEBAR ──
                                 FIX: removed lg:justify-end — content now flows from top
                                 and scrolls down instead of anchoring to bottom and
                                 getting clipped above the viewport when banner is visible.
                             ── */}
-                            <div className="sc-nsb hidden lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:py-4">
+                            <div className="sc-nsb hidden lg:flex lg:flex-col lg:gap-3 lg:py-4">
                                 <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link href="/scan" className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400">
@@ -569,7 +569,7 @@ export default function Scan() {
                             </div>
 
                             {/* ── CENTER ── */}
-                            <div className="sc-fu sc-nsb flex min-h-0 flex-col gap-3 lg:overflow-y-auto lg:py-4">
+                            <div className="sc-fu sc-nsb flex flex-col gap-3 lg:py-4">
                                 {/* Page title */}
                                 <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
                                     <div>
@@ -613,7 +613,7 @@ export default function Scan() {
                                 )}
 
                                 {/* SCAN CARD */}
-                                <div className="sc-maincard relative flex flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:min-h-0 lg:flex-1 dark:border-white/[.07] dark:bg-[#131720]">
+                                <div className="sc-maincard relative flex flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
                                     <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
                                         <span className="sc-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">doglens://scan</span>
                                         <div className="sc-mono ml-auto flex items-center gap-1.5 text-[10px] text-emerald-600 select-none dark:text-emerald-400">
@@ -622,7 +622,7 @@ export default function Scan() {
                                         </div>
                                     </div>
 
-                                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 overflow-y-auto p-4 lg:h-full lg:p-5">
+                                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 lg:p-5">
                                         {/* STATE A: Drop zone */}
                                         {!preview && !showCamera && (
                                             <div className="flex flex-col gap-3">
@@ -739,7 +739,7 @@ export default function Scan() {
                                 Content flows from top and scrolls instead of anchoring
                                 to bottom and getting clipped when banner is present.
                             ── */}
-                            <div className="sc-fu sc-nsb flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:py-4">
+                            <div className="sc-fu sc-nsb flex flex-col gap-3 lg:py-4">
                                 <Panel icon={<Eye size={11} />} title="How It Works">
                                     <div className="flex flex-col p-3">
                                         {[
