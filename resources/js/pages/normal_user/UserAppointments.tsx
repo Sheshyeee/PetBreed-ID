@@ -389,21 +389,21 @@ export default function UserAppointments() {
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link
                                             href="/scan"
-                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
                                         >
                                             <ScanIcon size={13} />
                                             <span>New Scan</span>
                                         </Link>
                                         <Link
                                             href="/scanhistory"
-                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
                                         >
                                             <History size={13} />
                                             <span>Scan History</span>
                                         </Link>
                                         <Link
                                             href="/appointments"
-                                            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400"
+                                            className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2 text-[11px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400"
                                         >
                                             <CalendarDays size={13} />
                                             <span>Appointments</span>
@@ -467,9 +467,6 @@ export default function UserAppointments() {
                                                         'sc-dpulse 2s ease-in-out infinite',
                                                 }}
                                             />
-                                            <span className="sc-mono text-[10px] font-semibold tracking-[.12em] text-emerald-700 uppercase dark:text-emerald-400">
-                                                Vet Scheduling
-                                            </span>
                                         </div>
                                         <h1 className="text-lg leading-none font-extrabold tracking-tight text-slate-900 sm:text-xl dark:text-white">
                                             My Appointments
@@ -493,8 +490,6 @@ export default function UserAppointments() {
 
                                 {/* Terminal bar card wrapping the list */}
                                 <div className="sc-panel-line relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[.07] dark:bg-[#131720]">
-                                   
-
                                     {/* Scrollable content */}
                                     <div className="sc-nsb flex-1 overflow-y-auto p-4">
                                         {appointments.length === 0 ? (
