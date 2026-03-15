@@ -13,14 +13,24 @@ type AdminNotification = {
     message: string;
     breed: string;
     scan_id: string;
-    appointment_date: string;
     result_id?: number;
+    appointment_date: string;
     appointment_time: string;
     vet_name: string;
     rejection_reason?: string;
     is_read: boolean;
     created_at: string;
 };
+
+// ─── read XSRF-TOKEN cookie (what Laravel actually checks) ───────────────────
+function getCsrf(): string {
+    return decodeURIComponent(
+        document.cookie
+            .split('; ')
+            .find((r) => r.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1] ?? '',
+    );
+}
 
 // ─── single notification row ──────────────────────────────────────────────────
 function NotifRow({
@@ -40,7 +50,7 @@ function NotifRow({
                 if (notif.result_id) {
                     router.visit(`/model/review-dog/${notif.result_id}`);
                 } else {
-                    router.visit(`/model/scan-results`);
+                    router.visit('/model/scan-results');
                 }
             }}
             className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
@@ -104,11 +114,9 @@ function AdminNotificationBell() {
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
     const [unread, setUnread] = useState(0);
-    const [loading, setLoading] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // fetch from the admin-specific endpoint
     const fetchNotifications = async () => {
         try {
             const res = await fetch('/admin/notifications', {
@@ -119,7 +127,7 @@ function AdminNotificationBell() {
             setNotifications(data.notifications ?? []);
             setUnread(data.unread_count ?? 0);
         } catch {
-            // silent fail — don't break the header
+            // silent
         }
     };
 
@@ -148,22 +156,22 @@ function AdminNotificationBell() {
 
     const markRead = async (id: number) => {
         try {
-            await fetch(`/admin/notifications/${id}/read`, {
+            const res = await fetch(`/admin/notifications/${id}/read`, {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN':
-                        (
-                            document.querySelector(
-                                'meta[name="csrf-token"]',
-                            ) as HTMLMetaElement
-                        )?.content ?? '',
+                    'X-XSRF-TOKEN': getCsrf(),
                     Accept: 'application/json',
+                    'Content-Type': 'application/json',
                 },
             });
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-            );
-            setUnread((c) => Math.max(0, c - 1));
+            if (res.ok) {
+                setNotifications((prev) =>
+                    prev.map((n) =>
+                        n.id === id ? { ...n, is_read: true } : n,
+                    ),
+                );
+                setUnread((c) => Math.max(0, c - 1));
+            }
         } catch {
             // silent
         }
@@ -171,22 +179,20 @@ function AdminNotificationBell() {
 
     const markAllRead = async () => {
         try {
-            await fetch('/admin/notifications/mark-all-read', {
+            const res = await fetch('/admin/notifications/mark-all-read', {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN':
-                        (
-                            document.querySelector(
-                                'meta[name="csrf-token"]',
-                            ) as HTMLMetaElement
-                        )?.content ?? '',
+                    'X-XSRF-TOKEN': getCsrf(),
                     Accept: 'application/json',
+                    'Content-Type': 'application/json',
                 },
             });
-            setNotifications((prev) =>
-                prev.map((n) => ({ ...n, is_read: true })),
-            );
-            setUnread(0);
+            if (res.ok) {
+                setNotifications((prev) =>
+                    prev.map((n) => ({ ...n, is_read: true })),
+                );
+                setUnread(0);
+            }
         } catch {
             // silent
         }
@@ -222,6 +228,11 @@ function AdminNotificationBell() {
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                 Appointment Responses
                             </span>
+                            {unread > 0 && (
+                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                    {unread} new
+                                </span>
+                            )}
                         </div>
                         {unread > 0 && (
                             <button

@@ -320,7 +320,6 @@ export default function Scan() {
                 <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
                     {icon}
                 </div>
-                {/* FIXED: was text-slate-400 → text-slate-600 */}
                 <span className="font-mono text-[10px] font-bold tracking-[.12em] text-slate-600 uppercase dark:text-slate-400">
                     {title}
                 </span>
@@ -332,7 +331,6 @@ export default function Scan() {
     const TopBreedsContent = () => (
         <div className="flex flex-col gap-0.5 p-2.5">
             {topBreeds.length === 0 ? (
-                /* FIXED: was text-slate-300 → text-slate-400 */
                 <p className="py-3 text-center font-mono text-[10px] text-slate-400 dark:text-slate-600">
                     No scan data yet
                 </p>
@@ -342,11 +340,9 @@ export default function Scan() {
                         key={i}
                         className="group flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/[.03]"
                     >
-                        {/* FIXED: was text-slate-300 → text-slate-500 */}
                         <span className="w-4 flex-shrink-0 font-mono text-[9px] text-slate-500 group-hover:text-emerald-500/70 dark:text-slate-600">
                             #{i + 1}
                         </span>
-                        {/* FIXED: was text-slate-600 → text-slate-700 */}
                         <span
                             className="flex-1 truncate text-[12px] font-medium text-slate-700 dark:text-slate-300"
                             title={b.breed}
@@ -394,16 +390,13 @@ export default function Scan() {
                     className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]"
                 >
                     <div className="flex items-center gap-2">
-                        {/* FIXED: was text-slate-300 → text-slate-500 */}
                         <span className="text-slate-500 dark:text-slate-600">
                             {s.icon}
                         </span>
-                        {/* FIXED: was text-slate-400 → text-slate-600 */}
                         <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">
                             {s.l}
                         </span>
                     </div>
-                    {/* FIXED: was text-slate-700 → text-slate-800 */}
                     <span className="font-mono text-[12px] font-bold text-slate-800 dark:text-slate-200">
                         {s.v}
                     </span>
@@ -419,29 +412,38 @@ export default function Scan() {
         return (
             <Link
                 href="/appointments"
-                className="sc-alertin relative z-20 mx-4 mt-2 flex flex-shrink-0 items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/[.08] px-4 py-2.5 no-underline transition-all hover:bg-emerald-500/[.12] dark:border-emerald-500/20 dark:bg-emerald-500/[.07]"
+                className="sc-banner relative z-20 mx-4 mt-2 flex flex-shrink-0 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 no-underline transition-all hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-400/[.06] dark:hover:bg-amber-400/[.10]"
             >
-                <div className="flex items-center gap-2.5">
-                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                {/* Left: icon + text */}
+                <div className="flex items-center gap-3">
+                    {/* Icon blob */}
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-400/[.12]">
                         <CalendarDays
-                            size={14}
-                            className="text-emerald-600 dark:text-emerald-400"
+                            size={15}
+                            className="text-amber-600 dark:text-amber-400"
                         />
                     </div>
+
                     <div className="min-w-0">
-                        <p className="text-[13px] leading-tight font-semibold text-emerald-800 dark:text-emerald-300">
-                            {count === 1
-                                ? `Appointment scheduled for ${next.breed}`
-                                : `${count} appointments awaiting your response`}
-                        </p>
-                        <p className="font-mono text-[10px] text-emerald-700/70 dark:text-emerald-400/70">
+                        <div className="flex items-center gap-2">
+                            {/* Pulse dot */}
+                            <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-amber-500" />
+                            <p className="text-[13px] leading-tight font-bold text-amber-900 dark:text-amber-200">
+                                {count === 1
+                                    ? `Appointment scheduled — ${next.breed}`
+                                    : `${count} appointments awaiting your response`}
+                            </p>
+                        </div>
+                        <p className="mt-0.5 font-mono text-[10px] text-amber-700/70 dark:text-amber-400/60">
                             {next.appointment_date} · {next.appointment_time} ·{' '}
                             {next.vet_name}
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-1 text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
-                    View <ChevronRight size={13} />
+
+                {/* Right: pill CTA */}
+                <div className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/[.08] dark:text-amber-300">
+                    View <ChevronRight size={12} />
                 </div>
             </Link>
         );
@@ -515,6 +517,8 @@ export default function Scan() {
                 .sc-alertin   { animation:sc-slidein .28s ease both; }
                 .sc-nsb::-webkit-scrollbar { display:none; }
                 .sc-nsb { scrollbar-width:none; }
+
+                .sc-banner { animation:sc-slidein .32s ease both; }
             `}</style>
 
             <div className="sc-root flex h-screen flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-[#080B0F]">
@@ -525,7 +529,9 @@ export default function Scan() {
                 <div className="relative z-20 flex-shrink-0">
                     <Header />
                 </div>
-                <div className="px-10">
+
+                {/* Appointment banner — sits between header and main content */}
+                <div className="relative z-20 flex-shrink-0 px-4 pt-2">
                     <AppointmentBanner />
                 </div>
 
@@ -559,7 +565,6 @@ export default function Scan() {
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                                     Install Mobile App
                                 </h2>
-                                {/* FIXED: was text-slate-400 → text-slate-500 */}
                                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                     Scan QR to download the Android app
                                 </p>
@@ -617,7 +622,7 @@ export default function Scan() {
                 </button>
 
                 {/* ── MAIN CONTENT ── */}
-                <div className="relative z-10 mt-[-30px] min-h-0 flex-1 overflow-hidden p-3 px-4">
+                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-hidden p-3 px-4">
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:overflow-hidden lg:p-4 lg:pb-4 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR — desktop only ── */}
@@ -629,7 +634,7 @@ export default function Scan() {
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link
                                             href="/scan"
-                                            className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2 text-[11px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400"
+                                            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400"
                                         >
                                             <ScanIcon size={13} />
                                             <span>New Scan</span>
@@ -638,17 +643,16 @@ export default function Scan() {
                                                 className="ml-auto opacity-40"
                                             />
                                         </Link>
-                                        {/* FIXED: was text-slate-500 → text-slate-600 */}
                                         <Link
                                             href="/scanhistory"
-                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
                                         >
                                             <History size={13} />
                                             <span>Scan History</span>
                                         </Link>
                                         <Link
                                             href="/appointments"
-                                            className="flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[11px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
+                                            className="flex items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-slate-200"
                                         >
                                             <CalendarDays size={13} />
                                             <span>Appointments</span>
@@ -689,13 +693,11 @@ export default function Scan() {
                                         <h1 className="text-lg leading-none font-extrabold tracking-tight text-slate-900 sm:text-xl dark:text-white">
                                             Scan Your Dog
                                         </h1>
-                                        {/* FIXED: was text-slate-500 → text-slate-600 */}
                                         <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                                             Upload a photo or use your camera to
                                             identify your dog's breed.
                                         </p>
                                     </div>
-                                    {/* FIXED: was text-slate-500 → text-slate-600 */}
                                     <Link
                                         href="/scanhistory"
                                         className="inline-flex flex-shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-600 no-underline transition-all hover:border-emerald-500/30 hover:bg-emerald-500/[.03] hover:text-emerald-700 dark:border-white/[.07] dark:bg-[#131720] dark:text-slate-400 dark:hover:text-emerald-400"
@@ -761,7 +763,6 @@ export default function Scan() {
                                 <div className="sc-maincard relative flex flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:min-h-0 lg:flex-1 dark:border-white/[.07] dark:bg-[#131720]">
                                     {/* Terminal bar */}
                                     <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[.06] dark:bg-[#0D1117]">
-                                        {/* FIXED: was text-slate-400 → text-slate-500 */}
                                         <span className="sc-mono ml-1 text-[10px] text-slate-500 select-none dark:text-slate-500">
                                             doglens://scan
                                         </span>
@@ -846,12 +847,10 @@ export default function Scan() {
                                                         </div>
                                                     </div>
                                                     <div className="text-center select-none">
-                                                        {/* FIXED: was text-slate-800 → already fine, kept */}
                                                         <p className="text-[15px] font-bold text-slate-800 dark:text-slate-100">
                                                             Drop your dog image
                                                             here
                                                         </p>
-                                                        {/* FIXED: was text-slate-400 → text-slate-500 */}
                                                         <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-500">
                                                             or{' '}
                                                             <span className="font-bold text-emerald-600 dark:text-emerald-400">
@@ -859,7 +858,6 @@ export default function Scan() {
                                                             </span>
                                                         </p>
                                                     </div>
-                                                    {/* FIXED: was text-slate-300 → text-slate-500 */}
                                                     <p className="sc-mono text-[9px] tracking-[.14em] text-slate-500 select-none dark:text-slate-600">
                                                         ALL FORMATS · MAX 10MB
                                                     </p>
@@ -867,7 +865,6 @@ export default function Scan() {
 
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-px flex-1 bg-slate-200 dark:bg-white/[.06]" />
-                                                    {/* FIXED: was text-slate-300 → text-slate-500 */}
                                                     <span className="sc-mono text-[9px] font-medium tracking-[.14em] text-slate-500 uppercase select-none dark:text-slate-600">
                                                         or use camera
                                                     </span>
@@ -882,7 +879,6 @@ export default function Scan() {
                                                     <Camera size={15} />{' '}
                                                     Activate Camera
                                                 </button>
-                                                {/* FIXED: was text-slate-300 → text-slate-500 */}
                                                 <p className="sc-mono text-center text-[9px] tracking-[.12em] text-slate-500 select-none dark:text-slate-600">
                                                     CHROME · EDGE · SAFARI ·
                                                     FIREFOX
@@ -927,7 +923,6 @@ export default function Scan() {
                                                                 className={`sc-hc sc-h${p}`}
                                                             />
                                                         ))}
-
                                                         <div className="sc-mono sc-ticker absolute bottom-3 left-3 rounded border border-emerald-500/20 bg-black/60 px-2 py-0.5 text-[9px] font-semibold tracking-[.14em] text-emerald-400 uppercase backdrop-blur-sm">
                                                             ● REC ·{' '}
                                                             {facingMode ===
@@ -956,7 +951,6 @@ export default function Scan() {
                                                         <ScanIcon size={15} />{' '}
                                                         Capture & Scan
                                                     </button>
-                                                    {/* FIXED: was text-slate-500 → text-slate-600 */}
                                                     <button
                                                         type="button"
                                                         onClick={stopCamera}
@@ -1049,7 +1043,6 @@ export default function Scan() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {/* FIXED: was text-slate-300 → text-slate-500 */}
                                                 {fileInfo && (
                                                     <p className="sc-mono truncate text-center text-[9px] tracking-wide text-slate-500 dark:text-slate-600">
                                                         {fileInfo}
@@ -1066,7 +1059,6 @@ export default function Scan() {
                                                             ? 'Analyzing…'
                                                             : 'Analyze Image'}
                                                     </button>
-                                                    {/* FIXED: was text-slate-500 → text-slate-600 */}
                                                     <button
                                                         type="button"
                                                         onClick={handleReset}
@@ -1130,7 +1122,6 @@ export default function Scan() {
                                                 <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/80 dark:text-emerald-500/65">
                                                     {s.n}
                                                 </span>
-                                                {/* FIXED: was text-slate-500 → text-slate-600 */}
                                                 <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
                                                     {s.t}
                                                 </p>
@@ -1151,10 +1142,7 @@ export default function Scan() {
                                                 <span className="sc-mono mt-[2px] w-5 flex-shrink-0 text-[9px] font-semibold text-emerald-600/70 dark:text-emerald-500/55">
                                                     0{i + 1}
                                                 </span>
-                                                {/* FIXED: regular text was text-slate-500 → text-slate-600 */}
-                                                <p
-                                                    className={`text-[12px] leading-relaxed text-slate-600 dark:text-slate-400`}
-                                                >
+                                                <p className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-400">
                                                     {tip.text}
                                                 </p>
                                             </div>
