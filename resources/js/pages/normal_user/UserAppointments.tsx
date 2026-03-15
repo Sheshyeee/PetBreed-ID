@@ -439,14 +439,7 @@ export default function UserAppointments() {
                                     </div>
                                 </Panel>
 
-                                {/* Delete info hint */}
-                                <Panel icon={<Trash2 size={11} />} title="Delete Rule">
-                                    <div className="p-3">
-                                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
-                                            You can delete an appointment only after you have <span className="font-semibold text-slate-700 dark:text-slate-300">accepted or declined</span> it. Pending appointments cannot be deleted until a response is made.
-                                        </p>
-                                    </div>
-                                </Panel>
+                               
                             </div>
 
                             {/* ── CENTER ── */}
@@ -519,53 +512,7 @@ export default function UserAppointments() {
                                 </div>
                             </div>
 
-                            {/* ── RIGHT SIDEBAR (kept minimal, matches layout) ── */}
-                            <div className="sc-fu hidden flex-col gap-3 lg:flex lg:min-h-0 lg:justify-start lg:overflow-x-hidden lg:overflow-y-auto">
-                                {/* Appointment summary counts */}
-                                <Panel icon={<CalendarDays size={11} />} title="Summary">
-                                    <div className="flex flex-col gap-1.5 p-2.5">
-                                        {[
-                                            { l: 'Total',     v: String(appointments.length),                                         color: 'text-slate-800 dark:text-slate-200' },
-                                            { l: 'Pending',   v: String(pending.length),                                              color: 'text-amber-600 dark:text-amber-300' },
-                                            { l: 'Confirmed', v: String(appointments.filter(a => a.status === 'accepted').length),    color: 'text-emerald-600 dark:text-emerald-400' },
-                                            { l: 'Declined',  v: String(appointments.filter(a => a.status === 'rejected').length),    color: 'text-red-500 dark:text-red-400' },
-                                        ].map((s, i) => (
-                                            <div key={i} className="flex cursor-default items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[.025] dark:border-white/[.04] dark:bg-white/[.03]">
-                                                <span className="font-mono text-[9px] font-medium tracking-[.1em] text-slate-600 uppercase dark:text-slate-500">{s.l}</span>
-                                                <span className={`font-mono text-[12px] font-bold ${s.color}`}>{s.v}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
-
-                                {/* Status legend */}
-                                <Panel icon={<CheckCircle2 size={11} />} title="Status Guide">
-                                    <div className="flex flex-col p-3">
-                                        {[
-                                            { dot: 'bg-amber-400 shadow-[0_0_5px_#f59e0b]', label: 'Pending',   desc: 'Awaiting your accept or decline.' },
-                                            { dot: 'bg-emerald-500 shadow-[0_0_5px_#10b981]', label: 'Confirmed', desc: 'You accepted. See you at the clinic.' },
-                                            { dot: 'bg-red-500 shadow-[0_0_5px_#ef4444]',    label: 'Declined',  desc: 'You declined. Contact clinic to reschedule.' },
-                                        ].map((s, i, arr) => (
-                                            <div key={i} className={`flex items-start gap-2.5 py-2.5 ${i < arr.length - 1 ? 'border-b border-slate-200 dark:border-white/[.05]' : ''}`}>
-                                                <span className={`mt-[5px] h-1.5 w-1.5 flex-shrink-0 rounded-full ${s.dot}`} />
-                                                <div>
-                                                    <p className="sc-mono text-[10px] font-bold tracking-[.08em] text-slate-700 uppercase dark:text-slate-300">{s.label}</p>
-                                                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">{s.desc}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Panel>
-
-                                {/* Delete rule reminder */}
-                                <Panel icon={<Trash2 size={11} />} title="Delete Rule">
-                                    <div className="p-3">
-                                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
-                                            The <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">🗑</span> button on each card is only active after you have <span className="font-semibold text-slate-700 dark:text-slate-300">accepted or declined</span>. Pending appointments must be responded to first.
-                                        </p>
-                                    </div>
-                                </Panel>
-                            </div>
+                           
 
                         </div>
                     </div>

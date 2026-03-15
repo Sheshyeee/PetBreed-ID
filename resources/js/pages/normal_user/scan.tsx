@@ -310,12 +310,6 @@ export default function Scan() {
         </div>
     );
 
-    /* ─────────────────────────────────────────────────────────────────────────
-       APPOINTMENT BANNER
-       Design: dark slate card — looks like an OS/app system notification.
-       Two-zone layout: a vivid indigo-to-cyan left icon column + a clean
-       content area. Completely distinct from the emerald page theme.
-    ───────────────────────────────────────────────────────────────────────── */
     const AppointmentBanner = () => {
         if (pendingAppointments.length === 0) return null;
         const next = pendingAppointments[0];
@@ -330,27 +324,21 @@ export default function Scan() {
                 {/* ── Left: vivid icon zone ──────────────────────────────── */}
                 <div className="bnr-icon relative flex w-[58px] flex-shrink-0 flex-col items-center justify-center overflow-hidden"
                     style={{ background: 'linear-gradient(145deg, #4f46e5 0%, #06b6d4 100%)' }}>
-                    {/* subtle dot-grid overlay */}
                     <div className="pointer-events-none absolute inset-0"
                         style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.15) 1px, transparent 1px)', backgroundSize: '8px 8px' }} />
                     <Stethoscope size={20} className="relative z-10 text-white drop-shadow" />
-                    {/* count badge */}
                     {count > 1 && (
                         <span className="relative z-10 mt-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 font-mono text-[8px] font-black"
                             style={{ color: '#4f46e5' }}>
                             {count}
                         </span>
                     )}
-                    {/* animated ping ring */}
                     <span className="bnr-ping absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-cyan-300" />
                 </div>
 
                 {/* ── Right: content zone ────────────────────────────────── */}
                 <div className="flex flex-1 items-center justify-between gap-4 border border-l-0 border-indigo-200/70 bg-indigo-50 px-4 py-3 transition-colors group-hover:bg-indigo-100/70 dark:border-indigo-400/15 dark:bg-[#1a1f35] dark:group-hover:bg-indigo-400/[.08]">
-
-                    {/* text */}
                     <div className="min-w-0 flex-1">
-                        {/* row 1: eyebrow label */}
                         <div className="mb-1 flex items-center gap-2">
                             <Sparkles size={9} className="flex-shrink-0 text-indigo-400" />
                             <span className="font-mono text-[9px] font-black uppercase tracking-[.18em] text-indigo-500 dark:text-indigo-400">
@@ -362,15 +350,11 @@ export default function Scan() {
                                 </span>
                             )}
                         </div>
-
-                        {/* row 2: headline */}
                         <p className="truncate text-[13px] font-extrabold leading-tight text-slate-900 dark:text-white">
                             {count === 1
                                 ? `${next.breed} — response needed`
                                 : `${next.breed} and ${count - 1} other${count - 1 > 1 ? 's' : ''} pending`}
                         </p>
-
-                        {/* row 3: inline meta */}
                         <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[10px] text-slate-500 dark:text-slate-400">
                             <span className="inline-flex items-center gap-1">
                                 <CalendarDays size={9} className="text-indigo-400" />
@@ -388,8 +372,6 @@ export default function Scan() {
                             </span>
                         </p>
                     </div>
-
-                    {/* CTA */}
                     <div className="bnr-cta flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-[12px] font-bold text-white"
                         style={{ boxShadow: '0 2px 10px rgba(79,70,229,.4)' }}>
                         Respond
@@ -471,7 +453,6 @@ export default function Scan() {
                 /* ── Banner ── */
                 .bnr { animation: bnr-in .36s cubic-bezier(.16,1,.3,1) both; }
 
-                /* icon zone shimmer on hover */
                 .bnr-icon::before {
                     content:''; position:absolute; top:0; left:-60%; width:40%; height:100%;
                     background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
@@ -480,13 +461,11 @@ export default function Scan() {
                 .bnr:hover .bnr-icon::before { opacity:1; animation: bnr-shimmer .5s ease forwards; }
                 @keyframes bnr-shimmer { from{left:-60%} to{left:130%} }
 
-                /* ping dot */
                 .bnr-ping {
                     animation: bnr-ping 2s ease-out infinite;
                     box-shadow: 0 0 0 0 rgba(103,232,249,1);
                 }
 
-                /* CTA hover */
                 .bnr-cta { transition: background .18s, box-shadow .2s, transform .18s; }
                 .bnr:hover .bnr-cta {
                     background: #4338ca !important;
@@ -497,19 +476,6 @@ export default function Scan() {
                 .bnr:hover .bnr-arrow { transform: translate(2px, -2px); }
             `}</style>
 
-            {/*
-              ═══════════════════════════════════════════════════════════════
-              SCROLL LAYOUT CONTRACT
-              ───────────────────────────────────────────────────────────────
-              Root          h-screen flex flex-col overflow-hidden
-              Header        flex-shrink-0
-              Banner wrap   flex-shrink-0   ← consumes its own height
-              Main          flex-1 min-h-0  ← gets EXACTLY what's left
-                Inner       h-full  lg:overflow-hidden
-                  Grid      h-full  grid-rows-[1fr]   ← single row fills parent
-                    Cols    min-h-0  overflow-y-auto   ← each col scrolls alone
-              ═══════════════════════════════════════════════════════════════
-            */}
             <div className="sc-root flex h-screen flex-col overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-[#080B0F]">
                 <div className="pointer-events-none fixed top-[-140px] left-[-70px] z-0 h-[260px] w-[460px] rounded-full bg-emerald-400/[.042] blur-[85px]" />
                 <div className="pointer-events-none fixed top-[-90px] right-[-40px] z-0 h-[210px] w-[340px] rounded-full bg-cyan-400/[.028] blur-[85px]" />
@@ -571,22 +537,15 @@ export default function Scan() {
 
                 {/* ── 3. Main content (flex-1 min-h-0 = fills remaining space exactly) ── */}
                 <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
-                    {/*
-                      Desktop: h-full + lg:overflow-hidden → inner is exactly parent height.
-                      Mobile:  overflow-y-auto → single scrollable column.
-                    */}
                     <div className="sc-nsb mx-auto h-full max-w-[1360px] overflow-x-hidden overflow-y-auto lg:overflow-hidden">
-                        {/*
-                          lg:grid-rows-[1fr]  ← THE KEY: forces the single grid row to fill
-                                                 the grid's height instead of sizing to content.
-                                                 Without this, columns overflow and can't scroll.
-                          lg:h-full           ← grid matches inner div height
-                          No lg:overflow-hidden here — each col handles its own scroll.
-                        */}
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:h-full lg:grid-cols-[210px_1fr_220px] lg:grid-rows-[1fr] lg:gap-4 lg:p-4 lg:pb-0 xl:grid-cols-[224px_1fr_232px]">
 
-                            {/* ── LEFT SIDEBAR ── */}
-                            <div className="sc-nsb hidden lg:flex lg:min-h-0 lg:flex-col lg:justify-end lg:gap-3 lg:overflow-y-auto lg:py-4">
+                            {/* ── LEFT SIDEBAR ──
+                                FIX: removed lg:justify-end — content now flows from top
+                                and scrolls down instead of anchoring to bottom and
+                                getting clipped above the viewport when banner is visible.
+                            ── */}
+                            <div className="sc-nsb hidden lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:py-4">
                                 <Panel icon={<ScanIcon size={11} />} title="Navigation">
                                     <div className="flex flex-col gap-1 p-2.5">
                                         <Link href="/scan" className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[.09] px-3 py-2.5 text-[13px] font-semibold text-emerald-700 no-underline dark:bg-emerald-500/[.11] dark:text-emerald-400">
@@ -775,8 +734,12 @@ export default function Scan() {
                                 </div>
                             </div>
 
-                            {/* ── RIGHT SIDEBAR ── */}
-                            <div className="sc-fu sc-nsb flex flex-col gap-3 lg:min-h-0 lg:justify-end lg:overflow-y-auto lg:py-4">
+                            {/* ── RIGHT SIDEBAR ──
+                                FIX: removed lg:justify-end — same fix as left sidebar.
+                                Content flows from top and scrolls instead of anchoring
+                                to bottom and getting clipped when banner is present.
+                            ── */}
+                            <div className="sc-fu sc-nsb flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:py-4">
                                 <Panel icon={<Eye size={11} />} title="How It Works">
                                     <div className="flex flex-col p-3">
                                         {[
