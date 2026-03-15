@@ -712,7 +712,7 @@ export default function Scan() {
                 </button>
 
                 {/* ── 3. Main content (flex-1 min-h-0 = fills remaining space exactly) ── */}
-                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-y-auto px-8 sm:px-0">
+                <div className="relative z-10 mt-[-20px] min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
                     <div className="sc-nsb mx-auto max-w-[1360px] overflow-x-hidden">
                         <div className="flex flex-col gap-3 p-3 pb-24 lg:grid lg:grid-cols-[210px_1fr_220px] lg:gap-4 lg:p-4 lg:pb-16 xl:grid-cols-[224px_1fr_232px]">
                             {/* ── LEFT SIDEBAR ──
