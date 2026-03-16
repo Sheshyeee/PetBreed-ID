@@ -25,11 +25,13 @@ interface SimulationData {
 }
 
 interface VisualFeature { label: string; value: string; }
+interface HealthNote   { issue: string; note: string; }
 
 interface AgeProfile {
     weight?: { male?: string; female?: string } | string;
     height?: { male?: string; female?: string } | string;
     visual_features?: VisualFeature[] | string[];
+    health_notes?: HealthNote[];
 }
 
 interface AgeProfiles {
@@ -92,11 +94,13 @@ function PhysicalComparison({
     const curWeight  = formatWH(current?.weight);
     const curHeight  = formatWH(current?.height);
     const curVisual  = normalizeVisual(current?.visual_features);
+    const curHealth  = current?.health_notes ?? [];
     const futWeight  = formatWH(future.weight);
     const futHeight  = formatWH(future.height);
     const futVisual  = normalizeVisual(future.visual_features);
+    const futHealth  = future.health_notes ?? [];
 
-    const hasAnyData = futWeight || futHeight || futVisual.length > 0;
+    const hasAnyData = futWeight || futHeight || futVisual.length > 0 || futHealth.length > 0;
     if (!hasAnyData) return null;
 
     const Col = ({
@@ -105,12 +109,14 @@ function PhysicalComparison({
         weight,
         height,
         visual,
+        healthNotes,
     }: {
         label: string;
         accent: 'emerald' | 'violet';
         weight: string | null;
         height: string | null;
         visual: VisualFeature[];
+        healthNotes: HealthNote[];
     }) => {
         const isViolet = accent === 'violet';
         return (
@@ -188,6 +194,29 @@ function PhysicalComparison({
                         </div>
                     </div>
                 )}
+
+                {/* Health Notes */}
+                {healthNotes.length > 0 && (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 dark:border-amber-500/15 dark:bg-amber-500/[.05]">
+                        <div className="mb-2 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 flex-shrink-0 text-amber-500 dark:text-amber-400">
+                                <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
+                            </svg>
+                            <span className="vs-mono text-[9px] tracking-[.08em] text-amber-600 uppercase dark:text-amber-400">Watch Out For</span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {healthNotes.map((h, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                    <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400 dark:bg-amber-500" />
+                                    <div>
+                                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">{h.issue}: </span>
+                                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{h.note}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -212,6 +241,7 @@ function PhysicalComparison({
                     weight={curWeight}
                     height={curHeight}
                     visual={curVisual}
+                    healthNotes={curHealth}
                 />
                 <Col
                     label={futureLabel}
@@ -219,6 +249,7 @@ function PhysicalComparison({
                     weight={futWeight}
                     height={futHeight}
                     visual={futVisual}
+                    healthNotes={futHealth}
                 />
             </div>
         </div>

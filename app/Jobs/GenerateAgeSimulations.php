@@ -1420,7 +1420,7 @@ class GenerateAgeSimulations implements ShouldQueue
     $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
     $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
 
-    $prompt = "You are a veterinary expert. For a {$breed} dog, provide accurate physical characteristics at 1 year old and 3 years old.
+    $prompt = "You are a veterinary expert. For a {$breed} dog, provide accurate physical characteristics and common health concerns at 1 year old and 3 years old.
 
 Return ONLY a valid JSON object — no markdown, no explanation, no extra text. Just the raw JSON:
 {
@@ -1433,6 +1433,11 @@ Return ONLY a valid JSON object — no markdown, no explanation, no extra text. 
       {\"label\": \"Body Build\", \"value\": \"Describe physique at 1 year\"},
       {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 1 year\"},
       {\"label\": \"Tail\",       \"value\": \"Describe tail at 1 year\"}
+    ],
+    \"health_notes\": [
+      {\"issue\": \"Simple name e.g. Skin Allergy\", \"note\": \"One plain sentence about why this appears at this age and what to watch for.\"},
+      {\"issue\": \"Simple name e.g. Ear Infection\", \"note\": \"One plain sentence.\"},
+      {\"issue\": \"Simple name e.g. Teething Pain\", \"note\": \"One plain sentence.\"}
     ]
   },
   \"3_years\": {
@@ -1444,13 +1449,24 @@ Return ONLY a valid JSON object — no markdown, no explanation, no extra text. 
       {\"label\": \"Body Build\", \"value\": \"Describe physique at 3 years\"},
       {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 3 years\"},
       {\"label\": \"Tail\",       \"value\": \"Describe tail at 3 years\"}
+    ],
+    \"health_notes\": [
+      {\"issue\": \"Simple name e.g. Joint Pain\", \"note\": \"One plain sentence about why this appears at this age and what to watch for.\"},
+      {\"issue\": \"Simple name e.g. Dental Tartar\", \"note\": \"One plain sentence.\"},
+      {\"issue\": \"Simple name e.g. Weight Gain\", \"note\": \"One plain sentence.\"}
     ]
   }
-}";
+}
+
+IMPORTANT RULES for health_notes:
+- Use ONLY simple everyday names a Filipino dog owner would understand. Say \"Hip Joint Problem\" not \"Hip Dysplasia\", \"Skin Allergy\" not \"Atopic Dermatitis\", \"Ear Infection\" not \"Otitis Externa\", \"Dental Tartar\" not \"Periodontal Disease\", \"Eye Discharge\" not \"Epiphora\".
+- Make each note factual and specific to the {$breed} breed at that exact age.
+- 3 health notes per age group. Pick the most common and realistic ones for this breed.
+- Keep each note to 1 short sentence only.";
 
     $payload = [
       'contents'         => [['parts' => [['text' => $prompt]]]],
-      'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 2048],
+      'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 3000],
     ];
 
     $client   = new Client(['timeout' => 30]);
