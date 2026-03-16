@@ -215,40 +215,68 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
                         </div>
 
                         {/* ── WEIGHT / HEIGHT / LIFESPAN QUICK STATS ── */}
-                        <div className="vhr-fu vhr-fu1 mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div className="vhr-fu vhr-fu1 mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             {/* Lifespan */}
-                            <div className="flex items-center gap-3 rounded-2xl border border-pink-200/60 bg-pink-50/60 px-4 py-3.5 dark:border-pink-500/20 dark:bg-pink-500/[.06]">
-                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-pink-300/40 bg-pink-100 dark:border-pink-500/25 dark:bg-pink-500/[.12]">
-                                    <Heart size={15} className="text-pink-600 dark:text-pink-400" />
-                                </div>
-                                <div>
-                                    <p className="vhr-mono text-[9px] tracking-[.1em] text-pink-600/70 uppercase dark:text-pink-400/70">Avg Lifespan</p>
-                                    <p className="text-[15px] font-extrabold text-pink-700 dark:text-pink-300">{lifespan} <span className="text-[11px] font-semibold">yrs</span></p>
+                            <div className="relative overflow-hidden rounded-2xl border border-pink-200 bg-gradient-to-br from-pink-50 to-rose-50 p-4 shadow-sm dark:border-pink-500/25 dark:from-pink-500/[.08] dark:to-rose-500/[.05]">
+                                <div className="pointer-events-none absolute -top-4 -right-4 h-20 w-20 rounded-full bg-pink-400/10 dark:bg-pink-400/[.06]" />
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-500/30">
+                                        <Heart size={16} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="vhr-mono text-[9px] font-semibold tracking-[.12em] text-pink-500 uppercase dark:text-pink-400">Avg Lifespan</p>
+                                        <p className="text-[22px] font-extrabold leading-tight text-pink-700 dark:text-pink-300">
+                                            {lifespan}<span className="ml-1 text-[13px] font-semibold text-pink-500 dark:text-pink-400">yrs</span>
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Weight */}
                             {weightStr && (
-                                <div className="flex items-center gap-3 rounded-2xl border border-purple-200/60 bg-purple-50/60 px-4 py-3.5 dark:border-purple-500/20 dark:bg-purple-500/[.06]">
-                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-purple-300/40 bg-purple-100 dark:border-purple-500/25 dark:bg-purple-500/[.12]">
-                                        <Scale size={15} className="text-purple-600 dark:text-purple-400" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="vhr-mono text-[9px] tracking-[.1em] text-purple-600/70 uppercase dark:text-purple-400/70">Typical Weight</p>
-                                        <p className="truncate text-[12px] font-bold text-purple-700 dark:text-purple-300" title={weightStr}>{weightStr}</p>
+                                <div className="relative overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 p-4 shadow-sm dark:border-violet-500/25 dark:from-violet-500/[.08] dark:to-purple-500/[.05]">
+                                    <div className="pointer-events-none absolute -top-4 -right-4 h-20 w-20 rounded-full bg-violet-400/10 dark:bg-violet-400/[.06]" />
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
+                                            <Scale size={16} className="text-white" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="vhr-mono text-[9px] font-semibold tracking-[.12em] text-violet-500 uppercase dark:text-violet-400">Typical Weight</p>
+                                            {/* Split male/female on the separator for wrapping */}
+                                            {weightStr.includes('·') ? (
+                                                <div className="mt-0.5 flex flex-col gap-0.5">
+                                                    {weightStr.split('·').map((part, i) => (
+                                                        <p key={i} className="text-[12px] font-bold text-violet-700 dark:text-violet-300">{part.trim()}</p>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="mt-0.5 text-[13px] font-bold text-violet-700 dark:text-violet-300">{weightStr}</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
                             {/* Height */}
                             {heightStr && (
-                                <div className="flex items-center gap-3 rounded-2xl border border-teal-200/60 bg-teal-50/60 px-4 py-3.5 dark:border-teal-500/20 dark:bg-teal-500/[.06]">
-                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-teal-300/40 bg-teal-100 dark:border-teal-500/25 dark:bg-teal-500/[.12]">
-                                        <Ruler size={15} className="text-teal-600 dark:text-teal-400" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="vhr-mono text-[9px] tracking-[.1em] text-teal-600/70 uppercase dark:text-teal-400/70">Typical Height</p>
-                                        <p className="truncate text-[12px] font-bold text-teal-700 dark:text-teal-300" title={heightStr}>{heightStr}</p>
+                                <div className="relative overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 p-4 shadow-sm dark:border-teal-500/25 dark:from-teal-500/[.08] dark:to-cyan-500/[.05]">
+                                    <div className="pointer-events-none absolute -top-4 -right-4 h-20 w-20 rounded-full bg-teal-400/10 dark:bg-teal-400/[.06]" />
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/30">
+                                            <Ruler size={16} className="text-white" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="vhr-mono text-[9px] font-semibold tracking-[.12em] text-teal-600 uppercase dark:text-teal-400">Typical Height</p>
+                                            {heightStr.includes('·') ? (
+                                                <div className="mt-0.5 flex flex-col gap-0.5">
+                                                    {heightStr.split('·').map((part, i) => (
+                                                        <p key={i} className="text-[12px] font-bold text-teal-700 dark:text-teal-300">{part.trim()}</p>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="mt-0.5 text-[13px] font-bold text-teal-700 dark:text-teal-300">{heightStr}</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

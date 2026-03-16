@@ -102,10 +102,25 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       $finalStatus = ($savedPaths['1_years'] || $savedPaths['3_years']) ? 'complete' : 'failed';
-      $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
+$this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
-      $elapsed = round(microtime(true) - $startTime, 2);
-      Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s | model: {$selectedModel}");
+   // ── Generate age-specific physical profiles (weight/height/visual features) ──
+   if ($finalStatus === 'complete') {
+       try {
+           $ageProfiles = $this->generateAgeProfiles($breedProfile);
+           if (!empty($ageProfiles)) {
+               $currentData = json_decode($result->simulation_data, true) ?? [];
+               $currentData['age_profiles'] = $ageProfiles;
+               $result->update(['simulation_data' => json_encode($currentData)]);
+               Log::info('✅ Age profiles stored for breed: ' . $breedProfile['breed']);
+           }
+       } catch (\Exception $e) {
+           Log::warning('⚠️ Age profile generation failed (non-critical): ' . $e->getMessage());
+       }
+   }
+
+   $elapsed = round(microtime(true) - $startTime, 2);
+   Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s | model: {$selectedModel}");
     } catch (\Exception $e) {
       Log::error('❌ SIMULATION FAILED', [
         'result_id' => $this->resultId,
@@ -1584,6 +1599,68 @@ class GenerateAgeSimulations implements ShouldQueue
     }
     return false;
   }
+
+  private function generateAgeProfiles(array $breedProfile): array
+    {
+        $breed    = $breedProfile['breed'];
+        $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+ 
+        $prompt = "You are a veterinary expert. For a {$breed} dog, provide accurate physical characteristics at 1 year old and 3 years old.
+ 
+Return ONLY a valid JSON object — no markdown, no explanation, no extra text. Just the raw JSON:
+{
+  \"1_year\": {
+    \"weight\": {\"male\": \"e.g. 18-22 lbs (8-10 kg)\", \"female\": \"e.g. 15-19 lbs (7-9 kg)\"},
+    \"height\": {\"male\": \"e.g. 12-14 inches (30-36 cm)\", \"female\": \"e.g. 11-13 inches (28-33 cm)\"},
+    \"visual_features\": [
+      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 1 year (e.g. Dense adult coat forming)\"},
+      {\"label\": \"Coat Color\", \"value\": \"Describe how color looks at 1 year (e.g. Richer, more defined)\"},
+      {\"label\": \"Body Build\", \"value\": \"Describe physique at 1 year (e.g. Lean adolescent, filling out)\"},
+      {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 1 year (e.g. Fully settled adult ears)\"},
+      {\"label\": \"Tail\",       \"value\": \"Describe tail at 1 year (e.g. Full length, adult curl)\"}
+    ]
+  },
+  \"3_years\": {
+    \"weight\": {\"male\": \"e.g. 20-26 lbs (9-12 kg)\", \"female\": \"e.g. 17-22 lbs (8-10 kg)\"},
+    \"height\": {\"male\": \"e.g. 13-15 inches (33-38 cm)\", \"female\": \"e.g. 12-14 inches (30-36 cm)\"},
+    \"visual_features\": [
+      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 3 years (e.g. Full dense prime adult coat)\"},
+      {\"label\": \"Coat Color\", \"value\": \"Describe color at 3 years (e.g. Deep and fully saturated)\"},
+      {\"label\": \"Body Build\", \"value\": \"Describe physique at 3 years (e.g. Peak muscle development)\"},
+      {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 3 years\"},
+      {\"label\": \"Tail\",       \"value\": \"Describe tail at 3 years\"}
+    ]
+  }
+}";
+ 
+        $payload = [
+            'contents'         => [['parts' => [['text' => $prompt]]]],
+            'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 900],
+        ];
+ 
+        $client   = new Client(['timeout' => 30]);
+        $response = $client->post($endpoint, [
+            'json'    => $payload,
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+ 
+        $data = json_decode($response->getBody()->getContents(), true);
+        $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
+ 
+        // Strip any markdown fences Gemini might add
+        $text = preg_replace('/^```json\s*/i', '', $text);
+        $text = preg_replace('/^```\s*/i',     '', $text);
+        $text = preg_replace('/\s*```$/i',     '', $text);
+        $text = trim($text);
+ 
+        $parsed = json_decode($text, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Invalid JSON from Gemini age profiles: ' . json_last_error_msg());
+        }
+ 
+        return $parsed;
+    }
 
   // ─────────────────────────────────────────────────────────────────────
   //  STATUS UPDATE

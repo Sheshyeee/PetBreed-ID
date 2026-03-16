@@ -10,11 +10,9 @@ use Illuminate\Support\Facades\Cache;
 
 class SimulationController extends Controller
 {
-    // ✅ FIXED: accepts Request so we can read scan_id from query string
     public function index(Request $request)
     {
         try {
-            // ✅ FIXED: query string first, session fallback
             $scanId = $request->query('scan_id') ?? session('last_scan_id');
 
             if (!$scanId) {
@@ -49,7 +47,7 @@ class SimulationController extends Controller
     private function prepareViewData($result)
     {
         $simulationData = json_decode($result->simulation_data, true) ?? [];
-        $baseUrl = config('filesystems.disks.object-storage.url');
+        $baseUrl        = config('filesystems.disks.object-storage.url');
 
         $originalImageUrl = null;
         if ($result->image) {
@@ -61,15 +59,30 @@ class SimulationController extends Controller
         }
 
         Log::info('🖼️ View Data', [
-            'scan_id'           => $result->scan_id,
-            'image_db'          => $result->image,
-            'base_url'          => $baseUrl,
+            'scan_id'            => $result->scan_id,
+            'image_db'           => $result->image,
+            'base_url'           => $baseUrl,
             'original_image_url' => $originalImageUrl,
-            'url_null'          => $originalImageUrl === null ? 'YES!' : 'NO'
+            'url_null'           => $originalImageUrl === null ? 'YES!' : 'NO',
         ]);
 
+        // ── Parse current health risks for weight/height/visual_features ──
+        $healthRisks = [];
+        if (!empty($result->health_risks)) {
+            $healthRisks = is_string($result->health_risks)
+                ? (json_decode($result->health_risks, true) ?? [])
+                : (is_array($result->health_risks) ? $result->health_risks : []);
+        }
+
+        $currentHealth = [
+            'weight'          => $healthRisks['weight']          ?? null,
+            'height'          => $healthRisks['height']          ?? null,
+            'visual_features' => $healthRisks['visual_features'] ?? [],
+            'lifespan'        => $healthRisks['lifespan']        ?? null,
+        ];
+
         return [
-            'id'                => $result->id,           // ✅ FIXED: added so back button → /scan-results/{id}
+            'id'                => $result->id,
             'scan_id'           => $result->scan_id,
             'breed'             => $result->breed,
             'originalImage'     => $originalImageUrl,
@@ -80,6 +93,9 @@ class SimulationController extends Controller
             'simulation_status' => $simulationData['status'] ?? 'pending',
             'breed_profile'     => $simulationData['breed_profile'] ?? null,
             'error'             => $simulationData['error'] ?? null,
+            // ── New fields ──
+            'age_profiles'      => $simulationData['age_profiles'] ?? null,
+            'current_health'    => $currentHealth,
         ];
     }
 
@@ -114,9 +130,9 @@ class SimulationController extends Controller
             $scanId = $request->input('scan_id');
             if (!$scanId) return response()->json(['success' => false, 'error' => 'No scan_id'], 400);
 
-            $result = Results::where('scan_id', $scanId)->firstOrFail();
+            $result         = Results::where('scan_id', $scanId)->firstOrFail();
             $simulationData = json_decode($result->simulation_data, true) ?? [];
-            $baseUrl = config('filesystems.disks.object-storage.url');
+            $baseUrl        = config('filesystems.disks.object-storage.url');
 
             $originalImageUrl = null;
             if ($result->image) {
@@ -135,7 +151,8 @@ class SimulationController extends Controller
                     '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                     '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
                 ],
-                'timestamp'      => now()->timestamp
+                'age_profiles'   => $simulationData['age_profiles'] ?? null,
+                'timestamp'      => now()->timestamp,
             ]);
         } catch (\Exception $e) {
             Log::error('Status error', ['error' => $e->getMessage()]);
