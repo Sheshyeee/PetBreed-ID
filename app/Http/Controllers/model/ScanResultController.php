@@ -679,32 +679,61 @@ class ScanResultController extends Controller
                 $simulationData = [
                     '1_years' => null,
                     '3_years' => null,
-                    'status' => 'pending'
+                    'status'  => 'pending',
                 ];
             }
 
-            // Build URLs from object storage
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            $responseData = [
-                'breed' => $result->breed,
-                'original_image' => $baseUrl . '/' . $result->image,
-                'simulations' => [
-                    '1_years' => $simulationData['1_years']
-                        ? $baseUrl . '/' . $simulationData['1_years']
-                        : null,
-                    '3_years' => $simulationData['3_years']
-                        ? $baseUrl . '/' . $simulationData['3_years']
-                        : null,
-                ],
-                'status' => $simulationData['status'] ?? 'pending',
+            // ── Build simulation image URLs ──────────────────────────────────
+            $build = function ($path) use ($baseUrl) {
+                if (!$path) return null;
+                if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
+                return $baseUrl . '/' . $path;
+            };
+
+            // ── Parse current health (weight / height / visual_features / lifespan) ──
+            $healthRisks = [];
+            if (!empty($result->health_risks)) {
+                $healthRisks = is_string($result->health_risks)
+                    ? (json_decode($result->health_risks, true) ?? [])
+                    : (is_array($result->health_risks) ? $result->health_risks : []);
+            }
+
+            $currentHealth = [
+                'weight'          => $healthRisks['weight']          ?? null,
+                'height'          => $healthRisks['height']          ?? null,
+                'visual_features' => $healthRisks['visual_features'] ?? [],
+                'health_notes'    => $healthRisks['health_notes']    ?? [],
+                'lifespan'        => $healthRisks['lifespan']        ?? null,
             ];
 
-            \Illuminate\Support\Facades\Log::info('Simulation data for mobile ' . $scan_id, $responseData);
+            $originalImage = $result->image
+                ? $build($result->image)
+                : null;
+
+            $responseData = [
+                'breed'          => $result->breed,
+                'original_image' => $originalImage,
+                'simulations'    => [
+                    '1_years' => $build($simulationData['1_years'] ?? null),
+                    '3_years' => $build($simulationData['3_years'] ?? null),
+                ],
+                'status'         => $simulationData['status'] ?? 'pending',
+                // ── NEW: physical / age data ──────────────────────────────────
+                'age_profiles'   => $simulationData['age_profiles'] ?? null,
+                'current_health' => $currentHealth,
+            ];
+
+            \Illuminate\Support\Facades\Log::info('Simulation data for mobile ' . $scan_id, [
+                'status'      => $responseData['status'],
+                'has_1_years' => !is_null($responseData['simulations']['1_years']),
+                'has_3_years' => !is_null($responseData['simulations']['3_years']),
+            ]);
 
             return response()->json([
                 'success' => true,
-                'data' => $responseData
+                'data'    => $responseData,
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Get simulation error: ' . $e->getMessage());
@@ -721,40 +750,42 @@ class ScanResultController extends Controller
     {
         try {
             $result = Results::where('scan_id', $scan_id)->first();
-
+ 
             if (!$result) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Scan result not found.'
                 ], 404);
             }
-
+ 
             $simulationData = is_string($result->simulation_data)
                 ? json_decode($result->simulation_data, true)
                 : $result->simulation_data;
-
-            $status = $simulationData['status'] ?? 'pending';
-
-            // Build URLs from object storage
+ 
+            $status  = $simulationData['status'] ?? 'pending';
             $baseUrl = config('filesystems.disks.object-storage.url');
-
+ 
+            $build = function ($path) use ($baseUrl) {
+                if (!$path) return null;
+                if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
+                return $baseUrl . '/' . $path;
+            };
+ 
             $simulations = [
-                '1_years' => isset($simulationData['1_years']) && $simulationData['1_years']
-                    ? $baseUrl . '/' . $simulationData['1_years']
-                    : null,
-                '3_years' => isset($simulationData['3_years']) && $simulationData['3_years']
-                    ? $baseUrl . '/' . $simulationData['3_years']
-                    : null,
+                '1_years' => $build($simulationData['1_years'] ?? null),
+                '3_years' => $build($simulationData['3_years'] ?? null),
             ];
-
+ 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'status' => $status,
+                'data'    => [
+                    'status'      => $status,
                     'simulations' => $simulations,
-                    'has_1_year' => !is_null($simulations['1_years']),
+                    'has_1_year'  => !is_null($simulations['1_years']),
                     'has_3_years' => !is_null($simulations['3_years']),
-                ]
+                    // ── NEW ──────────────────────────────────────────────────
+                    'age_profiles' => $simulationData['age_profiles'] ?? null,
+                ],
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Get simulation status error: ' . $e->getMessage());
@@ -766,31 +797,31 @@ class ScanResultController extends Controller
     }
 
     public function preview($id)
-{
-    $result = Results::findOrFail($id);
+    {
+        $result = Results::findOrFail($id);
 
-    $baseUrl = config('filesystems.disks.object-storage.url');
-    $result->image = $baseUrl . '/' . $result->image;
+        $baseUrl = config('filesystems.disks.object-storage.url');
+        $result->image = $baseUrl . '/' . $result->image;
 
-    $result->health_risks = is_string($result->health_risks)
-        ? json_decode($result->health_risks, true)
-        : $result->health_risks;
+        $result->health_risks = is_string($result->health_risks)
+            ? json_decode($result->health_risks, true)
+            : $result->health_risks;
 
-    $result->origin_history = is_string($result->origin_history)
-        ? json_decode($result->origin_history, true)
-        : $result->origin_history;
+        $result->origin_history = is_string($result->origin_history)
+            ? json_decode($result->origin_history, true)
+            : $result->origin_history;
 
-    $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
+        $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
 
-    // Check if a correction already exists for this scan
-    $alreadyCorrected = \App\Models\BreedCorrection::where('scan_id', $result->scan_id)->exists();
+        // Check if a correction already exists for this scan
+        $alreadyCorrected = \App\Models\BreedCorrection::where('scan_id', $result->scan_id)->exists();
 
-    return inertia('model/review-dog', [
-        'result'            => $result,
-        'appointment'       => $appointment,
-        'already_corrected' => $alreadyCorrected,
-    ]);
-}
+        return inertia('model/review-dog', [
+            'result'            => $result,
+            'appointment'       => $appointment,
+            'already_corrected' => $alreadyCorrected,
+        ]);
+    }
 
     public function index(Request $request)
     {
@@ -1805,7 +1836,7 @@ PROMPT;
         try {
             Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
-           $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
+            $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
  
 1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
@@ -2523,10 +2554,24 @@ Be verbose and detailed. Output ONLY the JSON.";
                 $hasPlainDiseaseNames = false;
                 if (!empty($cachedHealthRisks['concerns'])) {
                     $medicalKeywords = [
-                        'dysplasia', 'syndrome', 'dermatitis', 'toxocariasis',
-                        'luxation', 'brachycephalic', 'helminthiasis', 'pyoderma',
-                        'atopic', 'intervertebral', 'mitral', 'stenosis', 'cardiomyopathy',
-                        'otitis', 'hypothyroidism', 'epilepsy', 'bloat', 'torsion',
+                        'dysplasia',
+                        'syndrome',
+                        'dermatitis',
+                        'toxocariasis',
+                        'luxation',
+                        'brachycephalic',
+                        'helminthiasis',
+                        'pyoderma',
+                        'atopic',
+                        'intervertebral',
+                        'mitral',
+                        'stenosis',
+                        'cardiomyopathy',
+                        'otitis',
+                        'hypothyroidism',
+                        'epilepsy',
+                        'bloat',
+                        'torsion',
                     ];
                     $hasPlainDiseaseNames = true;
                     foreach ($cachedHealthRisks['concerns'] as $concern) {
@@ -2937,7 +2982,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                         'breed' => $learnResult['breed']
                     ]);
 
-                   return redirect()->back()->with('success', "✓ Correction saved!");
+                    return redirect()->back()->with('success', "✓ Correction saved!");
                 } else {
                     Log::warning('ML API learning failed (correction still saved)', [
                         'scan_id' => $result->scan_id,
