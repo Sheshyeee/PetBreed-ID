@@ -301,9 +301,7 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
                                             <Radar name="Risk" dataKey="value" stroke="#ec4899" strokeWidth={2.5} fill="url(#vhrGrad)" fillOpacity={0.6} />
                                         </RadarChart>
                                     </ResponsiveContainer>
-                                    <p className="vhr-mono text-center text-[9px] tracking-[.1em] text-slate-500 dark:text-slate-500">
-                                        Higher values = more common concerns for this breed
-                                    </p>
+                                    
                                 </div>
                             </Panel>
 

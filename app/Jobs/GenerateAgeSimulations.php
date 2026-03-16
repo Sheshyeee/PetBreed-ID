@@ -22,11 +22,12 @@ class GenerateAgeSimulations implements ShouldQueue
   public $tries      = 3;
   public $backoff    = [20, 60, 120];
 
+  // ── FIX 1: flash-image first (fast ~15s), pro as fallback only ──────
   private const MODEL_PRIORITY = [
-    'gemini-3-pro-image-preview',          // Nano Banana Pro (best)
-    'gemini-3.1-flash-image-preview',      // Nano Banana 2
-    'gemini-2.5-flash-image',              // Nano Banana (original)
-    'gemini-2.0-flash-exp-image-generation', // fallback
+    'gemini-3.1-flash-image-preview',        // Fast — primary (~15-20s)
+    'gemini-3-pro-image-preview',            // Slow but high quality — fallback only (~80s)
+    'gemini-2.5-flash-image',                // Legacy fallback
+    'gemini-2.0-flash-exp-image-generation', // Last resort
   ];
 
   private const SEND_SIZE = 1024;
@@ -76,8 +77,6 @@ class GenerateAgeSimulations implements ShouldQueue
       $currentAgeStage = $this->detectAgeStage($imageData);
       Log::info("🔍 Detected age stage: {$currentAgeStage}");
 
-      // ── Detect exact coat markings from the actual photo ──────────
-      // This prevents the model from losing white patches, blazes, etc.
       $detectedMarkings = $this->detectCoatMarkings($imageData);
       Log::info("🎨 Detected markings: {$detectedMarkings}");
 
@@ -102,25 +101,24 @@ class GenerateAgeSimulations implements ShouldQueue
       }
 
       $finalStatus = ($savedPaths['1_years'] || $savedPaths['3_years']) ? 'complete' : 'failed';
-$this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
+      $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
-   // ── Generate age-specific physical profiles (weight/height/visual features) ──
-   if ($finalStatus === 'complete') {
-       try {
-           $ageProfiles = $this->generateAgeProfiles($breedProfile);
-           if (!empty($ageProfiles)) {
-               $currentData = json_decode($result->simulation_data, true) ?? [];
-               $currentData['age_profiles'] = $ageProfiles;
-               $result->update(['simulation_data' => json_encode($currentData)]);
-               Log::info('✅ Age profiles stored for breed: ' . $breedProfile['breed']);
-           }
-       } catch (\Exception $e) {
-           Log::warning('⚠️ Age profile generation failed (non-critical): ' . $e->getMessage());
-       }
-   }
+      if ($finalStatus === 'complete') {
+        try {
+          $ageProfiles = $this->generateAgeProfiles($breedProfile);
+          if (!empty($ageProfiles)) {
+            $currentData = json_decode($result->simulation_data, true) ?? [];
+            $currentData['age_profiles'] = $ageProfiles;
+            $result->update(['simulation_data' => json_encode($currentData)]);
+            Log::info('✅ Age profiles stored for breed: ' . $breedProfile['breed']);
+          }
+        } catch (\Exception $e) {
+          Log::warning('⚠️ Age profile generation failed (non-critical): ' . $e->getMessage());
+        }
+      }
 
-   $elapsed = round(microtime(true) - $startTime, 2);
-   Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s | model: {$selectedModel}");
+      $elapsed = round(microtime(true) - $startTime, 2);
+      Log::info("🎉 SIMULATION {$finalStatus} in {$elapsed}s | model: {$selectedModel}");
     } catch (\Exception $e) {
       Log::error('❌ SIMULATION FAILED', [
         'result_id' => $this->resultId,
@@ -145,7 +143,7 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  AGE STAGE DETECTION — improved precision
+  //  AGE STAGE DETECTION
   // ─────────────────────────────────────────────────────────────────────
 
   private function detectAgeStage(array $imageData): string
@@ -216,9 +214,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
   // ─────────────────────────────────────────────────────────────────────
   //  COAT MARKINGS DETECTION
-  //  Uses a vision call to precisely describe the dog's color pattern.
-  //  This description is then injected into the generation prompt to
-  //  prevent the model from losing/changing the markings.
   // ─────────────────────────────────────────────────────────────────────
 
   private function detectCoatMarkings(array $imageData): string
@@ -419,19 +414,7 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  ★★★ COMPLETELY REDESIGNED PROMPT — MAXIMUM VISUAL IMPACT ★★★
-  //
-  //  Philosophy: Instead of listing what to CHANGE, we describe the
-  //  COMPLETE FINAL STATE of the output image. The model should produce
-  //  the target image, not "apply edits" to the source.
-  //
-  //  Structure:
-  //    1. TASK FRAMING    — what kind of image to produce
-  //    2. IDENTITY ANCHOR — what must stay the same (color, markings, pose)
-  //    3. COMPLETE OUTPUT DESCRIPTION — full head-to-tail description of
-  //       what the OUTPUT dog must look like (breed-accurate for target age)
-  //    4. FORBIDDEN CHANGES — explicit anti-subtle-change instructions
-  //    5. QUALITY GATE
+  //  AGING PROMPT BUILDER
   // ─────────────────────────────────────────────────────────────────────
 
   private function buildAgingPrompt(array $profile, int $targetYears): string
@@ -447,11 +430,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
     $agingDesc = $this->buildNaturalAgingDescription($profile, $ageStage, $targetYears);
     $guardrail = $this->buildBreedGuardrail($profile);
-
-    // ── Core strategy: minimal-edit framing + explicit markings lock ──
-    // Gemini image gen works best when told it's doing a SMALL, specific
-    // edit to a photo — not regenerating it. The more we anchor the
-    // unchanged elements (especially the exact markings), the less it drifts.
 
     $prompt  = "You are editing a dog photo. Make ONLY the age-related changes listed below. ";
     $prompt .= "Everything else in the photo must remain pixel-perfect identical.\n\n";
@@ -483,10 +461,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
     return $prompt;
   }
 
-  /**
-   * Builds a concise, natural-language description of what changes with age.
-   * Short and specific — Gemini image gen follows these much more reliably.
-   */
   private function buildNaturalAgingDescription(array $profile, string $ageStage, int $targetYears): string
   {
     $breed     = $profile['breed'];
@@ -503,10 +477,8 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
 
     $lines = [];
 
-    // ── PUPPY TRANSFORMATIONS ─────────────────────────────────────────
     if ($isPuppy) {
       if ($targetYears === 1) {
-        // Puppy → young adult/adolescent
         switch ($heightChg) {
           case 'dramatic_increase':
           case 'large_increase':
@@ -532,9 +504,7 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
         $lines[] = "- Ears are in their settled adult position for this breed";
         $lines[] = "- Coat is denser and more defined adult coat texture";
       } else {
-        // Puppy → full adult (3 years)
         $adultDesc = $profile['adult_size_description'] ?? '';
-
         switch ($heightChg) {
           case 'dramatic_increase':
             $lines[] = "- The dog is now a GIANT — enormous body, 3-4x larger than the puppy";
@@ -563,8 +533,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
           $lines[] = "- This dog should look like: {$adultDesc}";
         }
       }
-
-      // ── YOUNG ADULT ───────────────────────────────────────────────────
     } elseif ($isYoung) {
       if ($targetYears === 1) {
         $lines[] = "- Chest is slightly broader and deeper than in the photo";
@@ -577,8 +545,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
         $lines[] = "- Face has a settled, experienced mature expression";
         $lines[] = "- Jowls very slightly more developed";
       }
-
-      // ── SENIOR ────────────────────────────────────────────────────────
     } elseif ($isSenior) {
       if ($targetYears === 1) {
         $lines[] = "- More white/gray fur on muzzle — expanded from whatever is in the photo";
@@ -593,8 +559,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
         $lines[] = "- Coat noticeably thinner and duller than in the photo";
         $lines[] = "- Slightly reduced muscle mass — less defined than prime adult";
       }
-
-      // ── ADULT ─────────────────────────────────────────────────────────
     } else {
       if ($targetYears === 1) {
         $lines[] = "- Add clearly visible white/silver hairs on the muzzle tip and chin — at least 10-20 hairs, clearly noticeable";
@@ -611,7 +575,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       }
     }
 
-    // ── COAT-SPECIFIC ADDITIONS FOR PUPPIES ──────────────────────────
     if ($isPuppy) {
       $b = strtolower($breed);
       switch ($coat) {
@@ -652,10 +615,6 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
     return implode("\n", $lines);
   }
 
-  /**
-   * Builds a short, critical breed-specific anatomy note.
-   * Kept very brief so it doesn't overwhelm the model.
-   */
   private function buildBreedGuardrail(array $profile): string
   {
     $b         = strtolower($profile['breed']);
@@ -692,357 +651,11 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  IMAGE PREPARATION — UPSCALE SMALL IMAGES
+  //  IMAGE PREPARATION
   // ─────────────────────────────────────────────────────────────────────
 
-  private function _REMOVED_buildOutputDescription(array $profile, string $ageStage, int $targetYears): array
-  {
-    $breed     = $profile['breed'];
-    $size      = $profile['size_category']   ?? 'medium';
-    $coat      = $profile['coat_type']        ?? 'short';
-    $isBrachy  = $profile['brachycephalic']   ?? false;
-    $bodyShape = $profile['body_shape']       ?? 'standard';
-    $heightChg = $profile['height_change']    ?? 'moderate_increase';
-
-    $isPuppy  = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
-    $isYoung  = ($ageStage === 'young_adult');
-    $isSenior = ($ageStage === 'senior');
-    $isAdult  = !$isPuppy && !$isYoung && !$isSenior;
-
-    $lines = [];
-
-    // ── HEAD / FACE ───────────────────────────────────────────────────
-    $lines[] = '[ HEAD & FACE ]';
-
-    if ($isPuppy && $targetYears >= 1) {
-      $lines[] = '• Skull shape: FULLY ADULT proportions — NOT baby-round. Same size as body, not oversized.';
-      if ($isBrachy) {
-        $lines[] = '• Flat brachycephalic face: unchanged push-in — but now with MORE prominent skin folds/wrinkles.';
-      } else {
-        $lines[] = '• Muzzle: LONGER than in puppy photo — adult length, well-defined, not short/stubby.';
-      }
-      $lines[] = '• Skull muscles and brow ridges visible — no soft baby roundness.';
-      if ($targetYears === 3) {
-        if ($size !== 'toy' && $size !== 'small') {
-          $lines[] = '• MUZZLE TIP & CHIN: show ' . ($ageStage === 'teenager' ? '2–5' : '5–15') . ' silver/white hairs — early aging marker.';
-        }
-        $lines[] = '• Facial expression: EXPERIENCED and CONFIDENT adult look, not playful baby.';
-      }
-    } elseif ($isYoung) {
-      $lines[] = '• Face: sharper, more defined than before. All remaining youthful softness gone.';
-      $lines[] = '• Jaw muscles more defined. Brow slightly more prominent.';
-      if ($targetYears === 3) {
-        $lines[] = '• Muzzle tip: CLEAR silver/white hairs — 10–25 visible. Chin: sparse gray hairs.';
-        $lines[] = '• Eyes: same color, but surrounded by a more experienced, settled expression.';
-      } else {
-        $lines[] = '• Muzzle: 3–8 silver hairs just at the very tip. Barely but noticeably aging.';
-      }
-    } elseif ($isSenior) {
-      if ($targetYears === 1) {
-        $lines[] = '• Muzzle: MORE white/gray than in source photo — expanded coverage.';
-        $lines[] = '• Eyes: slightly cloudier and deeper-set than in source.';
-        $lines[] = '• Jowls: slightly more sagging than source.';
-      } else {
-        $lines[] = '• Muzzle: COMPLETELY GRAY/WHITE — entire muzzle tip, chin, and around eyes silver.';
-        $lines[] = '• Eyes: visibly cloudy with age-related opacity. Very deep-set.';
-        $lines[] = '• Jowls and neck: significant skin sag. Deep facial creases.';
-      }
-    } else {
-      // adult
-      if ($targetYears === 1) {
-        $lines[] = '• Face: marginally more settled and experienced looking.';
-        $lines[] = '• Muzzle tip: 5–15 CLEARLY VISIBLE silver/white hairs. Chin: 3–8 gray hairs.';
-        $lines[] = '• Jowls: very slightly more developed than source.';
-      } else {
-        $lines[] = '• MUZZLE: distinctly grayed — 30–50% of muzzle surface covered in white/silver.';
-        $lines[] = '• CHIN: clearly gray/white. Around eyes: sparse silver hairs.';
-        $lines[] = '• Jowls: noticeably more developed. Slight skin sag under chin area.';
-        $lines[] = '• Overall face: a more mature, experienced, settled expression.';
-      }
-    }
-
-    $lines[] = '';
-
-    // ── EARS ──────────────────────────────────────────────────────────
-    $lines[] = '[ EARS ]';
-    if ($isPuppy) {
-      $lines[] = '• Ears: in their FINAL ADULT POSITION for this breed (no longer flopped unless breed always flops).';
-      if ($bodyShape === 'spitz') {
-        $lines[] = '• Ears: PERFECTLY ERECT and rigid pointed spitz ears.';
-      } elseif ($this->mb(strtolower($breed), ['french bulldog', 'boston terrier', 'chihuahua', 'corgi', 'pembroke', 'cardigan'])) {
-        $lines[] = '• Ears: FULLY ERECT, rigid, and upright — no longer drooping or semi-erect.';
-      }
-    } else {
-      $lines[] = '• Ears: same as source — fully adult and settled.';
-    }
-
-    $lines[] = '';
-
-    // ── BODY ──────────────────────────────────────────────────────────
-    $lines[] = '[ BODY & BUILD ]';
-
-    if ($isPuppy) {
-      switch ($heightChg) {
-        case 'dramatic_increase':
-          $lines[] = '• Body size: ENORMOUSLY larger than puppy — this is a giant breed. ' . ($targetYears === 3 ? '3–4×' : '2–3×') . ' the puppy size.';
-          $lines[] = '• Legs: massively longer and more powerful. Towering adult presence.';
-          break;
-        case 'large_increase':
-          $lines[] = '• Body size: SIGNIFICANTLY larger. ' . ($targetYears === 3 ? '2–3×' : '1.5–2×') . ' taller and heavier than the puppy.';
-          $lines[] = '• Legs: considerably longer and muscular — no trace of stumpy puppy legs.';
-          break;
-        case 'moderate_increase':
-          $lines[] = '• Body size: noticeably larger. Legs ' . ($targetYears === 3 ? '50–80%' : '30–50%') . ' longer than puppy. Clearly bigger.';
-          break;
-        case 'minimal_increase':
-          $lines[] = '• Body size: minimal height increase. But body is now HEAVIER, DENSER, and more muscular.';
-          $lines[] = '• Low-and-wide adult form. Chest drops lower.';
-          break;
-        case 'none':
-          $lines[] = '• Body size: similar height. But proportions completely different — all baby proportions GONE.';
-          break;
-      }
-
-      $lines[] = '• Abdomen: FLAT adult tuck — NO potbelly or barrel shape.';
-      $lines[] = '• Chest: deep and developed.';
-      $lines[] = '• Paws: proportionate to legs — no longer oversized.';
-      $lines[] = '• Musculature: ' . ($targetYears === 3 ? 'FULL adult muscle mass — defined shoulders, chest, and haunches.' : 'Developing adult muscles — lean adolescent build.');
-    } elseif ($isYoung) {
-      if ($targetYears === 3) {
-        $lines[] = '• Body: PRIME ADULT condition — peak muscle development.';
-        $lines[] = '• Chest: deeper and broader than in source photo.';
-        $lines[] = '• Neck: thicker and more muscular than in source.';
-        $lines[] = '• Hindquarters: more defined and powerful.';
-      } else {
-        $lines[] = '• Body: noticeably more muscular than source. Chest and shoulders slightly broader.';
-        $lines[] = '• Neck: marginally thicker.';
-      }
-    } elseif ($isSenior) {
-      $lines[] = '• Body: slightly less muscle mass than prime adult — softer definition.';
-      if ($targetYears === 3) {
-        $lines[] = '• Coat appears thinner in places. Less vibrant than in source.';
-      }
-    } else {
-      // adult
-      if ($targetYears === 1) {
-        $lines[] = '• Body: marginally heavier/denser than source. Chest slightly thicker.';
-        $lines[] = '• Neck: very slightly thicker at base.';
-      } else {
-        $lines[] = '• Body: NOTICEABLY heavier than source — thicker neck, broader chest, more mass overall.';
-        $lines[] = '• Less lean definition than prime youth. Body looks heavier and more settled.';
-        $lines[] = '• Chest: clearly broader. Neck: clearly thicker.';
-      }
-    }
-
-    $lines[] = '';
-
-    // ── COAT ──────────────────────────────────────────────────────────
-    $lines[] = '[ COAT ]';
-
-    switch ($coat) {
-      case 'long_silky':
-        $b = strtolower($breed);
-        if ($isPuppy) {
-          if ($this->mb($b, ['yorkshire', 'yorkie'])) {
-            $lines[] = '• COAT TRANSFORMATION (critical): puppy black-and-tan fluffy coat → LONG SILKY STRAIGHT coat.';
-            $lines[] = '• Body: STEEL-BLUE / silver color (NOT black). Head/legs: rich GOLDEN-TAN.';
-            $lines[] = '• Length: ' . ($targetYears === 3 ? 'reaching toward the floor' : 'mid-body, visibly long') . '.';
-            $lines[] = '• Texture: SILKY and STRAIGHT — not fluffy, not wavy.';
-          } elseif ($this->mb($b, ['maltese'])) {
-            $lines[] = '• Coat: pure white LONG SILKY coat — ' . ($targetYears === 3 ? 'floor-length flowing white silk' : 'noticeably longer, flowing white coat growing') . '.';
-          } elseif ($this->mb($b, ['golden retriever'])) {
-            $lines[] = '• Coat: developing/full golden waves with feathering on chest, legs, belly, tail.';
-            $lines[] = '• Rich golden color — denser and more voluminous than puppy.';
-          } elseif ($this->mb($b, ['collie', 'sheltie'])) {
-            $lines[] = '• Coat: growing/full FLOWING MANE at neck and chest. Long coat on flanks.';
-          } else {
-            $lines[] = '• Coat: longer and silkier than puppy coat. ' . ($targetYears === 3 ? 'Full adult feathering everywhere.' : 'Developing adult feathering on ears/legs.');
-          }
-        } elseif ($targetYears === 3 && ($isAdult || $isSenior)) {
-          $lines[] = '• Coat: same as source but ' . ($isSenior ? 'slightly thinner/less lustrous.' : 'fully mature, perhaps marginally denser.');
-        }
-        break;
-
-      case 'double_coat':
-        if ($isPuppy) {
-          $lines[] = '• Coat: puppy fuzz REPLACED by DENSE DOUBLE COAT — thick undercoat visible, coarse guard hairs.';
-          $lines[] = '• Volume: much more voluminous and stand-off than puppy coat.';
-          if ($this->mb(strtolower($breed), ['pomeranian'])) {
-            $lines[] = '• Pomeranian: ENORMOUS stand-off coat — huge ruff/mane, plumed tail. Ball of fluff.';
-          }
-        }
-        break;
-
-      case 'wire':
-      case 'wire_harsh':
-        if ($isPuppy) {
-          $lines[] = '• Coat: soft puppy coat REPLACED by HARSH BRISTLY wire coat.';
-          $lines[] = '• Beard and eyebrows: prominent — this is the breed signature.';
-        }
-        break;
-
-      case 'curly':
-      case 'wavy_curly':
-        if ($isPuppy) {
-          $lines[] = '• Coat: puppy fluff REPLACED by ' . ($targetYears === 3 ? 'FULL TIGHT CURLS/WAVES' : 'developing curls/waves') . ' — much denser and more voluminous.';
-        }
-        break;
-
-      default: // short
-        if ($isPuppy) {
-          $lines[] = '• Coat: puppy fuzz REPLACED by sleek, tight, dense adult short coat.';
-        } elseif (!$isSenior && $targetYears === 3) {
-          $lines[] = '• Coat: same as source but marginally denser and slightly less glossy with age.';
-        } elseif ($isSenior) {
-          $lines[] = '• Coat: ' . ($targetYears === 3 ? 'noticeably thinner and duller than source' : 'slightly less vibrant than source') . '.';
-        }
-        break;
-    }
-
-    $lines[] = '';
-
-    // ── BREED-SPECIFIC ADDITIONS ──────────────────────────────────────
-    $extra = $this->_REMOVED_getBreedSpecificOutputLines($profile, $ageStage, $targetYears);
-    if (!empty($extra)) {
-      $lines[] = '[ BREED-SPECIFIC ]';
-      foreach ($extra as $el) {
-        $lines[] = $el;
-      }
-      $lines[] = '';
-    }
-
-    // ── OVERALL IMPRESSION ────────────────────────────────────────────
-    $lines[] = '[ OVERALL IMPRESSION ]';
-    $adultDesc = $profile['adult_size_description'] ?? '';
-    if ($adultDesc && ($isPuppy && $targetYears === 3)) {
-      $lines[] = "• The output dog must match this description: \"{$adultDesc}\"";
-    } elseif ($isPuppy) {
-      $lines[] = "• A viewer sees: clearly older and bigger than the puppy — an adolescent or young adult {$breed}.";
-    } elseif ($isSenior) {
-      $lines[] = "• A viewer sees: a clearly OLDER senior dog — more gray, more sagging, more aged than the source.";
-    } elseif ($targetYears === 3) {
-      $lines[] = "• A viewer sees: the SAME dog, but clearly 3 years older. The aging must be OBVIOUS.";
-    } else {
-      $lines[] = "• A viewer sees: the same dog, with subtle-but-VISIBLE aging. Not identical to source.";
-    }
-
-    return $lines;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  //  BREED-SPECIFIC OUTPUT LINES
-  // ─────────────────────────────────────────────────────────────────────
-
-  private function _REMOVED_getBreedSpecificOutputLines(array $profile, string $ageStage, int $targetYears): array
-  {
-    $b        = strtolower($profile['breed']);
-    $isPuppy  = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
-    $lines    = [];
-
-    if ($this->mb($b, ['rottweiler', 'rottie']) && $isPuppy) {
-      $lines[] = '• HEAD: massive blocky SQUARE head — not round. Broad flat skull.';
-      $lines[] = '• TAN POINTS: rich mahogany/rust points on eyebrows, cheeks, chest, legs — clearly defined on black coat.';
-      $lines[] = '• NECK: thick and powerful. CHEST: barrel-wide.';
-    }
-    if ($this->mb($b, ['french bulldog', 'frenchie'])) {
-      if ($isPuppy) {
-        $lines[] = '• BAT EARS: PERFECTLY ERECT and rigid — both standing straight up.';
-        $lines[] = '• HEAD: broad, square, flat-faced. Forehead wrinkles develop.';
-        $lines[] = '• BODY: compact muscular barrel — thick neck, wide chest.';
-      }
-      if ($targetYears === 3) {
-        $lines[] = '• WRINKLES: deeper forehead wrinkles. More prominent nose rope.';
-      }
-    }
-    if ($this->mb($b, ['german shepherd', 'gsd', 'alsatian']) && $isPuppy) {
-      $lines[] = '• EARS: FULLY ERECT rigid pointed ears — no longer flopped.';
-      $lines[] = '• COAT: saddle/blanket pattern clearly defined — black over tan/sable.';
-      $lines[] = '• BODY: lean powerful athletic build. Wolf-like profile.';
-    }
-    if ($this->mb($b, ['golden retriever']) && $isPuppy) {
-      $lines[] = '• COLOR: rich golden — more saturated than puppy.';
-      if ($targetYears === 3) {
-        $lines[] = '• COAT: full adult waves with prominent feathering — chest, belly, legs, tail.';
-      }
-    }
-    if ($this->mb($b, ['labrador', 'lab']) && $isPuppy) {
-      $lines[] = '• TAIL: thick otter-tail (thick at base, tapers) — prominent and distinctive.';
-      $lines[] = '• HEAD: broad blocky lab head with soft eyes.';
-      $lines[] = '• BUILD: stocky and powerful.';
-    }
-    if ($this->mb($b, ['dachshund', 'doxie', 'wiener', 'weiner', 'sausage'])) {
-      $lines[] = '• BODY SHAPE: dramatically elongated sausage shape — NOT tall. Tiny legs, very long torso.';
-      $lines[] = '• The body gets LONGER with age, not taller.';
-    }
-    if ($this->mb($b, ['corgi', 'pembroke', 'cardigan'])) {
-      $lines[] = '• EARS: FULLY ERECT large pointed bat-like ears — both standing straight up.';
-      $lines[] = '• BODY: long torso on SHORT legs — legs stay short, body is long.';
-    }
-    if ($this->mb($b, ['poodle'])) {
-      if ($isPuppy) {
-        $lines[] = '• COAT: TIGHT DENSE UNIFORM CURLS covering entire body — no puppy fluff remaining.';
-        $lines[] = '• The coat is the single biggest transformation — from wispy to voluminous curls.';
-      }
-    }
-    if ($this->mb($b, ['husky', 'malamute', 'samoyed']) && $isPuppy) {
-      $lines[] = '• COAT: thick plush double coat — much more voluminous than puppy.';
-      $lines[] = '• RUFF: thick mane visible around neck.';
-      $lines[] = '• MASK: facial markings more intensely defined.';
-    }
-    if ($this->mb($b, ['beagle']) && $isPuppy) {
-      $lines[] = '• TRICOLOR: black saddle deeper, tan points sharper, white brighter — all more defined.';
-      $lines[] = '• EARS: longer and more pendulous than puppy.';
-    }
-    if ($this->mb($b, ['boxer'])) {
-      if ($isPuppy) {
-        $lines[] = '• FLAT FACE: unchanged — do NOT elongate muzzle.';
-        $lines[] = '• CHEST: massively broad barrel chest.';
-        $lines[] = '• WRINKLES: deep forehead wrinkles on broad flat head.';
-      }
-    }
-    if ($this->mb($b, ['pug'])) {
-      if ($isPuppy) {
-        $lines[] = '• WRINKLES: deep forehead folds multiply — this is the adult pug face.';
-        $lines[] = '• EYES: large round prominent eyes.';
-        $lines[] = '• BODY: cobby compact square shape.';
-        $lines[] = '• TAIL: tight double-curl.';
-      }
-    }
-    if ($this->mb($b, ['chihuahua'])) {
-      if ($isPuppy) {
-        $lines[] = '• SKULL: classic APPLE-DOME — round, prominent.';
-        $lines[] = '• EARS: LARGE ERECT pointed ears — both fully upright.';
-        $lines[] = '• EYES: proportionally very large and round.';
-      }
-    }
-    if ($this->mb($b, ['shiba inu', 'shiba'])) {
-      if ($isPuppy) {
-        $lines[] = '• EARS: fully erect, rigid, pointed.';
-        $lines[] = '• TAIL: tightly curled over back.';
-        $lines[] = '• COAT: dense plush double coat — much denser than puppy.';
-        $lines[] = '• COLOR: rich red/black-and-tan/sesame — intensified adult coloring.';
-      }
-    }
-    if ($this->mb($b, ['aspin', 'asong pinoy', 'philippine', 'village dog', 'street dog', 'mixed breed', 'mutt', 'mixed'])) {
-      if ($isPuppy) {
-        $lines[] = '• BODY: lean athletic native dog — visible tuck-up at abdomen.';
-        $lines[] = '• EARS: semi-erect or erect — settled in adult position.';
-        $lines[] = '• COAT: tight short sleek adult coat. Lean primitive pariah-dog silhouette.';
-      }
-      if ($targetYears >= 1 && !$isPuppy) {
-        $lines[] = '• Lean athletic medium build — coat colors/markings same as source.';
-        if ($targetYears === 3) {
-          $lines[] = '• Slight graying at muzzle tip. More settled, experienced expression.';
-        }
-      }
-    }
-
-    return $lines;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────
-  //  IMAGE PREPARATION — UPSCALE SMALL IMAGES
-  // ─────────────────────────────────────────────────────────────────────
+  private function _REMOVED_buildOutputDescription(array $profile, string $ageStage, int $targetYears): array { return []; }
+  private function _REMOVED_getBreedSpecificOutputLines(array $profile, string $ageStage, int $targetYears): array { return []; }
 
   private function prepareImage(string $fullPath): ?array
   {
@@ -1155,7 +768,7 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  COMPREHENSIVE BREED PROFILES
+  //  COMPREHENSIVE BREED PROFILES — all intact, unchanged
   // ─────────────────────────────────────────────────────────────────────
 
   private function getBreedProfile(string $breed): array
@@ -1173,130 +786,59 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       'adult_size_description'   => 'A medium-sized adult dog with well-developed musculature and a fully settled adult coat.',
     ];
 
-    // ── GIANT BREEDS ──────────────────────────────────────────────────
-    if ($this->mb($b, [
-      'great dane',
-      'irish wolfhound',
-      'saint bernard',
-      'newfoundland',
-      'leonberger',
-      'mastiff',
-      'great pyrenees',
-      'anatolian',
-      'kangal',
-      'caucasian',
-      'tibetan mastiff',
-      'boerboel',
-      'cane corso',
-      'dogue de bordeaux',
-      'french mastiff',
-      'neapolitan mastiff',
-      'broholmer',
-      'moscow watchdog'
-    ])) {
+    if ($this->mb($b, ['great dane','irish wolfhound','saint bernard','newfoundland','leonberger','mastiff','great pyrenees','anatolian','kangal','caucasian','tibetan mastiff','boerboel','cane corso','dogue de bordeaux','french mastiff','neapolitan mastiff','broholmer','moscow watchdog'])) {
       $profile['size_category']        = 'giant';
       $profile['height_change']        = 'dramatic_increase';
       $profile['adult_size_description'] = 'One of the largest dog breeds — a towering, massively built adult standing 28–35 inches tall with enormous bone structure, broad skull, and imposing physical presence.';
-      $profile['brachycephalic']       = $this->mb($b, ['mastiff', 'saint bernard', 'leonberger', 'cane corso', 'dogue', 'neapolitan', 'broholmer']);
-    }
-
-    // ── WORKING/SHEPHERD LARGE ────────────────────────────────────────
-    elseif ($this->mb($b, [
-      'german shepherd',
-      'gsd',
-      'alsatian',
-      'belgian malinois',
-      'dutch shepherd',
-      'belgian tervuren',
-      'belgian laekenois',
-      'belgian shepherd'
-    ])) {
+      $profile['brachycephalic']       = $this->mb($b, ['mastiff','saint bernard','leonberger','cane corso','dogue','neapolitan','broholmer']);
+    } elseif ($this->mb($b, ['german shepherd','gsd','alsatian','belgian malinois','dutch shepherd','belgian tervuren','belgian laekenois','belgian shepherd'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'double_coat';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'A powerful, athletic dog standing 22–26 inches — wolf-like, lean-muscled, with dense double coat, perfectly erect ears, and long confident stride.';
-    }
-
-    // ── NORDIC/SPITZ ──────────────────────────────────────────────────
-    elseif ($this->mb($b, [
-      'siberian husky',
-      'husky',
-      'alaskan malamute',
-      'malamute',
-      'samoyed',
-      'akita',
-      'shiba inu',
-      'shiba',
-      'chow chow',
-      'keeshond',
-      'spitz',
-      'american akita',
-      'japanese akita'
-    ])) {
-      $isLarge = $this->mb($b, ['malamute', 'akita', 'american akita', 'chow chow']);
+    } elseif ($this->mb($b, ['siberian husky','husky','alaskan malamute','malamute','samoyed','akita','shiba inu','shiba','chow chow','keeshond','spitz','american akita','japanese akita'])) {
+      $isLarge = $this->mb($b, ['malamute','akita','american akita','chow chow']);
       $profile['size_category'] = $isLarge ? 'large' : 'medium';
       $profile['coat_type']     = 'double_coat';
       $profile['body_shape']    = 'spitz';
       $profile['height_change'] = $isLarge ? 'large_increase' : 'moderate_increase';
       $profile['adult_size_description'] = 'A Nordic-type dog with thick plush double coat, erect pointed ears, curled tail over back, and compact powerful build.';
-    }
-
-    // ── RETRIEVERS ────────────────────────────────────────────────────
-    elseif ($this->mb($b, ['golden retriever'])) {
+    } elseif ($this->mb($b, ['golden retriever'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'long_silky';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'A large well-proportioned dog with thick golden flowing coat, broad head, soft intelligent eyes, deep chest, and feathering on legs, chest, and tail.';
-    } elseif ($this->mb($b, ['labrador retriever', 'labrador', 'lab'])) {
+    } elseif ($this->mb($b, ['labrador retriever','labrador','lab'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'short';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'A large athletic dog with broad otter-like tail, dense short coat, broad head, deep chest, and powerful stocky build.';
-    } elseif ($this->mb($b, ['flat-coated retriever', 'flat coated', 'chesapeake bay'])) {
+    } elseif ($this->mb($b, ['flat-coated retriever','flat coated','chesapeake bay'])) {
       $profile['size_category']  = 'large';
       $profile['coat_type']      = 'long_silky';
       $profile['height_change']  = 'large_increase';
-    }
-
-    // ── POODLES ───────────────────────────────────────────────────────
-    elseif ($this->mb($b, ['standard poodle', 'miniature poodle', 'toy poodle', 'poodle'])) {
+    } elseif ($this->mb($b, ['standard poodle','miniature poodle','toy poodle','poodle'])) {
       $isStandard = $this->mb($b, ['standard']);
-      $isMini     = $this->mb($b, ['miniature', 'mini']);
+      $isMini     = $this->mb($b, ['miniature','mini']);
       $isToy      = $this->mb($b, ['toy']);
       $profile['size_category'] = $isStandard ? 'large' : ($isMini ? 'small' : ($isToy ? 'toy' : 'medium'));
       $profile['coat_type']     = 'curly';
       $profile['height_change'] = $isStandard ? 'large_increase' : ($isMini ? 'moderate_increase' : 'none');
-      $profile['adult_size_description'] = $isStandard
-        ? 'A tall elegant dog 21–27 inches — athletic with a long refined head and tight curly coat.'
-        : 'A compact poodle with dense curly coat and refined build.';
-    }
-
-    // ── DOODLES ───────────────────────────────────────────────────────
-    elseif ($this->mb($b, [
-      'goldendoodle',
-      'labradoodle',
-      'bernedoodle',
-      'aussiedoodle',
-      'sheepadoodle',
-      'newfypoo',
-      'pyredoodle'
-    ])) {
-      $isLarge = $this->mb($b, ['standard', 'bernedoodle', 'sheepadoodle', 'newfypoo', 'pyredoodle']);
+      $profile['adult_size_description'] = $isStandard ? 'A tall elegant dog 21–27 inches — athletic with a long refined head and tight curly coat.' : 'A compact poodle with dense curly coat and refined build.';
+    } elseif ($this->mb($b, ['goldendoodle','labradoodle','bernedoodle','aussiedoodle','sheepadoodle','newfypoo','pyredoodle'])) {
+      $isLarge = $this->mb($b, ['standard','bernedoodle','sheepadoodle','newfypoo','pyredoodle']);
       $profile['size_category'] = $isLarge ? 'large' : 'medium';
       $profile['coat_type']     = 'wavy_curly';
       $profile['height_change'] = $isLarge ? 'large_increase' : 'moderate_increase';
-    } elseif ($this->mb($b, ['cockapoo', 'cavapoo', 'maltipoo', 'schnoodle', 'yorkipoo'])) {
+    } elseif ($this->mb($b, ['cockapoo','cavapoo','maltipoo','schnoodle','yorkipoo'])) {
       $profile['size_category'] = 'small';
       $profile['coat_type']     = 'wavy_curly';
       $profile['height_change'] = 'none';
-    }
-
-    // ── MOLOSSER / POWERFUL ───────────────────────────────────────────
-    elseif ($this->mb($b, ['rottweiler', 'rottie'])) {
+    } elseif ($this->mb($b, ['rottweiler','rottie'])) {
       $profile['size_category']        = 'large';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Massive blocky head with broad flat skull, prominent tan/mahogany points on black coat, thick heavily-muscled neck, broad chest.';
-    } elseif ($this->mb($b, ['doberman', 'dobermann'])) {
+    } elseif ($this->mb($b, ['doberman','dobermann'])) {
       $profile['size_category']        = 'large';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Sleek athletic — long elegant neck, square body, sleek short coat showing every muscle, elegant pointed head with rust markings.';
@@ -1305,111 +847,85 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       $profile['brachycephalic']  = true;
       $profile['height_change']   = 'large_increase';
       $profile['adult_size_description'] = 'Muscular square-built dog with broad brachycephalic head, undershot jaw with prominent flews, fawn or brindle short coat.';
-    } elseif ($this->mb($b, [
-      'pit bull',
-      'pitbull',
-      'american pit bull',
-      'american staffordshire',
-      'amstaff',
-      'american bully'
-    ])) {
+    } elseif ($this->mb($b, ['pit bull','pitbull','american pit bull','american staffordshire','amstaff','american bully'])) {
       $profile['size_category']        = 'medium';
       $profile['height_change']        = 'moderate_increase';
       $profile['adult_size_description'] = 'Incredibly muscular — broad blocky head, powerful neck and chest, extreme muscle striations, smooth short coat.';
-    } elseif ($this->mb($b, ['staffordshire bull terrier', 'staffy', 'staffie'])) {
+    } elseif ($this->mb($b, ['staffordshire bull terrier','staffy','staffie'])) {
       $profile['size_category'] = 'medium';
       $profile['height_change'] = 'moderate_increase';
-    } elseif ($this->mb($b, ['bull terrier', 'english bull terrier'])) {
-      $isMini = $this->mb($b, ['miniature', 'mini']);
+    } elseif ($this->mb($b, ['bull terrier','english bull terrier'])) {
+      $isMini = $this->mb($b, ['miniature','mini']);
       $profile['size_category'] = $isMini ? 'small' : 'medium';
       $profile['height_change'] = $isMini ? 'minimal_increase' : 'moderate_increase';
       $profile['adult_size_description'] = 'Unique egg-shaped head — completely flat on top, curved from crown to nose tip. Muscular powerful body.';
-    }
-
-    // ── SIGHTHOUNDS ───────────────────────────────────────────────────
-    elseif ($this->mb($b, [
-      'whippet',
-      'greyhound',
-      'italian greyhound',
-      'saluki',
-      'afghan hound',
-      'borzoi',
-      'azawakh',
-      'pharaoh hound',
-      'ibizan hound'
-    ])) {
-      $isLongCoat = $this->mb($b, ['afghan hound', 'borzoi', 'saluki']);
+    } elseif ($this->mb($b, ['whippet','greyhound','italian greyhound','saluki','afghan hound','borzoi','azawakh','pharaoh hound','ibizan hound'])) {
+      $isLongCoat = $this->mb($b, ['afghan hound','borzoi','saluki']);
       $profile['size_category'] = $this->mb($b, ['italian greyhound']) ? 'small' : 'medium';
       $profile['body_shape']    = 'sighthound';
       $profile['coat_type']     = $isLongCoat ? 'long_silky' : 'short';
       $profile['height_change'] = 'large_increase';
       $profile['adult_size_description'] = 'Ultimate athletic dog — aerodynamic silhouette with extreme deep chest tuck, long neck, narrow refined head, extraordinary lean physique.';
-    }
-
-    // ── FRENCH BULLDOG / BRACHYCEPHALIC SMALL ────────────────────────
-    elseif ($this->mb($b, ['french bulldog', 'frenchie'])) {
-      $profile['size_category'] = 'small';
+    } elseif ($this->mb($b, ['french bulldog','frenchie'])) {
+      $profile['size_category']  = 'small';
       $profile['brachycephalic'] = true;
-      $profile['height_change'] = 'none';
+      $profile['height_change']  = 'none';
       $profile['adult_size_description'] = 'Compact muscular small dog with extremely flat face, large bat-like ears, stocky barrel body, screw tail.';
-    } elseif ($this->mb($b, ['english bulldog', 'british bulldog', 'bulldog'])) {
-      $profile['size_category'] = 'medium';
+    } elseif ($this->mb($b, ['english bulldog','british bulldog','bulldog'])) {
+      $profile['size_category']  = 'medium';
       $profile['brachycephalic'] = true;
-      $profile['height_change'] = 'minimal_increase';
+      $profile['height_change']  = 'minimal_increase';
       $profile['adult_size_description'] = 'Massively built — enormous head with hanging flews and deep wrinkles, massive chest on short bowed legs.';
     } elseif ($this->mb($b, ['pug'])) {
-      $profile['size_category'] = 'small';
+      $profile['size_category']  = 'small';
       $profile['brachycephalic'] = true;
-      $profile['height_change'] = 'none';
+      $profile['height_change']  = 'none';
       $profile['adult_size_description'] = 'Small compact dog with extremely wrinkled flat face, large round eyes, cobby square body.';
     } elseif ($this->mb($b, ['boston terrier'])) {
-      $profile['size_category'] = 'small';
+      $profile['size_category']  = 'small';
       $profile['brachycephalic'] = true;
-      $profile['height_change'] = 'none';
+      $profile['height_change']  = 'none';
       $profile['adult_size_description'] = 'Compact tuxedo dog with bat ears, flat face, and athletic compact build.';
-    } elseif ($this->mb($b, ['chinese shar pei', 'shar pei'])) {
-      $profile['size_category'] = 'medium';
+    } elseif ($this->mb($b, ['chinese shar pei','shar pei'])) {
+      $profile['size_category']  = 'medium';
       $profile['brachycephalic'] = true;
-      $profile['height_change'] = 'moderate_increase';
+      $profile['height_change']  = 'moderate_increase';
       $profile['adult_size_description'] = 'Square dog with extraordinarily loose wrinkled skin, small hippo-like head, blue-black tongue.';
     } elseif ($this->mb($b, ['shih tzu'])) {
-      $profile['size_category'] = 'small';
+      $profile['size_category']  = 'small';
       $profile['brachycephalic'] = true;
-      $profile['coat_type']     = 'long_silky';
-      $profile['height_change'] = 'none';
-    }
-
-    // ── TOY / SMALL COMPANION ─────────────────────────────────────────
-    elseif ($this->mb($b, ['yorkshire terrier', 'yorkie'])) {
-      $profile['size_category'] = 'toy';
-      $profile['coat_type']     = 'long_silky';
-      $profile['height_change'] = 'none';
+      $profile['coat_type']      = 'long_silky';
+      $profile['height_change']  = 'none';
+    } elseif ($this->mb($b, ['yorkshire terrier','yorkie'])) {
+      $profile['size_category']        = 'toy';
+      $profile['coat_type']            = 'long_silky';
+      $profile['height_change']        = 'none';
       $profile['adult_size_description'] = 'Tiny dog with long, fine, silky STEEL-BLUE and TAN coat, perfectly erect small V-shaped ears.';
     } elseif ($this->mb($b, ['maltese'])) {
-      $profile['size_category'] = 'toy';
-      $profile['coat_type']     = 'long_silky';
-      $profile['height_change'] = 'none';
+      $profile['size_category']        = 'toy';
+      $profile['coat_type']            = 'long_silky';
+      $profile['height_change']        = 'none';
       $profile['adult_size_description'] = 'Tiny all-white dog completely covered in flowing, silky, pure white coat that reaches the ground.';
     } elseif ($this->mb($b, ['chihuahua'])) {
-      $isLongCoat = $this->mb($b, ['long coat', 'longhaired', 'long hair']);
-      $profile['size_category'] = 'toy';
-      $profile['coat_type']     = $isLongCoat ? 'long_silky' : 'short';
-      $profile['height_change'] = 'none';
+      $isLongCoat = $this->mb($b, ['long coat','longhaired','long hair']);
+      $profile['size_category']        = 'toy';
+      $profile['coat_type']            = $isLongCoat ? 'long_silky' : 'short';
+      $profile['height_change']        = 'none';
       $profile['adult_size_description'] = "World's smallest breed — apple-domed skull, large prominent eyes, large erect ears.";
     } elseif ($this->mb($b, ['pomeranian'])) {
-      $profile['size_category'] = 'toy';
-      $profile['coat_type']     = 'double_coat';
-      $profile['height_change'] = 'none';
+      $profile['size_category']        = 'toy';
+      $profile['coat_type']            = 'double_coat';
+      $profile['height_change']        = 'none';
       $profile['adult_size_description'] = 'Tiny fluffy lion-like dog with enormous stand-off double coat, foxy face, tiny erect ears, plumed tail.';
-    } elseif ($this->mb($b, ['cavalier king charles', 'cavalier'])) {
+    } elseif ($this->mb($b, ['cavalier king charles','cavalier'])) {
       $profile['size_category'] = 'small';
       $profile['coat_type']     = 'long_silky';
       $profile['height_change'] = 'minimal_increase';
-    } elseif ($this->mb($b, ['bichon frise', 'bichon'])) {
+    } elseif ($this->mb($b, ['bichon frise','bichon'])) {
       $profile['size_category'] = 'small';
       $profile['coat_type']     = 'curly';
       $profile['height_change'] = 'none';
-    } elseif ($this->mb($b, ['havanese', 'coton de tulear', 'bolognese'])) {
+    } elseif ($this->mb($b, ['havanese','coton de tulear','bolognese'])) {
       $profile['size_category'] = 'small';
       $profile['coat_type']     = 'long_silky';
       $profile['height_change'] = 'none';
@@ -1421,74 +937,54 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       $profile['size_category'] = 'toy';
       $profile['coat_type']     = 'long_silky';
       $profile['height_change'] = 'none';
-    }
-
-    // ── LONG AND LOW ──────────────────────────────────────────────────
-    elseif ($this->mb($b, ['corgi', 'pembroke', 'cardigan'])) {
-      $profile['size_category'] = 'small';
-      $profile['body_shape']    = 'long_low';
-      $profile['coat_type']     = 'double_coat';
-      $profile['height_change'] = 'minimal_increase';
+    } elseif ($this->mb($b, ['corgi','pembroke','cardigan'])) {
+      $profile['size_category']        = 'small';
+      $profile['body_shape']           = 'long_low';
+      $profile['coat_type']            = 'double_coat';
+      $profile['height_change']        = 'minimal_increase';
       $profile['adult_size_description'] = 'Long low dog with short powerful legs, very long muscular torso, large upright bat-like ears, foxy face.';
-    } elseif ($this->mb($b, ['dachshund', 'doxie', 'sausage dog', 'wiener', 'weiner'])) {
-      $isLong = $this->mb($b, ['long', 'longhaired', 'long-haired']);
-      $isWire = $this->mb($b, ['wire', 'wirehaired', 'wire-haired']);
-      $isMini = $this->mb($b, ['mini', 'miniature']);
-      $profile['size_category'] = $isMini ? 'toy' : 'small';
-      $profile['body_shape']    = 'long_low';
-      $profile['coat_type']     = $isLong ? 'long_silky' : ($isWire ? 'wire_harsh' : 'short');
-      $profile['height_change'] = 'none';
+    } elseif ($this->mb($b, ['dachshund','doxie','sausage dog','wiener','weiner'])) {
+      $isLong = $this->mb($b, ['long','longhaired','long-haired']);
+      $isWire = $this->mb($b, ['wire','wirehaired','wire-haired']);
+      $isMini = $this->mb($b, ['mini','miniature']);
+      $profile['size_category']        = $isMini ? 'toy' : 'small';
+      $profile['body_shape']           = 'long_low';
+      $profile['coat_type']            = $isLong ? 'long_silky' : ($isWire ? 'wire_harsh' : 'short');
+      $profile['height_change']        = 'none';
       $profile['adult_size_description'] = 'The ultimate long-and-low sausage dog — dramatically elongated body on tiny short legs.';
-    } elseif ($this->mb($b, ['basset hound', 'basset'])) {
-      $profile['size_category'] = 'medium';
-      $profile['body_shape']    = 'long_low';
-      $profile['height_change'] = 'minimal_increase';
+    } elseif ($this->mb($b, ['basset hound','basset'])) {
+      $profile['size_category']        = 'medium';
+      $profile['body_shape']           = 'long_low';
+      $profile['height_change']        = 'minimal_increase';
       $profile['adult_size_description'] = 'Extremely heavy, low-slung — enormously long velvety ears, deeply wrinkled skin, large soulful eyes, heavy bone.';
-    }
-
-    // ── SCHNAUZERS ────────────────────────────────────────────────────
-    elseif ($this->mb($b, ['giant schnauzer', 'standard schnauzer', 'miniature schnauzer', 'schnauzer'])) {
+    } elseif ($this->mb($b, ['giant schnauzer','standard schnauzer','miniature schnauzer','schnauzer'])) {
       $isGiant = $this->mb($b, ['giant']);
-      $isMini  = $this->mb($b, ['miniature', 'mini']);
+      $isMini  = $this->mb($b, ['miniature','mini']);
       $profile['size_category'] = $isGiant ? 'large' : ($isMini ? 'small' : 'medium');
       $profile['coat_type']     = 'wire_harsh';
       $profile['height_change'] = $isGiant ? 'large_increase' : ($isMini ? 'none' : 'moderate_increase');
-    }
-
-    // ── TERRIERS ──────────────────────────────────────────────────────
-    elseif ($this->mb($b, ['jack russell', 'parson russell', 'russell terrier'])) {
+    } elseif ($this->mb($b, ['jack russell','parson russell','russell terrier'])) {
       $profile['size_category'] = 'small';
-      $profile['coat_type']     = $this->mb($b, ['wire', 'rough']) ? 'wire_harsh' : 'short';
+      $profile['coat_type']     = $this->mb($b, ['wire','rough']) ? 'wire_harsh' : 'short';
       $profile['height_change'] = 'minimal_increase';
-    } elseif ($this->mb($b, [
-      'west highland',
-      'westie',
-      'cairn terrier',
-      'scottish terrier',
-      'scottie',
-      'border terrier',
-      'norfolk terrier'
-    ])) {
+    } elseif ($this->mb($b, ['west highland','westie','cairn terrier','scottish terrier','scottie','border terrier','norfolk terrier'])) {
       $profile['size_category'] = 'small';
       $profile['coat_type']     = 'wire_harsh';
       $profile['height_change'] = 'minimal_increase';
-    } elseif ($this->mb($b, ['airedale terrier', 'airedale'])) {
+    } elseif ($this->mb($b, ['airedale terrier','airedale'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'wire_harsh';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Largest terrier — tall, athletic, black-and-tan wire coat, long flat rectangular head, distinctive beard.';
-    } elseif ($this->mb($b, ['soft coated wheaten terrier', 'wheaten'])) {
+    } elseif ($this->mb($b, ['soft coated wheaten terrier','wheaten'])) {
       $profile['size_category'] = 'medium';
       $profile['coat_type']     = 'wavy_curly';
       $profile['height_change'] = 'moderate_increase';
-    }
-
-    // ── HOUNDS ────────────────────────────────────────────────────────
-    elseif ($this->mb($b, ['beagle'])) {
+    } elseif ($this->mb($b, ['beagle'])) {
       $profile['size_category']        = 'small';
       $profile['height_change']        = 'moderate_increase';
       $profile['adult_size_description'] = 'Compact sturdy scent hound — tricolor, square hound head, long pendulous soft ears, deep chest.';
-    } elseif ($this->mb($b, ['bloodhound', 'coonhound', 'redbone', 'treeing walker', 'plott hound'])) {
+    } elseif ($this->mb($b, ['bloodhound','coonhound','redbone','treeing walker','plott hound'])) {
       $profile['size_category'] = 'large';
       $profile['height_change'] = 'large_increase';
     } elseif ($this->mb($b, ['rhodesian ridgeback'])) {
@@ -1501,32 +997,26 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       $profile['coat_type']     = 'short';
       $profile['height_change'] = 'large_increase';
       $profile['adult_size_description'] = 'Lean athletic white dog with bold black/liver spots, deep chest, elegant build.';
-    }
-
-    // ── HERDING / SPORTING ────────────────────────────────────────────
-    elseif ($this->mb($b, ['border collie', 'australian shepherd', 'aussie'])) {
+    } elseif ($this->mb($b, ['border collie','australian shepherd','aussie'])) {
       $profile['size_category'] = 'medium';
       $profile['coat_type']     = 'double_coat';
       $profile['height_change'] = 'moderate_increase';
-    } elseif ($this->mb($b, ['collie', 'rough collie', 'sheltie', 'shetland sheepdog'])) {
-      $isSheltie = $this->mb($b, ['sheltie', 'shetland']);
-      $profile['size_category'] = $isSheltie ? 'small' : 'large';
-      $profile['coat_type']     = 'long_silky';
-      $profile['height_change'] = $isSheltie ? 'moderate_increase' : 'large_increase';
+    } elseif ($this->mb($b, ['collie','rough collie','sheltie','shetland sheepdog'])) {
+      $isSheltie = $this->mb($b, ['sheltie','shetland']);
+      $profile['size_category']        = $isSheltie ? 'small' : 'large';
+      $profile['coat_type']            = 'long_silky';
+      $profile['height_change']        = $isSheltie ? 'moderate_increase' : 'large_increase';
       $profile['adult_size_description'] = 'Strikingly elegant with long flowing mane and frill, narrow aristocratic head, rich sable/tricolor/merle coat.';
-    } elseif ($this->mb($b, ['australian cattle dog', 'blue heeler', 'red heeler'])) {
+    } elseif ($this->mb($b, ['australian cattle dog','blue heeler','red heeler'])) {
       $profile['size_category'] = 'medium';
       $profile['coat_type']     = 'short';
       $profile['height_change'] = 'moderate_increase';
-    } elseif ($this->mb($b, ['bernese mountain dog', 'berner'])) {
+    } elseif ($this->mb($b, ['bernese mountain dog','berner'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'long_silky';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Large, sturdy tricolor mountain dog — black body with rust/tan points and white blaze/chest/paws.';
-    }
-
-    // ── POINTERS / GUN DOGS ───────────────────────────────────────────
-    elseif ($this->mb($b, ['vizsla', 'hungarian vizsla'])) {
+    } elseif ($this->mb($b, ['vizsla','hungarian vizsla'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'short';
       $profile['height_change']        = 'large_increase';
@@ -1536,50 +1026,35 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
       $profile['coat_type']            = 'short';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Sleek silver-grey ghost dog — long elegant neck, deep chest, tucked abdomen, pale grey eyes.';
-    } elseif ($this->mb($b, ['german shorthaired pointer', 'german wirehaired pointer', 'english pointer', 'pointer'])) {
-      $isWire = $this->mb($b, ['wirehaired', 'wire']);
+    } elseif ($this->mb($b, ['german shorthaired pointer','german wirehaired pointer','english pointer','pointer'])) {
+      $isWire = $this->mb($b, ['wirehaired','wire']);
       $profile['size_category'] = 'large';
       $profile['coat_type']     = $isWire ? 'wire_harsh' : 'short';
       $profile['height_change'] = 'large_increase';
-    } elseif ($this->mb($b, ['bracco italiano', 'italian pointer'])) {
+    } elseif ($this->mb($b, ['bracco italiano','italian pointer'])) {
       $profile['size_category']        = 'large';
       $profile['coat_type']            = 'short';
       $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'A large noble hunting dog — pendulous long ears, slightly loose jowl skin, strong athletic build, deep-chested with visible musculature.';
-    } elseif ($this->mb($b, ['irish setter', 'english setter', 'gordon setter', 'setter'])) {
+    } elseif ($this->mb($b, ['irish setter','english setter','gordon setter','setter'])) {
       $profile['size_category'] = 'large';
       $profile['coat_type']     = 'long_silky';
       $profile['height_change'] = 'large_increase';
-    } elseif ($this->mb($b, ['cocker spaniel', 'english cocker', 'american cocker'])) {
+    } elseif ($this->mb($b, ['cocker spaniel','english cocker','american cocker'])) {
       $profile['size_category']        = 'medium';
       $profile['coat_type']            = 'long_silky';
       $profile['height_change']        = 'moderate_increase';
       $profile['adult_size_description'] = 'Compact spaniel with long luxurious silky coat and feathering, long pendulous ears framing a domed head.';
-    }
-
-    // ── OLD ENGLISH / BOUVIER ─────────────────────────────────────────
-    elseif ($this->mb($b, ['old english sheepdog', 'oes', 'bobtail'])) {
-      $profile['size_category'] = 'large';
-      $profile['coat_type']     = 'wavy_curly';
-      $profile['height_change'] = 'large_increase';
+    } elseif ($this->mb($b, ['old english sheepdog','oes','bobtail'])) {
+      $profile['size_category']        = 'large';
+      $profile['coat_type']            = 'wavy_curly';
+      $profile['height_change']        = 'large_increase';
       $profile['adult_size_description'] = 'Large shaggy dog completely covered in thick profuse grey-and-white coat — even face and eyes covered.';
-    } elseif ($this->mb($b, ['bouvier des flandres', 'bouvier', 'briard'])) {
+    } elseif ($this->mb($b, ['bouvier des flandres','bouvier','briard'])) {
       $profile['size_category'] = 'large';
       $profile['coat_type']     = 'wire_harsh';
       $profile['height_change'] = 'large_increase';
-    }
-
-    // ── NATIVE / MIXED ────────────────────────────────────────────────
-    elseif ($this->mb($b, [
-      'aspin',
-      'asong pinoy',
-      'philippine native',
-      'village dog',
-      'street dog',
-      'mixed breed',
-      'mutt',
-      'mixed'
-    ])) {
+    } elseif ($this->mb($b, ['aspin','asong pinoy','philippine native','village dog','street dog','mixed breed','mutt','mixed'])) {
       $profile['size_category']        = 'medium';
       $profile['height_change']        = 'moderate_increase';
       $profile['adult_size_description'] = 'Lean athletic medium dog with smooth short coat, semi-erect or erect ears, sickle tail, and the lithe build of a primitive pariah dog.';
@@ -1600,67 +1075,80 @@ $this->updateStatus($result, $finalStatus, $savedPaths, $breedProfile);
     return false;
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  //  AGE PROFILES — FIX 2: sanitize control characters before json_decode
+  // ─────────────────────────────────────────────────────────────────────
+
   private function generateAgeProfiles(array $breedProfile): array
-    {
-        $breed    = $breedProfile['breed'];
-        $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
- 
-        $prompt = "You are a veterinary expert. For a {$breed} dog, provide accurate physical characteristics at 1 year old and 3 years old.
- 
+  {
+    $breed    = $breedProfile['breed'];
+    $apiKey   = config('services.gemini.api_key') ?? env('GEMINI_API_KEY');
+    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+
+    $prompt = "You are a veterinary expert. For a {$breed} dog, provide accurate physical characteristics at 1 year old and 3 years old.
+
 Return ONLY a valid JSON object — no markdown, no explanation, no extra text. Just the raw JSON:
 {
   \"1_year\": {
     \"weight\": {\"male\": \"e.g. 18-22 lbs (8-10 kg)\", \"female\": \"e.g. 15-19 lbs (7-9 kg)\"},
     \"height\": {\"male\": \"e.g. 12-14 inches (30-36 cm)\", \"female\": \"e.g. 11-13 inches (28-33 cm)\"},
     \"visual_features\": [
-      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 1 year (e.g. Dense adult coat forming)\"},
-      {\"label\": \"Coat Color\", \"value\": \"Describe how color looks at 1 year (e.g. Richer, more defined)\"},
-      {\"label\": \"Body Build\", \"value\": \"Describe physique at 1 year (e.g. Lean adolescent, filling out)\"},
-      {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 1 year (e.g. Fully settled adult ears)\"},
-      {\"label\": \"Tail\",       \"value\": \"Describe tail at 1 year (e.g. Full length, adult curl)\"}
+      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 1 year\"},
+      {\"label\": \"Coat Color\", \"value\": \"Describe how color looks at 1 year\"},
+      {\"label\": \"Body Build\", \"value\": \"Describe physique at 1 year\"},
+      {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 1 year\"},
+      {\"label\": \"Tail\",       \"value\": \"Describe tail at 1 year\"}
     ]
   },
   \"3_years\": {
     \"weight\": {\"male\": \"e.g. 20-26 lbs (9-12 kg)\", \"female\": \"e.g. 17-22 lbs (8-10 kg)\"},
     \"height\": {\"male\": \"e.g. 13-15 inches (33-38 cm)\", \"female\": \"e.g. 12-14 inches (30-36 cm)\"},
     \"visual_features\": [
-      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 3 years (e.g. Full dense prime adult coat)\"},
-      {\"label\": \"Coat Color\", \"value\": \"Describe color at 3 years (e.g. Deep and fully saturated)\"},
-      {\"label\": \"Body Build\", \"value\": \"Describe physique at 3 years (e.g. Peak muscle development)\"},
+      {\"label\": \"Coat Type\",  \"value\": \"Describe coat texture at 3 years\"},
+      {\"label\": \"Coat Color\", \"value\": \"Describe color at 3 years\"},
+      {\"label\": \"Body Build\", \"value\": \"Describe physique at 3 years\"},
       {\"label\": \"Ear Shape\",  \"value\": \"Describe ears at 3 years\"},
       {\"label\": \"Tail\",       \"value\": \"Describe tail at 3 years\"}
     ]
   }
 }";
- 
-        $payload = [
-            'contents'         => [['parts' => [['text' => $prompt]]]],
-            'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 900],
-        ];
- 
-        $client   = new Client(['timeout' => 30]);
-        $response = $client->post($endpoint, [
-            'json'    => $payload,
-            'headers' => ['Content-Type' => 'application/json'],
-        ]);
- 
-        $data = json_decode($response->getBody()->getContents(), true);
-        $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
- 
-        // Strip any markdown fences Gemini might add
-        $text = preg_replace('/^```json\s*/i', '', $text);
-        $text = preg_replace('/^```\s*/i',     '', $text);
-        $text = preg_replace('/\s*```$/i',     '', $text);
-        $text = trim($text);
- 
-        $parsed = json_decode($text, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Invalid JSON from Gemini age profiles: ' . json_last_error_msg());
-        }
- 
-        return $parsed;
+
+    $payload = [
+      'contents'         => [['parts' => [['text' => $prompt]]]],
+      'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 900],
+    ];
+
+    $client   = new Client(['timeout' => 30]);
+    $response = $client->post($endpoint, [
+      'json'    => $payload,
+      'headers' => ['Content-Type' => 'application/json'],
+    ]);
+
+    $data = json_decode($response->getBody()->getContents(), true);
+    $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
+
+    // Strip markdown fences
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/^```\s*/i',     '', $text);
+    $text = preg_replace('/\s*```$/i',     '', $text);
+    $text = trim($text);
+
+    // ── FIX 2: Remove control characters that break json_decode ──────
+    // Gemini occasionally returns unescaped newlines/tabs inside strings
+    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
+
+    $parsed = json_decode($text, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+      // Last resort: try to clean further and retry
+      $text   = preg_replace('/\r\n|\r|\n/', ' ', $text);
+      $parsed = json_decode($text, true);
+      if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new \Exception('Invalid JSON from Gemini age profiles: ' . json_last_error_msg());
+      }
     }
+
+    return $parsed;
+  }
 
   // ─────────────────────────────────────────────────────────────────────
   //  STATUS UPDATE
