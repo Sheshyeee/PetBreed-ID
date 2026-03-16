@@ -16,8 +16,11 @@ class MobileAppointmentController extends Controller
   public function index()
   {
     $baseUrl = config('filesystems.disks.object-storage.url');
+    $userId  = Auth::id();
 
-    $appointments = Appointment::where('user_id', Auth::id())
+    Log::info('📱 Mobile appointments fetch', ['user_id' => $userId]);
+
+    $appointments = Appointment::where('user_id', $userId)
       ->with('result:id,scan_id,breed,confidence,image')
       ->latest()
       ->get()
@@ -25,11 +28,26 @@ class MobileAppointmentController extends Controller
         if ($appt->result?->image) {
           $appt->result->image = $baseUrl . '/' . $appt->result->image;
         }
+
+        // Normalize appointment_date to string
         $appt->appointment_date = $appt->appointment_date
           ? $appt->appointment_date->format('Y-m-d')
           : null;
+
+        // ── FIX: Normalize null initiated_by → default to 'clinic' ──
+        // Records created before the initiated_by migration have NULL.
+        // The mobile app filters by this field — null = invisible.
+        if (empty($appt->initiated_by)) {
+          $appt->initiated_by = 'clinic';
+        }
+
         return $appt;
       });
+
+    Log::info('📱 Mobile appointments returning', [
+      'user_id' => $userId,
+      'count'   => $appointments->count(),
+    ]);
 
     return response()->json(['success' => true, 'appointments' => $appointments]);
   }
