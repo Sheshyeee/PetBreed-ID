@@ -1450,7 +1450,7 @@ Return ONLY a valid JSON object — no markdown, no explanation, no extra text. 
 
     $payload = [
       'contents'         => [['parts' => [['text' => $prompt]]]],
-      'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 900],
+      'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 2048],
     ];
 
     $client   = new Client(['timeout' => 30]);
