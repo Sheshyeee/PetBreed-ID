@@ -766,31 +766,31 @@ class ScanResultController extends Controller
     }
 
     public function preview($id)
-    {
-        $result = Results::findOrFail($id);
+{
+    $result = Results::findOrFail($id);
 
-        $baseUrl = config('filesystems.disks.object-storage.url');
-        $result->image = $baseUrl . '/' . $result->image;
+    $baseUrl = config('filesystems.disks.object-storage.url');
+    $result->image = $baseUrl . '/' . $result->image;
 
-        $result->health_risks = is_string($result->health_risks)
-            ? json_decode($result->health_risks, true)
-            : $result->health_risks;
+    $result->health_risks = is_string($result->health_risks)
+        ? json_decode($result->health_risks, true)
+        : $result->health_risks;
 
-        $result->origin_history = is_string($result->origin_history)
-            ? json_decode($result->origin_history, true)
-            : $result->origin_history;
+    $result->origin_history = is_string($result->origin_history)
+        ? json_decode($result->origin_history, true)
+        : $result->origin_history;
 
-        $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
+    $appointment = \App\Models\Appointment::where('scan_id', $result->scan_id)->first();
 
-        // Check if a correction already exists for this scan
-        $alreadyCorrected = \App\Models\BreedCorrection::where('scan_id', $result->scan_id)->exists();
+    // Check if a correction already exists for this scan
+    $alreadyCorrected = \App\Models\BreedCorrection::where('scan_id', $result->scan_id)->exists();
 
-        return inertia('model/review-dog', [
-            'result'            => $result,
-            'appointment'       => $appointment,
-            'already_corrected' => $alreadyCorrected,
-        ]);
-    }
+    return inertia('model/review-dog', [
+        'result'            => $result,
+        'appointment'       => $appointment,
+        'already_corrected' => $alreadyCorrected,
+    ]);
+}
 
     public function index(Request $request)
     {
@@ -1805,7 +1805,7 @@ PROMPT;
         try {
             Log::info("🤖 Starting Gemini AI description generation for: {$detectedBreed}");
 
-            $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
+           $combinedPrompt = "You are a veterinary and canine history expert. The dog is a {$detectedBreed}.
 Return valid JSON with these 3 specific keys. ENSURE CONTENT IS DETAILED AND EDUCATIONAL.
  
 1. 'description': Write a 2 sentence summary of the breed's identity and historical significance.
@@ -2501,36 +2501,58 @@ Be verbose and detailed. Output ONLY the JSON.";
 
                 // Generate AI descriptions — check DB cache first
                 $cachedResult = Results::where('breed', $detectedBreed)
-    ->whereNotNull('description')
-    ->where('description', '!=', '')
-    ->orderBy('created_at', 'desc')
-    ->first();
+                    ->whereNotNull('description')
+                    ->where('description', '!=', '')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
 
-// Check if cached data has the new fields (visual_features, weight, height)
-$cachedHealthRisks = null;
-if ($cachedResult && !empty($cachedResult->description)) {
-    $cachedHealthRisks = is_string($cachedResult->health_risks)
-        ? json_decode($cachedResult->health_risks, true)
-        : ($cachedResult->health_risks ?? []);
-}
+                // Decode cached health_risks once for inspection
+                $cachedHealthRisks = null;
+                if ($cachedResult && !empty($cachedResult->description)) {
+                    $cachedHealthRisks = is_string($cachedResult->health_risks)
+                        ? json_decode($cachedResult->health_risks, true)
+                        : ($cachedResult->health_risks ?? []);
+                }
 
-$hasNewFields = !empty($cachedHealthRisks['visual_features'])
-    && !empty($cachedHealthRisks['weight'])
-    && !empty($cachedHealthRisks['height']);
+                // Check if cached data has the new fields (visual_features, weight, height)
+                $hasNewFields = !empty($cachedHealthRisks['visual_features'])
+                    && !empty($cachedHealthRisks['weight'])
+                    && !empty($cachedHealthRisks['height']);
 
-if ($cachedResult && !empty($cachedResult->description) && $hasNewFields) {
-    Log::info('⚡ Using cached AI description for breed: ' . $detectedBreed);
-    $aiData = [
-        'description'    => $cachedResult->description,
-        'origin_history' => is_string($cachedResult->origin_history)
-            ? json_decode($cachedResult->origin_history, true)
-            : ($cachedResult->origin_history ?? []),
-        'health_risks'   => $cachedHealthRisks,
-    ];
-} else {
-    Log::info('🔄 Cache missing new fields — regenerating AI for breed: ' . $detectedBreed);
-    $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
-}
+                // Check if disease names are plain language (not old medical jargon)
+                $hasPlainDiseaseNames = false;
+                if (!empty($cachedHealthRisks['concerns'])) {
+                    $medicalKeywords = [
+                        'dysplasia', 'syndrome', 'dermatitis', 'toxocariasis',
+                        'luxation', 'brachycephalic', 'helminthiasis', 'pyoderma',
+                        'atopic', 'intervertebral', 'mitral', 'stenosis', 'cardiomyopathy',
+                        'otitis', 'hypothyroidism', 'epilepsy', 'bloat', 'torsion',
+                    ];
+                    $hasPlainDiseaseNames = true;
+                    foreach ($cachedHealthRisks['concerns'] as $concern) {
+                        $nameLower = strtolower($concern['name'] ?? '');
+                        foreach ($medicalKeywords as $keyword) {
+                            if (str_contains($nameLower, $keyword)) {
+                                $hasPlainDiseaseNames = false;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+
+                if ($cachedResult && !empty($cachedResult->description) && $hasNewFields && $hasPlainDiseaseNames) {
+                    Log::info('⚡ Using cached AI description for breed: ' . $detectedBreed);
+                    $aiData = [
+                        'description'    => $cachedResult->description,
+                        'origin_history' => is_string($cachedResult->origin_history)
+                            ? json_decode($cachedResult->origin_history, true)
+                            : ($cachedResult->origin_history ?? []),
+                        'health_risks'   => $cachedHealthRisks,
+                    ];
+                } else {
+                    Log::info('🔄 Cache outdated (missing new fields or old disease names) — regenerating AI for breed: ' . $detectedBreed);
+                    $aiData = $this->generateAIDescriptionsConcurrent($detectedBreed, []);
+                }
 
                 $simulationData = [
                     '1_years'              => null,
@@ -2915,7 +2937,7 @@ if ($cachedResult && !empty($cachedResult->description) && $hasNewFields) {
                         'breed' => $learnResult['breed']
                     ]);
 
-                    return redirect()->back()->with('success', "✓ Correction saved!");
+                   return redirect()->back()->with('success', "✓ Correction saved!");
                 } else {
                     Log::warning('ML API learning failed (correction still saved)', [
                         'scan_id' => $result->scan_id,
