@@ -43,6 +43,7 @@ interface CurrentHealth {
     weight?: { male?: string; female?: string } | string;
     height?: { male?: string; female?: string } | string;
     visual_features?: VisualFeature[] | string[];
+    health_notes?: HealthNote[];
     lifespan?: string;
 }
 

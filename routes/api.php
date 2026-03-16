@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MobileAppointmentController;
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\SimulationStatusController;
 use App\Http\Controllers\model\ScanResultController;
@@ -67,6 +68,18 @@ Route::prefix('v1')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
+    // List all user appointments
+    Route::get('/appointments', [MobileAppointmentController::class, 'index']);
+
+    // User submits a new appointment request
+    Route::post('/appointments/request', [MobileAppointmentController::class, 'request']);
+
+    // User accepts or rejects a clinic appointment
+    Route::post('/appointments/{appointment}/status', [MobileAppointmentController::class, 'updateStatus']);
+
+    // Delete appointment
+    Route::delete('/appointments/{appointment}', [MobileAppointmentController::class, 'destroy']);
   });
 });
 
