@@ -654,8 +654,343 @@ class GenerateAgeSimulations implements ShouldQueue
   //  IMAGE PREPARATION
   // ─────────────────────────────────────────────────────────────────────
 
-  private function _REMOVED_buildOutputDescription(array $profile, string $ageStage, int $targetYears): array { return []; }
-  private function _REMOVED_getBreedSpecificOutputLines(array $profile, string $ageStage, int $targetYears): array { return []; }
+  private function _REMOVED_buildOutputDescription(array $profile, string $ageStage, int $targetYears): array
+  {
+    $breed     = $profile['breed'];
+    $size      = $profile['size_category']   ?? 'medium';
+    $coat      = $profile['coat_type']        ?? 'short';
+    $isBrachy  = $profile['brachycephalic']   ?? false;
+    $bodyShape = $profile['body_shape']       ?? 'standard';
+    $heightChg = $profile['height_change']    ?? 'moderate_increase';
+
+    $isPuppy  = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
+    $isYoung  = ($ageStage === 'young_adult');
+    $isSenior = ($ageStage === 'senior');
+    $isAdult  = !$isPuppy && !$isYoung && !$isSenior;
+
+    $lines = [];
+
+    // ── HEAD / FACE ───────────────────────────────────────────────────
+    $lines[] = '[ HEAD & FACE ]';
+
+    if ($isPuppy && $targetYears >= 1) {
+      $lines[] = '• Skull shape: FULLY ADULT proportions — NOT baby-round. Same size as body, not oversized.';
+      if ($isBrachy) {
+        $lines[] = '• Flat brachycephalic face: unchanged push-in — but now with MORE prominent skin folds/wrinkles.';
+      } else {
+        $lines[] = '• Muzzle: LONGER than in puppy photo — adult length, well-defined, not short/stubby.';
+      }
+      $lines[] = '• Skull muscles and brow ridges visible — no soft baby roundness.';
+      if ($targetYears === 3) {
+        if ($size !== 'toy' && $size !== 'small') {
+          $lines[] = '• MUZZLE TIP & CHIN: show ' . ($ageStage === 'teenager' ? '2–5' : '5–15') . ' silver/white hairs — early aging marker.';
+        }
+        $lines[] = '• Facial expression: EXPERIENCED and CONFIDENT adult look, not playful baby.';
+      }
+    } elseif ($isYoung) {
+      $lines[] = '• Face: sharper, more defined than before. All remaining youthful softness gone.';
+      $lines[] = '• Jaw muscles more defined. Brow slightly more prominent.';
+      if ($targetYears === 3) {
+        $lines[] = '• Muzzle tip: CLEAR silver/white hairs — 10–25 visible. Chin: sparse gray hairs.';
+        $lines[] = '• Eyes: same color, but surrounded by a more experienced, settled expression.';
+      } else {
+        $lines[] = '• Muzzle: 3–8 silver hairs just at the very tip. Barely but noticeably aging.';
+      }
+    } elseif ($isSenior) {
+      if ($targetYears === 1) {
+        $lines[] = '• Muzzle: MORE white/gray than in source photo — expanded coverage.';
+        $lines[] = '• Eyes: slightly cloudier and deeper-set than in source.';
+        $lines[] = '• Jowls: slightly more sagging than source.';
+      } else {
+        $lines[] = '• Muzzle: COMPLETELY GRAY/WHITE — entire muzzle tip, chin, and around eyes silver.';
+        $lines[] = '• Eyes: visibly cloudy with age-related opacity. Very deep-set.';
+        $lines[] = '• Jowls and neck: significant skin sag. Deep facial creases.';
+      }
+    } else {
+      if ($targetYears === 1) {
+        $lines[] = '• Face: marginally more settled and experienced looking.';
+        $lines[] = '• Muzzle tip: 5–15 CLEARLY VISIBLE silver/white hairs. Chin: 3–8 gray hairs.';
+        $lines[] = '• Jowls: very slightly more developed than source.';
+      } else {
+        $lines[] = '• MUZZLE: distinctly grayed — 30–50% of muzzle surface covered in white/silver.';
+        $lines[] = '• CHIN: clearly gray/white. Around eyes: sparse silver hairs.';
+        $lines[] = '• Jowls: noticeably more developed. Slight skin sag under chin area.';
+        $lines[] = '• Overall face: a more mature, experienced, settled expression.';
+      }
+    }
+
+    $lines[] = '';
+
+    // ── EARS ──────────────────────────────────────────────────────────
+    $lines[] = '[ EARS ]';
+    if ($isPuppy) {
+      $lines[] = '• Ears: in their FINAL ADULT POSITION for this breed (no longer flopped unless breed always flops).';
+      if ($bodyShape === 'spitz') {
+        $lines[] = '• Ears: PERFECTLY ERECT and rigid pointed spitz ears.';
+      } elseif ($this->mb(strtolower($breed), ['french bulldog', 'boston terrier', 'chihuahua', 'corgi', 'pembroke', 'cardigan'])) {
+        $lines[] = '• Ears: FULLY ERECT, rigid, and upright — no longer drooping or semi-erect.';
+      }
+    } else {
+      $lines[] = '• Ears: same as source — fully adult and settled.';
+    }
+
+    $lines[] = '';
+
+    // ── BODY ──────────────────────────────────────────────────────────
+    $lines[] = '[ BODY & BUILD ]';
+
+    if ($isPuppy) {
+      switch ($heightChg) {
+        case 'dramatic_increase':
+          $lines[] = '• Body size: ENORMOUSLY larger than puppy — this is a giant breed. ' . ($targetYears === 3 ? '3–4×' : '2–3×') . ' the puppy size.';
+          $lines[] = '• Legs: massively longer and more powerful. Towering adult presence.';
+          break;
+        case 'large_increase':
+          $lines[] = '• Body size: SIGNIFICANTLY larger. ' . ($targetYears === 3 ? '2–3×' : '1.5–2×') . ' taller and heavier than the puppy.';
+          $lines[] = '• Legs: considerably longer and muscular — no trace of stumpy puppy legs.';
+          break;
+        case 'moderate_increase':
+          $lines[] = '• Body size: noticeably larger. Legs ' . ($targetYears === 3 ? '50–80%' : '30–50%') . ' longer than puppy. Clearly bigger.';
+          break;
+        case 'minimal_increase':
+          $lines[] = '• Body size: minimal height increase. But body is now HEAVIER, DENSER, and more muscular.';
+          $lines[] = '• Low-and-wide adult form. Chest drops lower.';
+          break;
+        case 'none':
+          $lines[] = '• Body size: similar height. But proportions completely different — all baby proportions GONE.';
+          break;
+      }
+      $lines[] = '• Abdomen: FLAT adult tuck — NO potbelly or barrel shape.';
+      $lines[] = '• Chest: deep and developed.';
+      $lines[] = '• Paws: proportionate to legs — no longer oversized.';
+      $lines[] = '• Musculature: ' . ($targetYears === 3 ? 'FULL adult muscle mass — defined shoulders, chest, and haunches.' : 'Developing adult muscles — lean adolescent build.');
+    } elseif ($isYoung) {
+      if ($targetYears === 3) {
+        $lines[] = '• Body: PRIME ADULT condition — peak muscle development.';
+        $lines[] = '• Chest: deeper and broader than in source photo.';
+        $lines[] = '• Neck: thicker and more muscular than in source.';
+        $lines[] = '• Hindquarters: more defined and powerful.';
+      } else {
+        $lines[] = '• Body: noticeably more muscular than source. Chest and shoulders slightly broader.';
+        $lines[] = '• Neck: marginally thicker.';
+      }
+    } elseif ($isSenior) {
+      $lines[] = '• Body: slightly less muscle mass than prime adult — softer definition.';
+      if ($targetYears === 3) {
+        $lines[] = '• Coat appears thinner in places. Less vibrant than in source.';
+      }
+    } else {
+      if ($targetYears === 1) {
+        $lines[] = '• Body: marginally heavier/denser than source. Chest slightly thicker.';
+        $lines[] = '• Neck: very slightly thicker at base.';
+      } else {
+        $lines[] = '• Body: NOTICEABLY heavier than source — thicker neck, broader chest, more mass overall.';
+        $lines[] = '• Less lean definition than prime youth. Body looks heavier and more settled.';
+        $lines[] = '• Chest: clearly broader. Neck: clearly thicker.';
+      }
+    }
+
+    $lines[] = '';
+
+    // ── COAT ──────────────────────────────────────────────────────────
+    $lines[] = '[ COAT ]';
+
+    switch ($coat) {
+      case 'long_silky':
+        $b = strtolower($breed);
+        if ($isPuppy) {
+          if ($this->mb($b, ['yorkshire', 'yorkie'])) {
+            $lines[] = '• COAT TRANSFORMATION (critical): puppy black-and-tan fluffy coat → LONG SILKY STRAIGHT coat.';
+            $lines[] = '• Body: STEEL-BLUE / silver color (NOT black). Head/legs: rich GOLDEN-TAN.';
+            $lines[] = '• Length: ' . ($targetYears === 3 ? 'reaching toward the floor' : 'mid-body, visibly long') . '.';
+            $lines[] = '• Texture: SILKY and STRAIGHT — not fluffy, not wavy.';
+          } elseif ($this->mb($b, ['maltese'])) {
+            $lines[] = '• Coat: pure white LONG SILKY coat — ' . ($targetYears === 3 ? 'floor-length flowing white silk' : 'noticeably longer, flowing white coat growing') . '.';
+          } elseif ($this->mb($b, ['golden retriever'])) {
+            $lines[] = '• Coat: developing/full golden waves with feathering on chest, legs, belly, tail.';
+            $lines[] = '• Rich golden color — denser and more voluminous than puppy.';
+          } elseif ($this->mb($b, ['collie', 'sheltie'])) {
+            $lines[] = '• Coat: growing/full FLOWING MANE at neck and chest. Long coat on flanks.';
+          } else {
+            $lines[] = '• Coat: longer and silkier than puppy coat. ' . ($targetYears === 3 ? 'Full adult feathering everywhere.' : 'Developing adult feathering on ears/legs.');
+          }
+        } elseif ($targetYears === 3 && ($isAdult || $isSenior)) {
+          $lines[] = '• Coat: same as source but ' . ($isSenior ? 'slightly thinner/less lustrous.' : 'fully mature, perhaps marginally denser.');
+        }
+        break;
+
+      case 'double_coat':
+        if ($isPuppy) {
+          $lines[] = '• Coat: puppy fuzz REPLACED by DENSE DOUBLE COAT — thick undercoat visible, coarse guard hairs.';
+          $lines[] = '• Volume: much more voluminous and stand-off than puppy coat.';
+          if ($this->mb(strtolower($breed), ['pomeranian'])) {
+            $lines[] = '• Pomeranian: ENORMOUS stand-off coat — huge ruff/mane, plumed tail. Ball of fluff.';
+          }
+        }
+        break;
+
+      case 'wire':
+      case 'wire_harsh':
+        if ($isPuppy) {
+          $lines[] = '• Coat: soft puppy coat REPLACED by HARSH BRISTLY wire coat.';
+          $lines[] = '• Beard and eyebrows: prominent — this is the breed signature.';
+        }
+        break;
+
+      case 'curly':
+      case 'wavy_curly':
+        if ($isPuppy) {
+          $lines[] = '• Coat: puppy fluff REPLACED by ' . ($targetYears === 3 ? 'FULL TIGHT CURLS/WAVES' : 'developing curls/waves') . ' — much denser and more voluminous.';
+        }
+        break;
+
+      default:
+        if ($isPuppy) {
+          $lines[] = '• Coat: puppy fuzz REPLACED by sleek, tight, dense adult short coat.';
+        } elseif (!$isSenior && $targetYears === 3) {
+          $lines[] = '• Coat: same as source but marginally denser and slightly less glossy with age.';
+        } elseif ($isSenior) {
+          $lines[] = '• Coat: ' . ($targetYears === 3 ? 'noticeably thinner and duller than source' : 'slightly less vibrant than source') . '.';
+        }
+        break;
+    }
+
+    $lines[] = '';
+
+    // ── BREED-SPECIFIC ADDITIONS ──────────────────────────────────────
+    $extra = $this->_REMOVED_getBreedSpecificOutputLines($profile, $ageStage, $targetYears);
+    if (!empty($extra)) {
+      $lines[] = '[ BREED-SPECIFIC ]';
+      foreach ($extra as $el) {
+        $lines[] = $el;
+      }
+      $lines[] = '';
+    }
+
+    // ── OVERALL IMPRESSION ────────────────────────────────────────────
+    $lines[] = '[ OVERALL IMPRESSION ]';
+    $adultDesc = $profile['adult_size_description'] ?? '';
+    if ($adultDesc && ($isPuppy && $targetYears === 3)) {
+      $lines[] = "• The output dog must match this description: \"{$adultDesc}\"";
+    } elseif ($isPuppy) {
+      $lines[] = "• A viewer sees: clearly older and bigger than the puppy — an adolescent or young adult {$breed}.";
+    } elseif ($isSenior) {
+      $lines[] = "• A viewer sees: a clearly OLDER senior dog — more gray, more sagging, more aged than the source.";
+    } elseif ($targetYears === 3) {
+      $lines[] = "• A viewer sees: the SAME dog, but clearly 3 years older. The aging must be OBVIOUS.";
+    } else {
+      $lines[] = "• A viewer sees: the same dog, with subtle-but-VISIBLE aging. Not identical to source.";
+    }
+
+    return $lines;
+  }
+
+  private function _REMOVED_getBreedSpecificOutputLines(array $profile, string $ageStage, int $targetYears): array
+  {
+    $b       = strtolower($profile['breed']);
+    $isPuppy = in_array($ageStage, ['newborn_puppy', 'puppy', 'teenager']);
+    $lines   = [];
+
+    if ($this->mb($b, ['rottweiler', 'rottie']) && $isPuppy) {
+      $lines[] = '• HEAD: massive blocky SQUARE head — not round. Broad flat skull.';
+      $lines[] = '• TAN POINTS: rich mahogany/rust points on eyebrows, cheeks, chest, legs — clearly defined on black coat.';
+      $lines[] = '• NECK: thick and powerful. CHEST: barrel-wide.';
+    }
+    if ($this->mb($b, ['french bulldog', 'frenchie'])) {
+      if ($isPuppy) {
+        $lines[] = '• BAT EARS: PERFECTLY ERECT and rigid — both standing straight up.';
+        $lines[] = '• HEAD: broad, square, flat-faced. Forehead wrinkles develop.';
+        $lines[] = '• BODY: compact muscular barrel — thick neck, wide chest.';
+      }
+      if ($targetYears === 3) {
+        $lines[] = '• WRINKLES: deeper forehead wrinkles. More prominent nose rope.';
+      }
+    }
+    if ($this->mb($b, ['german shepherd', 'gsd', 'alsatian']) && $isPuppy) {
+      $lines[] = '• EARS: FULLY ERECT rigid pointed ears — no longer flopped.';
+      $lines[] = '• COAT: saddle/blanket pattern clearly defined — black over tan/sable.';
+      $lines[] = '• BODY: lean powerful athletic build. Wolf-like profile.';
+    }
+    if ($this->mb($b, ['golden retriever']) && $isPuppy) {
+      $lines[] = '• COLOR: rich golden — more saturated than puppy.';
+      if ($targetYears === 3) {
+        $lines[] = '• COAT: full adult waves with prominent feathering — chest, belly, legs, tail.';
+      }
+    }
+    if ($this->mb($b, ['labrador', 'lab']) && $isPuppy) {
+      $lines[] = '• TAIL: thick otter-tail (thick at base, tapers) — prominent and distinctive.';
+      $lines[] = '• HEAD: broad blocky lab head with soft eyes.';
+      $lines[] = '• BUILD: stocky and powerful.';
+    }
+    if ($this->mb($b, ['dachshund', 'doxie', 'wiener', 'weiner', 'sausage'])) {
+      $lines[] = '• BODY SHAPE: dramatically elongated sausage shape — NOT tall. Tiny legs, very long torso.';
+      $lines[] = '• The body gets LONGER with age, not taller.';
+    }
+    if ($this->mb($b, ['corgi', 'pembroke', 'cardigan'])) {
+      $lines[] = '• EARS: FULLY ERECT large pointed bat-like ears — both standing straight up.';
+      $lines[] = '• BODY: long torso on SHORT legs — legs stay short, body is long.';
+    }
+    if ($this->mb($b, ['poodle'])) {
+      if ($isPuppy) {
+        $lines[] = '• COAT: TIGHT DENSE UNIFORM CURLS covering entire body — no puppy fluff remaining.';
+        $lines[] = '• The coat is the single biggest transformation — from wispy to voluminous curls.';
+      }
+    }
+    if ($this->mb($b, ['husky', 'malamute', 'samoyed']) && $isPuppy) {
+      $lines[] = '• COAT: thick plush double coat — much more voluminous than puppy.';
+      $lines[] = '• RUFF: thick mane visible around neck.';
+      $lines[] = '• MASK: facial markings more intensely defined.';
+    }
+    if ($this->mb($b, ['beagle']) && $isPuppy) {
+      $lines[] = '• TRICOLOR: black saddle deeper, tan points sharper, white brighter — all more defined.';
+      $lines[] = '• EARS: longer and more pendulous than puppy.';
+    }
+    if ($this->mb($b, ['boxer'])) {
+      if ($isPuppy) {
+        $lines[] = '• FLAT FACE: unchanged — do NOT elongate muzzle.';
+        $lines[] = '• CHEST: massively broad barrel chest.';
+        $lines[] = '• WRINKLES: deep forehead wrinkles on broad flat head.';
+      }
+    }
+    if ($this->mb($b, ['pug'])) {
+      if ($isPuppy) {
+        $lines[] = '• WRINKLES: deep forehead folds multiply — this is the adult pug face.';
+        $lines[] = '• EYES: large round prominent eyes.';
+        $lines[] = '• BODY: cobby compact square shape.';
+        $lines[] = '• TAIL: tight double-curl.';
+      }
+    }
+    if ($this->mb($b, ['chihuahua'])) {
+      if ($isPuppy) {
+        $lines[] = '• SKULL: classic APPLE-DOME — round, prominent.';
+        $lines[] = '• EARS: LARGE ERECT pointed ears — both fully upright.';
+        $lines[] = '• EYES: proportionally very large and round.';
+      }
+    }
+    if ($this->mb($b, ['shiba inu', 'shiba'])) {
+      if ($isPuppy) {
+        $lines[] = '• EARS: fully erect, rigid, pointed.';
+        $lines[] = '• TAIL: tightly curled over back.';
+        $lines[] = '• COAT: dense plush double coat — much denser than puppy.';
+        $lines[] = '• COLOR: rich red/black-and-tan/sesame — intensified adult coloring.';
+      }
+    }
+    if ($this->mb($b, ['aspin', 'asong pinoy', 'philippine', 'village dog', 'street dog', 'mixed breed', 'mutt', 'mixed'])) {
+      if ($isPuppy) {
+        $lines[] = '• BODY: lean athletic native dog — visible tuck-up at abdomen.';
+        $lines[] = '• EARS: semi-erect or erect — settled in adult position.';
+        $lines[] = '• COAT: tight short sleek adult coat. Lean primitive pariah-dog silhouette.';
+      }
+      if ($targetYears >= 1 && !$isPuppy) {
+        $lines[] = '• Lean athletic medium build — coat colors/markings same as source.';
+        if ($targetYears === 3) {
+          $lines[] = '• Slight graying at muzzle tip. More settled, experienced expression.';
+        }
+      }
+    }
+
+    return $lines;
+  }
 
   private function prepareImage(string $fullPath): ?array
   {
@@ -1127,27 +1462,59 @@ Return ONLY a valid JSON object — no markdown, no explanation, no extra text. 
     $data = json_decode($response->getBody()->getContents(), true);
     $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
 
-    // Strip markdown fences
-    $text = preg_replace('/^```json\s*/i', '', $text);
+    $parsed = $this->repairAndDecodeJson($text);
+    if ($parsed === null) {
+      throw new \Exception('Invalid JSON from Gemini age profiles after all repair attempts');
+    }
+
+    return $parsed;
+  }
+
+  /**
+   * Aggressively clean and decode JSON that Gemini may have polluted
+   * with control characters, markdown fences, or unescaped newlines.
+   */
+  private function repairAndDecodeJson(string $text): ?array
+  {
+    // Step 1: strip markdown fences (```json ... ``` or ``` ... ```)
+    $text = preg_replace('/^```json\s*/i', '', trim($text));
     $text = preg_replace('/^```\s*/i',     '', $text);
     $text = preg_replace('/\s*```$/i',     '', $text);
     $text = trim($text);
 
-    // ── FIX 2: Remove control characters that break json_decode ──────
-    // Gemini occasionally returns unescaped newlines/tabs inside strings
-    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
-
+    // Step 2: quick attempt on clean text
     $parsed = json_decode($text, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-      // Last resort: try to clean further and retry
-      $text   = preg_replace('/\r\n|\r|\n/', ' ', $text);
-      $parsed = json_decode($text, true);
-      if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new \Exception('Invalid JSON from Gemini age profiles: ' . json_last_error_msg());
-      }
+    if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+      return $parsed;
     }
 
-    return $parsed;
+    // Step 3: remove ALL ASCII control characters except \t (0x09) \n (0x0A) \r (0x0D)
+    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text);
+    $parsed = json_decode($text, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+      return $parsed;
+    }
+
+    // Step 4: collapse all literal newlines/tabs to spaces
+    // (handles unescaped newlines inside JSON string values)
+    $text = preg_replace('/\r\n|\r|\n|\t/', ' ', $text);
+    // Collapse multiple spaces
+    $text = preg_replace('/ {2,}/', ' ', $text);
+    $parsed = json_decode($text, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+      return $parsed;
+    }
+
+    // Step 5: strip ALL non-printable / non-UTF8 bytes as last resort
+    $text = preg_replace('/[^\x20-\x7E\x{0080}-\x{FFFF}]/u', '', $text);
+    $parsed = json_decode($text, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+      return $parsed;
+    }
+
+    // All attempts failed
+    Log::warning('repairAndDecodeJson: all attempts failed. Raw text sample: ' . substr($text, 0, 300));
+    return null;
   }
 
   // ─────────────────────────────────────────────────────────────────────
