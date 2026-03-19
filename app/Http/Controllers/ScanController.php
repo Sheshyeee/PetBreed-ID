@@ -12,7 +12,7 @@ class ScanController extends Controller
     public function index()
     {
         // ── Top 5 most-scanned breeds ────────────────────────────────────────
-        $topBreeds = Results::selectRaw('breed, COUNT(*) as scan_count, ROUND(AVG(confidence), 1) as avg_confidence')
+        $topBreeds = Results::selectRaw('breed, COUNT(*) as scan_count, ROUND(CAST(AVG(confidence) AS numeric), 1) as avg_confidence')
             ->whereNotNull('breed')
             ->where('breed', '!=', '')
             ->groupBy('breed')

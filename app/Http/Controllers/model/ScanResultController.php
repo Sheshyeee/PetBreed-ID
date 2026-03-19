@@ -750,32 +750,32 @@ class ScanResultController extends Controller
     {
         try {
             $result = Results::where('scan_id', $scan_id)->first();
- 
+
             if (!$result) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Scan result not found.'
                 ], 404);
             }
- 
+
             $simulationData = is_string($result->simulation_data)
                 ? json_decode($result->simulation_data, true)
                 : $result->simulation_data;
- 
+
             $status  = $simulationData['status'] ?? 'pending';
             $baseUrl = config('filesystems.disks.object-storage.url');
- 
+
             $build = function ($path) use ($baseUrl) {
                 if (!$path) return null;
                 if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
                 return $baseUrl . '/' . $path;
             };
- 
+
             $simulations = [
                 '1_years' => $build($simulationData['1_years'] ?? null),
                 '3_years' => $build($simulationData['3_years'] ?? null),
             ];
- 
+
             return response()->json([
                 'success' => true,
                 'data'    => [
@@ -3082,7 +3082,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 COUNT(*)                                          AS total,
                 SUM(CASE WHEN pending = 'verified' THEN 1 ELSE 0 END) AS verified_count,
                 SUM(CASE WHEN pending != 'verified' THEN 1 ELSE 0 END) AS pending_count,
-                ROUND(AVG(confidence), 1)                         AS avg_confidence
+                ROUND(CAST(AVG(confidence) AS numeric), 1)                         AS avg_confidence
             ")
                 ->first();
 
