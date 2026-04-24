@@ -2990,7 +2990,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]);
 
                     $correction->update([
-                        'status' => 'Saved (ML Error)'
+                        'status' => 'Saved '
                     ]);
 
                     return redirect()->back();
@@ -3003,7 +3003,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 ]);
 
                 $correction->update([
-                    'status' => 'Saved (ML Error)'
+                    'status' => 'Saved'
                 ]);
 
                 return redirect()->back();
