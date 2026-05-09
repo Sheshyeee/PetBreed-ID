@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Sanctum\HasApiTokens; // Added for Sanctum
-use Illuminate\Notifications\Notifiable; // Re-added for standard functionality
+use Laravel\Sanctum\HasApiTokens; 
+use Illuminate\Notifications\Notifiable; 
 
 class User extends Authenticatable
 {

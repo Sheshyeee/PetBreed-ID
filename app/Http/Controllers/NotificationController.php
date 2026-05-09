@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationController extends Controller
 {
-    /**
-     * Get all notifications for the authenticated user
-     */
+    
     public function index()
     {
         $user = Auth::user();
@@ -50,9 +48,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    /**
-     * Get unread notification count
-     */
+  
     public function getUnreadCount()
     {
         $user = Auth::user();
@@ -70,9 +66,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    /**
-     * Mark notification as read
-     */
+  
     public function markAsRead($id)
     {
         try {
@@ -91,7 +85,6 @@ class NotificationController extends Controller
                     'user_id' => Auth::id()
                 ]);
 
-                // Check if request expects JSON (API) or Inertia (web)
                 if (request()->expectsJson()) {
                     return response()->json([
                         'success' => false,

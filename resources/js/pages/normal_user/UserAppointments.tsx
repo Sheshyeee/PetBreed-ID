@@ -48,7 +48,6 @@ type PageProps = {
     appointments: Appointment[];
 };
 
-// ── Panel ─────────────────────────────────────────────────────────────────────
 const Panel = ({
     icon,
     title,
@@ -93,7 +92,6 @@ const statusConfig = {
     },
 };
 
-// ── Appointment Card ──────────────────────────────────────────────────────────
 function AppointmentCard({ appt }: { appt: Appointment }) {
     const [showRejectForm, setShowRejectForm] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
@@ -114,8 +112,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
     };
     const [confirmDelete, setConfirmDelete] = useState(false);
 
-    // User can delete their own requests anytime.
-    // For clinic-created: only after responding.
+    
     const canDelete =
         appt.initiated_by === 'user' ||
         (appt.initiated_by === 'clinic' && appt.status !== 'pending');
@@ -355,7 +352,6 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
     );
 }
 
-// ── Clinic Location Panel ─────────────────────────────────────────────────────
 function ClinicLocationPanel() {
     const mapsUrl = 'https://maps.google.com/?q=13.2929132,123.4886336';
 

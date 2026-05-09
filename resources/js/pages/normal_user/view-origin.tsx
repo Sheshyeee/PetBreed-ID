@@ -314,8 +314,7 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                 >
                                     <div className="p-6 sm:p-7">
                                         {timeline.length > 0 ? (
-                                            // ✅ FIX: increased pl-6 → pl-9 so the dot (left:-9px, w:14px)
-                                            // no longer overlaps the year text
+                                           
                                             <div className="vo-timeline-line space-y-7 border-cyan-200 pl-8 dark:border-cyan-500/20">
                                                 {timeline.map((item, i) => (
                                                     <div
@@ -324,8 +323,7 @@ const ViewOrigin: FC<Props> = ({ results }) => {
                                                     >
                                                         <div className="vo-dot" />
                                                         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-5">
-                                                            {/* ✅ FIX: min-w-[90px] → min-w-[130px] to fit long labels
-                                                                like "1st Century CE" without wrapping or clipping */}
+                                                           
                                                             <span className="vo-mono min-w-[130px] flex-shrink-0 text-[11px] font-bold text-cyan-700 dark:text-cyan-400">
                                                                 {item.year}
                                                             </span>

@@ -14,26 +14,20 @@ class TrainingQueueController extends Controller
     {
         $correctedScanIds = BreedCorrection::pluck('scan_id');
 
-        // 1. Get the actual "To Do" list (maybe just the recent 6 for display)
         $recentPendingResults = Results::whereNotIn('scan_id', $correctedScanIds)
             ->latest()
             ->take(6)
             ->get();
 
-        // 2. Get the TOTAL count of pending items (The number you want in the stat card)
         $totalPendingCount = Results::whereNotIn('scan_id', $correctedScanIds)->count();
 
-        // 3. Get history with proper image URLs
         $corrections = BreedCorrection::latest()->paginate(10);
 
-        // Build base URL from object storage
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        // Transform corrections to include full image URLs
         $corrections->getCollection()->transform(function ($correction) use ($baseUrl) {
     $correction->image_path = $baseUrl . '/' . $correction->image_path;
 
-    // Resolve the Results id so the frontend can link to /model/review-dog/{result_id}
     $result = Results::where('scan_id', $correction->scan_id)
         ->select('id')
         ->first();

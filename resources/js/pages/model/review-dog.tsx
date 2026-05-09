@@ -144,7 +144,6 @@ export default function ReviewDog() {
     const [correctedBreedName, setCorrectedBreedName] = useState('');
     const [corrected, setCorrected] = useState(already_corrected ?? false);
 
-    // ── Correction submit — stay on page, show prompt ────────────────────────
     const submitCorrection: FormEventHandler = (e) => {
         e.preventDefault();
         const breedBeforeReset = data.correct_breed;
@@ -158,7 +157,6 @@ export default function ReviewDog() {
         });
     };
 
-    // ── Appointment submit — show success alert ──────────────────────────────
     const submitAppointment: FormEventHandler = (e) => {
         e.preventDefault();
         apptForm.post('/model/appointments', {
@@ -169,7 +167,6 @@ export default function ReviewDog() {
         });
     };
 
-    // ── Parse stored JSON ────────────────────────────────────────────────────
     const healthRisks = parseField<HealthRisks>(result?.health_risks);
     const origin      = parseField<OriginHistory>(result?.origin_history);
     const concerns    = healthRisks?.concerns   ?? [];
@@ -247,9 +244,7 @@ export default function ReviewDog() {
                 </div>
             )}
 
-            {/* ══════════════════════════════════════════════════════════════ */}
-            {/* MODAL 1 — Post-correction: schedule appointment?               */}
-            {/* ══════════════════════════════════════════════════════════════ */}
+           
             {showApptModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
                     <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900">
@@ -321,9 +316,7 @@ export default function ReviewDog() {
                 </div>
             )}
 
-            {/* ══════════════════════════════════════════════════════════════ */}
-            {/* MODAL 2 — Appointment created success                          */}
-            {/* ══════════════════════════════════════════════════════════════ */}
+            
             {showSuccessAlert && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
                     <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900">
@@ -519,9 +512,7 @@ export default function ReviewDog() {
                     </div>
                 </div>
 
-                {/* ══════════════════════════════════════════════════════════ */}
-                {/* BREED SUMMARY CARD                                         */}
-                {/* ══════════════════════════════════════════════════════════ */}
+              
                 <Card className="overflow-hidden dark:bg-neutral-900">
                     <button
                         type="button"
@@ -643,9 +634,7 @@ export default function ReviewDog() {
                     )}
                 </Card>
 
-                {/* ══════════════════════════════════════════════════════════ */}
-                {/* APPOINTMENT SCHEDULING                                      */}
-                {/* ══════════════════════════════════════════════════════════ */}
+               
                 <Card id="appointment-card" className="overflow-hidden dark:bg-neutral-900">
                     <button
                         type="button"

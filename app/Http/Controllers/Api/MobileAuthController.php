@@ -38,7 +38,7 @@ class MobileAuthController extends Controller
 
             $googleUser = json_decode($response->getBody()->getContents());
 
-            // Verify the token 'sub' (Unique Google ID) exists
+          
             if (!isset($googleUser->sub)) {
                 return response()->json([
                     'success' => false,
@@ -46,15 +46,15 @@ class MobileAuthController extends Controller
                 ], 401);
             }
 
-            // Find existing user or prepare to create new one
+            
             $user = User::where('google_id', $googleUser->sub)->first();
 
-            // Avatar Management: Only download if user is new or avatar is missing
+           
             $avatarUrl = $user ? $user->avatar : null;
             if (!$avatarUrl && isset($googleUser->picture)) {
                 try {
                     $avatarContents = file_get_contents($googleUser->picture);
-                    // Use a static name based on ID so we don't save duplicates
+                   
                     $avatarName = 'avatar_' . $googleUser->sub . '.jpg';
                     $avatarPath = 'avatars/' . $avatarName;
                     Storage::disk('object-storage')->put($avatarPath, $avatarContents);
@@ -77,7 +77,6 @@ class MobileAuthController extends Controller
                 ]
             );
 
-            // Cleanup: Revoke old tokens for this specific app/device to keep table clean
             $user->tokens()->where('name', 'mobile-app')->delete();
             $token = $user->createToken('mobile-app')->plainTextToken;
 

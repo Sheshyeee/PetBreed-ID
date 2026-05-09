@@ -20,25 +20,13 @@ use OpenAI\Laravel\Facades\OpenAI;
 
 class ScanResultController extends Controller
 {
-    /**
-     * ==========================================
-     * HELPER: Calculate breed-specific learning progress
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: Calculate breed-specific learning progress
-     * Fetches data from ML API instead of local file
-     * ==========================================
-     */
+   
     private function calculateBreedLearningProgress(): array
     {
         try {
             Log::info('🔍 Building vet teaching log from BreedCorrection records');
 
-            // ---------------------------------------------------------------
-            // Get all corrections, most recent first
-            // ---------------------------------------------------------------
+          
             $allCorrections = BreedCorrection::orderBy('created_at', 'desc')->get();
 
             if ($allCorrections->isEmpty()) {
@@ -46,10 +34,7 @@ class ScanResultController extends Controller
                 return [];
             }
 
-            // ---------------------------------------------------------------
-            // Group by corrected_breed (case-insensitive)
-            // For each breed, track every correction event
-            // ---------------------------------------------------------------
+           
             $breedGroups = [];
 
             foreach ($allCorrections as $correction) {
@@ -66,7 +51,7 @@ class ScanResultController extends Controller
             $results = [];
 
             foreach ($breedGroups as $key => $group) {
-                $corrections    = $group['corrections']; // array, most recent first
+                $corrections    = $group['corrections']; 
                 $correctedBreed = $group['corrected_breed'];
                 $count          = count($corrections);
 
@@ -75,27 +60,26 @@ class ScanResultController extends Controller
                 // The very first time this breed was taught (oldest)
                 $first  = $corrections[count($corrections) - 1];
 
-                // What the AI originally predicted for the latest correction
                 $aiGuessBreed      = $latest->original_breed   ?? 'Unknown';
                 $aiGuessConfidence = (float) ($latest->confidence ?? 0);
 
-                // Was the AI wrong about the breed, or just uncertain?
+               
                 $breedWasWrong = strtolower(trim($aiGuessBreed)) !== $key;
 
-                // Determine event type — drives the card colour and icon
+                
                 if ($breedWasWrong) {
-                    // AI predicted a completely different breed
-                    $eventType  = 'corrected';   // "AI thought it was X, vet said Y"
+                 
+                    $eventType  = 'corrected';  
                     $statusLabel = 'AI Corrected';
                     $statusColor = 'blue';
                 } elseif ($aiGuessConfidence < 70) {
-                    // AI knew the breed but wasn't confident
-                    $eventType   = 'boosted';    // "AI was unsure, vet confirmed"
+                    
+                    $eventType   = 'boosted';    
                     $statusLabel = 'Confidence Boosted';
                     $statusColor = 'amber';
                 } else {
-                    // AI was right and confident — vet confirmed
-                    $eventType   = 'confirmed';  // "AI was right, vet verified"
+                    
+                    $eventType   = 'confirmed';  
                     $statusLabel = 'Verified by Vet';
                     $statusColor = 'green';
                 }
@@ -104,8 +88,8 @@ class ScanResultController extends Controller
                 $firstDate   = \Carbon\Carbon::parse($first->created_at);
                 $daysTaught  = (int) $firstDate->diffInDays(now());
 
-                // ML API memory count (optional enrichment — never blocks rendering)
-                $mlExamples = $count; // fallback = number of corrections
+               
+                $mlExamples = $count;
                 try {
                     static $mlBreedCounts = null;
                     if ($mlBreedCounts === null) {
@@ -126,7 +110,7 @@ class ScanResultController extends Controller
                 }
 
                 $results[] = [
-                    // Fields the frontend needs for the Teaching Log cards
+                    
                     'breed'              => $correctedBreed,
                     'ai_guess_breed'     => $aiGuessBreed,
                     'ai_guess_confidence' => round($aiGuessConfidence, 1),
@@ -139,10 +123,10 @@ class ScanResultController extends Controller
                     'days_since_taught'  => $daysTaught,
                     'latest_taught_date' => \Carbon\Carbon::parse($latest->created_at)->format('M d, Y'),
 
-                    // Keep legacy fields so nothing else in the codebase breaks
+                    
                     'examples_learned'   => $mlExamples,
                     'corrections_made'   => $count,
-                    'avg_confidence'     => 100.0,   // after correction result is 100%
+                    'avg_confidence'     => 100.0,   
                     'success_rate'       => 100.0,
                     'first_learned'      => $firstDate->format('M d, Y'),
                     'days_learning'      => $daysTaught,
@@ -150,8 +134,7 @@ class ScanResultController extends Controller
                 ];
             }
 
-            // Sort: corrected events first (most impressive), then boosted, then confirmed
-            // Within each group, sort by times_taught descending (most trained = most proof)
+            /
             $order = ['corrected' => 0, 'boosted' => 1, 'confirmed' => 2];
             usort($results, function ($a, $b) use ($order) {
                 $oa = $order[$a['event_type']] ?? 9;
@@ -177,11 +160,7 @@ class ScanResultController extends Controller
     }
 
 
-    /**
-     * =============================================================================
-     * getLearningTimeline — unchanged, kept here for completeness
-     * =============================================================================
-     */
+
     private function getLearningTimeline(int $days = 10): array
     {
         $timeline = [];
@@ -218,15 +197,11 @@ class ScanResultController extends Controller
     {
         $today = \Carbon\Carbon::now()->startOfDay();
 
-        // ── Grid start: the Sunday of the week that is 11 full weeks before
-        //   the Sunday of the CURRENT week.  This gives us 12 complete columns
-        //   of 7 days each, just like GitHub. ──────────────────────────────────
+       
         $startOfCurrentWeek = $today->copy()->startOfWeek(\Carbon\Carbon::SUNDAY);
         $gridStart = $startOfCurrentWeek->copy()->subWeeks(11);   // 11 weeks back → col 0
 
-        // ── Grid end: the last day of the current month. ─────────────────────
-        //   This ensures the rightmost column always shows through the end of
-        //   the month, never stopping mid-week on "today".
+       
         $gridEnd = $today->copy()->endOfMonth()->startOfDay();
 
         // ── Fetch all correction counts in the full range (past + future = 0) ─
@@ -272,13 +247,7 @@ class ScanResultController extends Controller
     }
 
 
-    /**
-     * =============================================================================
-     *  REPLACEMENT: getHeatmapSummary()
-     *
-     *  Unchanged in logic but updated to ignore future cells when computing stats.
-     * =============================================================================
-     */
+   
     private function getHeatmapSummary(array $heatmap): array
     {
         $past = array_filter($heatmap, fn($d) => !($d['is_future'] ?? false));
@@ -305,10 +274,6 @@ class ScanResultController extends Controller
 
 
 
-    /**
-     * Returns one chip per unique corrected breed for the memory wall.
-     * Each entry: { breed, times_taught, first_taught, level }
-     */
     private function getBreedMemoryWall(): array
     {
         $rows = \App\Models\BreedCorrection::selectRaw(
@@ -343,10 +308,7 @@ class ScanResultController extends Controller
         return $wall;
     }
 
-    /**
-     * Returns a small summary for the heatmap header stats.
-     */
-
+  
 
 
 
@@ -379,8 +341,7 @@ class ScanResultController extends Controller
         $lowConfidenceCount  = $result->where('confidence', '<=', 40)->count();
         $highConfidenceCount = $result->where('confidence', '>=', 41)->count();
 
-        // High Confidence Rate — always 0-100%, never negative, always reassuring
-        // "X% of all scans scored above 80% confidence"
+       
         $highConfidenceRate = $resultCount > 0
             ? round(($result->where('confidence', '>=', 80)->count() / $resultCount) * 100, 1)
             : 0;
@@ -389,9 +350,7 @@ class ScanResultController extends Controller
         $twoWeeksAgo = Carbon::now()->subDays(14);
         $oneMonthAgo = Carbon::now()->subDays(30);
 
-        // -------------------------------------------------------------------------
-        // AI Training Activity — heatmap + breed memory wall
-        // -------------------------------------------------------------------------
+       
         $learningHeatmap = $this->getLearningHeatmap();
         $heatmapSummary  = $this->getHeatmapSummary($learningHeatmap);
         $breedMemoryWall = $this->getBreedMemoryWall();
@@ -399,14 +358,10 @@ class ScanResultController extends Controller
         // Keep the old variable as an empty array so nothing else breaks
         $breedLearningProgress = [];
 
-        // -------------------------------------------------------------------------
-        // Day-by-day learning timeline — 10 days
-        // -------------------------------------------------------------------------
+       
         $learningTimeline = $this->getLearningTimeline(10);
 
-        // -------------------------------------------------------------------------
-        // ML API memory stats
-        // -------------------------------------------------------------------------
+     
         $memoryCount  = 0;
         $uniqueBreeds = [];
 
@@ -433,9 +388,7 @@ class ScanResultController extends Controller
             ]);
         }
 
-        // -------------------------------------------------------------------------
-        // Memory hit rate (how many recent scans had a prior correction)
-        // -------------------------------------------------------------------------
+      
         $recentCorrectionsCount = BreedCorrection::where('created_at', '>=', $oneWeekAgo)->count();
         $currentWeekResults     = Results::where('created_at', '>=', $oneWeekAgo)->get();
 
@@ -449,9 +402,7 @@ class ScanResultController extends Controller
         $weeklyScans   = $currentWeekResults->count();
         $memoryHitRate = $weeklyScans > 0 ? ($memoryAssistedScans / $weeklyScans) * 100 : 0;
 
-        // -------------------------------------------------------------------------
-        // Learning Progress Score (composite 0-100)
-        // -------------------------------------------------------------------------
+      
         $firstCorrection = BreedCorrection::oldest()->first();
 
         if ($firstCorrection) {
@@ -692,7 +643,7 @@ class ScanResultController extends Controller
                 return $baseUrl . '/' . $path;
             };
 
-            // ── Parse current health (weight / height / visual_features / lifespan) ──
+           
             $healthRisks = [];
             if (!empty($result->health_risks)) {
                 $healthRisks = is_string($result->health_risks)
@@ -941,11 +892,7 @@ class ScanResultController extends Controller
     }
 
 
-    /**
-     * ==========================================
-     * HELPER: Calculate image hash
-     * ==========================================
-     */
+   
     private function calculateImageHash($imagePath)
     {
         try {
@@ -956,11 +903,7 @@ class ScanResultController extends Controller
         }
     }
 
-    /**
-     * ==========================================
-     * HELPER: Check for exact image match
-     * ==========================================
-     */
+   
     private function checkExactImageMatch($imageHash)
     {
         if (!$imageHash) {
@@ -972,9 +915,7 @@ class ScanResultController extends Controller
             ->first();
 
         if ($previousResult) {
-            // Only serve cache if the previous result was high quality.
-            // Low-confidence or model-only results get re-run so Gemini
-            // gets another chance to identify correctly.
+           
             $prevMethod     = $previousResult->prediction_method ?? 'unknown';
             $prevConfidence = (float) ($previousResult->confidence ?? 0);
             $lowQualityMethods = ['yolo_only', 'model', 'unknown'];
@@ -1001,11 +942,7 @@ class ScanResultController extends Controller
         return [false, null];
     }
 
-    /**
-     * ==========================================
-     * HELPER: Check if image has admin correction
-     * ==========================================
-     */
+   
     private function checkAdminCorrection($imageHash)
     {
         if (!$imageHash) {
@@ -1029,52 +966,7 @@ class ScanResultController extends Controller
         return [false, null];
     }
 
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - DETAILED ANALYTICAL PROMPT
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - OPTIMIZED PROMPT
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - OPTIMIZED PROMPT
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - OPTIMIZED PROMPT
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * BREED IDENTIFICATION - FIXED FOR ACCURACY
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: BREED IDENTIFICATION - Handle both local and object storage paths
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: API-ONLY BREED IDENTIFICATION - Faster, More Accurate, General Purpose
-     * No ML fallback - OpenAI API handles all breeds
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * HELPER: Clean breed name - remove mix/cross notation
-     * ==========================================
-     */
+   
     private function cleanBreedName(string $breedName): string
     {
         $trimmed = trim($breedName, " \t\n\r\0\x0B\"'`");
@@ -1089,16 +981,16 @@ class ScanResultController extends Controller
         // Strip trailing "Mix" / "Cross" / "mix" / "cross" word
         $trimmed = preg_replace('/\s+(mix|cross)$/i', '', $trimmed);
 
-        // Remove everything after a slash — "Affenpinscher / Chihuahua" → "Affenpinscher"
+        
         if (str_contains($trimmed, '/')) {
             $parts   = explode('/', $trimmed);
             $trimmed = trim($parts[0]);
         }
 
-        // Remove " x <breed>" suffix — "Corgi x Poodle" → "Corgi"
+      
         $trimmed = preg_replace('/\s+x\s+.+$/i', '', $trimmed);
 
-        // Remove " mixed with <breed>" suffix
+       
         $trimmed = preg_replace('/\s+mixed with .+$/i', '', $trimmed);
 
         $trimmed = trim($trimmed);
@@ -1106,20 +998,8 @@ class ScanResultController extends Controller
         return empty($trimmed) ? $breedName : $trimmed;
     }
 
-    /**
-     * ==========================================
-     * FIXED: API-ONLY BREED IDENTIFICATION - Realistic Confidence Scoring
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * GEMINI BREED IDENTIFICATION
-     * Two-call approach:
-     * Call 1 — deep thinking for primary breed
-     * Call 2 — alternatives with realistic confidence
-     * ==========================================
-     */
-    private function identifyBreedWithAPI($imagePath, $isObjectStorage = false, $mlBreed = null, $mlConfidence = null): array
+    
+    private function identify($imagePath, $isObjectStorage = false, $mlBreed = null, $mlConfidence = null): array
     {
         Log::info('=== STARTING GEMINI BREED IDENTIFICATION (v2 SINGLE-CALL) ===');
         Log::info('Image path: ' . $imagePath);
@@ -1133,9 +1013,7 @@ class ScanResultController extends Controller
         Log::info('✓ Gemini API key is configured');
 
         try {
-            // ----------------------------------------------------------------
-            // LOAD IMAGE — identical to original
-            // ----------------------------------------------------------------
+           
             if ($isObjectStorage) {
                 if (!Storage::disk('object-storage')->exists($imagePath)) {
                     Log::error('✗ Image not found in object storage: ' . $imagePath);
@@ -1176,11 +1054,7 @@ class ScanResultController extends Controller
 
             $overallStart = microtime(true);
 
-            // ----------------------------------------------------------------
-            // ML CONTEXT INJECTION
-            // Give Gemini the YOLO result as a weak directional hint only.
-            // Gemini's own visual analysis ALWAYS takes priority.
-            // ----------------------------------------------------------------
+          
             $mlContextPrefix = '';
             if (!empty($mlBreed) && !empty($mlConfidence)) {
                 $mlConfPct = round($mlConfidence, 1);
@@ -1218,9 +1092,7 @@ MLCONTEXT;
                 }
             }
 
-            // ----------------------------------------------------------------
-            // PROMPT
-            // ----------------------------------------------------------------
+           
             $combinedPrompt = $mlContextPrefix . <<<'PROMPT'
 You are a world-class canine geneticist, FCI international dog show judge, veterinary breed specialist, and breed historian with forensic-level expertise covering EVERY dog breed recognized by AKC, FCI, UKC, KC, CKC, PHBA, and all international kennel clubs — including purebreds, rare breeds, ancient landraces, regional breeds, Southeast Asian native dogs (Aspin, Bangkaew, Phu Quoc Ridgeback, Taiwan Dog, Kintamani, etc.), and ALL recognized designer/hybrid breeds.
 
@@ -1470,9 +1342,7 @@ PROMPT;
 
             Log::info('📥 Raw Gemini response: ' . substr($body, 0, 1000));
 
-            // ----------------------------------------------------------------
-            // EXTRACT JSON TEXT FROM RESPONSE PARTS — identical to original
-            // ----------------------------------------------------------------
+           
             $jsonText = '';
 
             if (!empty($result['candidates'][0]['content']['parts'])) {
@@ -1511,9 +1381,7 @@ PROMPT;
 
             $parsed = json_decode($jsonText, true);
 
-            // ── TRUNCATED JSON RECOVERY ───────────────────────────────────────
-            // If Gemini's output was cut mid-JSON, extract primary_breed via
-            // regex before giving up and falling back to YOLO's wrong answer.
+           
             if (json_last_error() !== JSON_ERROR_NONE || empty($parsed['primary_breed'])) {
                 Log::warning('JSON parse failed — attempting truncation recovery. Raw: ' . $jsonText);
                 $recovered = [];
@@ -1550,9 +1418,7 @@ PROMPT;
                 }
             }
 
-            // ----------------------------------------------------------------
-            // BUILD PRIMARY BREED NAME — identical to original
-            // ----------------------------------------------------------------
+            
             $classType            = trim($parsed['classification_type'] ?? 'purebred');
             $recognizedHybridName = isset($parsed['recognized_hybrid_name'])
                 ? trim((string) $parsed['recognized_hybrid_name'], " \t\n\r\0\x0B\"'`")
@@ -1673,11 +1539,6 @@ PROMPT;
 
 
 
-    // ============================================================
-    // 3. extractBreedFromGeminiResponse()
-    // Kept intact — still used by any other code paths that may
-    // call it (e.g. fallback routes). No changes.
-    // ============================================================
     private function extractBreedFromGeminiResponse(array $result): string
     {
         if (isset($result['error'])) {
@@ -1745,9 +1606,7 @@ PROMPT;
         return empty($rawText) ? 'Unknown' : $rawText;
     }
 
-    /**
-     * ML Model Prediction (Fallback)
-     */
+   
     private function identifyBreedWithModel($imagePath): array
     {
         try {
@@ -1778,9 +1637,7 @@ PROMPT;
                 ]);
             }
 
-            // ── TITLE-CASE FIX ───────────────────────────────────────────────────
-            // YOLO model returns lowercase breed names (e.g. "shih tzu", "golden retriever")
-            // ucwords() capitalizes first letter of every word → "Shih Tzu", "Golden Retriever"
+            
             $breedName = ucwords(strtolower(trim($result['breed'])));
 
             // Fix top_predictions breed names too
@@ -1810,16 +1667,7 @@ PROMPT;
         }
     }
 
-    /**
-     * ==========================================
-     * OPTIMIZED: Generate AI descriptions with detailed prompts
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * FIXED: Generate AI descriptions with better error handling
-     * ==========================================
-     */
+  
     private function generateAIDescriptionsConcurrent($detectedBreed, $dogFeatures)
     {
         $aiData = [
@@ -2038,18 +1886,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             return $aiData;
         }
     }
-    /**
-     * ==========================================
-     * OPTIMIZED: Faster feature extraction with detailed prompt
-     * ==========================================
-     */
-
-
-    /**
-     * ==========================================
-     * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING
-     * ==========================================
-     */
+    
     private function validateDogImage($imagePath): array
     {
         try {
@@ -2122,17 +1959,7 @@ Be verbose and detailed. Output ONLY the JSON.";
         }
     }
 
-    /**
-     * ==========================================
-     * MAIN ANALYZE METHOD - OPTIMIZED WITH SIMULATION CACHING AND DOG VALIDATION
-     * ==========================================
-     */
-    /**
-     * ==========================================
-     * MAIN ANALYZE METHOD - FIXED: API-ONLY (NO ML FALLBACK)
-     * Preserves: Admin correction, exact match caching, learning mechanism, simulations
-     * ==========================================
-     */
+    
     public function analyze(Request $request)
     {
         Log::info('=================================');
@@ -2342,7 +2169,7 @@ Be verbose and detailed. Output ONLY the JSON.";
             $simulationData   = [];
 
             if ($hasCorrection) {
-                // ── EXACT IMAGE WITH ADMIN CORRECTION = 100% ──────────────────────
+                
                 $detectedBreed  = $correction->corrected_breed;
                 $confidence     = 100.0;
                 $topPredictions = [
@@ -2385,7 +2212,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } elseif ($hasExactMatch && $previousResult) {
-                // ── EXACT IMAGE MATCH - REUSE ALL DATA ────────────────────────────
+               
                 $detectedBreed    = $previousResult->breed;
                 $confidence       = $previousResult->confidence;
                 $topPredictions   = $previousResult->top_predictions;
@@ -2423,20 +2250,14 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]
                 ]);
             } else {
-                // ══════════════════════════════════════════════════════════════════
-                // NEW IMAGE — GEMINI IS ALWAYS THE PRIMARY CLASSIFIER
-                // YOLO runs in parallel as a 100%-confidence-only emergency fallback.
-                // Gemini classifies completely independently (no YOLO hint injected).
-                // ══════════════════════════════════════════════════════════════════
+                
                 Log::info('→ New image — Gemini classifying independently (no ML hint)...');
 
                 if (!file_exists($fullPath)) {
                     throw new \Exception('Image file was lost before breed identification');
                 }
 
-                // ── STEP A: ML API (YOLO) — runs only for the 100% fallback ──────
-                // We run YOLO alongside Gemini, but its result is NEVER passed to
-                // Gemini and is only used if Gemini itself fails completely.
+              
                 $mlResult      = $this->identifyBreedWithModel($fullPath);
                 $mlBreed       = null;
                 $mlConfidence  = 0;
@@ -2459,12 +2280,10 @@ Be verbose and detailed. Output ONLY the JSON.";
                     ]);
                 }
 
-                // ── STEP B: GEMINI — classifies completely on its own ─────────────
-                // NO mlBreed and NO mlConfidence passed → Gemini has zero YOLO bias.
-                // Gemini's answer is ALWAYS the final answer.
+              
                 Log::info('→ Running Gemini (fully independent — no YOLO hint)...');
 
-                $geminiResult = $this->identifyBreedWithAPI(
+                $geminiResult = $this->identify(
                     $fullPath,
                     false,
                     null,   // ← no ML breed hint
@@ -2472,7 +2291,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 );
 
                 if ($geminiResult['success']) {
-                    // ✅ GEMINI IS ALWAYS THE FINAL ANSWER
+                   
                     $detectedBreed    = $geminiResult['breed'];
                     $confidence       = $geminiResult['confidence'];
                     $predictionMethod = 'gemini_primary';
@@ -2485,8 +2304,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                         'ml_confidence'     => $mlConfidence,
                     ]);
                 } elseif ($mlResult['success'] && $mlConfidence >= 100) {
-                    // ── EMERGENCY FALLBACK: Gemini failed + YOLO is 100% certain ──
-                    // Only in this case do we accept YOLO's answer.
+                   
                     $detectedBreed    = $mlBreed;
                     $confidence       = $mlConfidence;
                     $predictionMethod = 'ml_100_gemini_failed';
@@ -2498,7 +2316,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                         'gemini_error' => $geminiResult['error'] ?? 'unknown',
                     ]);
                 } else {
-                    // ── TOTAL FAILURE — both Gemini and YOLO couldn't help ─────────
+                  
                     Log::error('✗ Both Gemini and ML failed', [
                         'gemini_error' => $geminiResult['error'] ?? 'unknown',
                         'ml_success'   => $mlResult['success'],
@@ -2530,14 +2348,14 @@ Be verbose and detailed. Output ONLY the JSON.";
                     'range'      => $confidence >= 85 ? 'High' : ($confidence >= 60 ? 'Moderate' : 'Low'),
                 ]);
 
-                // Generate AI descriptions — check DB cache first
+              
                 $cachedResult = Results::where('breed', $detectedBreed)
                     ->whereNotNull('description')
                     ->where('description', '!=', '')
                     ->orderBy('created_at', 'desc')
                     ->first();
 
-                // Decode cached health_risks once for inspection
+                
                 $cachedHealthRisks = null;
                 if ($cachedResult && !empty($cachedResult->description)) {
                     $cachedHealthRisks = is_string($cachedResult->health_risks)
@@ -2545,12 +2363,10 @@ Be verbose and detailed. Output ONLY the JSON.";
                         : ($cachedResult->health_risks ?? []);
                 }
 
-                // Check if cached data has the new fields (visual_features, weight, height)
                 $hasNewFields = !empty($cachedHealthRisks['visual_features'])
                     && !empty($cachedHealthRisks['weight'])
                     && !empty($cachedHealthRisks['height']);
 
-                // Check if disease names are plain language (not old medical jargon)
                 $hasPlainDiseaseNames = false;
                 if (!empty($cachedHealthRisks['concerns'])) {
                     $medicalKeywords = [
@@ -2616,9 +2432,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 ]);
             }
 
-            // ==========================================
-            // SAVE TO DATABASE
-            // ==========================================
+            
             $uniqueId = strtoupper(Str::random(6));
 
             $dbResult = Results::create([
@@ -2845,7 +2659,6 @@ Be verbose and detailed. Output ONLY the JSON.";
             // Find the scan result
             $result = Results::where('scan_id', $validated['scan_id'])->firstOrFail();
 
-            // ✅ FIX #3: Store ORIGINAL breed BEFORE updating
             $originalBreed = $result->breed;
             $originalConfidence = $result->confidence;
 
@@ -2859,17 +2672,13 @@ Be verbose and detailed. Output ONLY the JSON.";
             // Normalize breed name (lowercase, trimmed)
             $normalizedCorrectBreed = strtolower(trim($validated['correct_breed']));
 
-            // ============================================================================
-            // STEP 1: CREATE CORRECTION RECORD (BEFORE UPDATING RESULT)
-            // ============================================================================
-
-            // ✅ FIX #2: Store just the relative path, not the full URL
+           
             $imagePath = $result->image; // This should be like "scans/users/1/abc123.jpg"
 
             $correction = BreedCorrection::create([
                 'scan_id' => $result->scan_id,
                 'image_path' => $imagePath, // Relative path for flexibility
-                'original_breed' => $originalBreed, // ✅ Now correctly stores AI's prediction
+                'original_breed' => $originalBreed, 
                 'corrected_breed' => $validated['correct_breed'], // Human's correction
                 'confidence' => $originalConfidence,
                 'status' => 'Added to Memory',
@@ -2881,9 +2690,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 'corrected_breed' => $validated['correct_breed']
             ]);
 
-            // ============================================================================
-            // STEP 2: UPDATE SCAN RESULT
-            // ============================================================================
+           
 
             $result->update([
                 'pending' => 'verified',
@@ -2896,9 +2703,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 'new_breed' => $validated['correct_breed']
             ]);
 
-            // ============================================================================
-            // STEP 3: NOTIFY USER
-            // ============================================================================
+           
 
             if ($result->user_id) {
                 \App\Models\Notification::create([
@@ -2921,9 +2726,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 ]);
             }
 
-            // ============================================================================
-            // STEP 4: TEACH ML API (THE CRITICAL LEARNING STEP)
-            // ============================================================================
+           
 
             try {
                 $mlService = new \App\Services\MLApiService();
@@ -2957,7 +2760,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 // Send to ML API for learning
                 $learnResult = $mlService->learnBreed(
                     $tempPathWithExt,
-                    $normalizedCorrectBreed // ✅ Send normalized breed name
+                    $normalizedCorrectBreed 
                 );
 
                 // Clean up temp file
@@ -2970,7 +2773,7 @@ Be verbose and detailed. Output ONLY the JSON.";
                 if ($learnResult['success']) {
                     $status = $learnResult['status']; // 'added', 'updated', or 'skipped'
 
-                    // Update correction status based on ML API response
+                   
                     $correction->update([
                         'status' => ucfirst($status) . ' to ML Memory'
                     ]);
@@ -3076,7 +2879,6 @@ Be verbose and detailed. Output ONLY the JSON.";
             $userId  = $request->user()->id;
             $baseUrl = config('filesystems.disks.object-storage.url');
 
-            // ── Aggregate stats across ALL records for this user ──
             $stats = Results::where('user_id', $userId)
                 ->selectRaw("
                 COUNT(*)                                          AS total,

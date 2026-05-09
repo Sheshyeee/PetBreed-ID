@@ -66,7 +66,6 @@ class SimulationController extends Controller
             'url_null'           => $originalImageUrl === null ? 'YES!' : 'NO',
         ]);
 
-        // ── Parse current health risks for weight/height/visual_features ──
         $healthRisks = [];
         if (!empty($result->health_risks)) {
             $healthRisks = is_string($result->health_risks)

@@ -22,7 +22,6 @@ class GenerateAgeSimulations implements ShouldQueue
   public $tries      = 3;
   public $backoff    = [20, 60, 120];
 
-  // ── FIX 1: flash-image first (fast ~15s), pro as fallback only ──────
   private const MODEL_PRIORITY = [
     'gemini-3.1-flash-image-preview',        // Fast — primary (~15-20s)
     'gemini-3-pro-image-preview',            // Slow but high quality — fallback only (~80s)
@@ -44,9 +43,6 @@ class GenerateAgeSimulations implements ShouldQueue
     $this->imagePath = $imagePath;
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  ENTRY POINT
-  // ─────────────────────────────────────────────────────────────────────
 
   public function handle()
   {
@@ -131,9 +127,6 @@ class GenerateAgeSimulations implements ShouldQueue
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  MODEL SELECTION
-  // ─────────────────────────────────────────────────────────────────────
 
   private function selectBestModel(): string
   {
@@ -142,9 +135,7 @@ class GenerateAgeSimulations implements ShouldQueue
     return self::MODEL_PRIORITY[0];
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  AGE STAGE DETECTION
-  // ─────────────────────────────────────────────────────────────────────
+ 
 
   private function detectAgeStage(array $imageData): string
   {
@@ -212,9 +203,7 @@ class GenerateAgeSimulations implements ShouldQueue
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  COAT MARKINGS DETECTION
-  // ─────────────────────────────────────────────────────────────────────
+  
 
   private function detectCoatMarkings(array $imageData): string
   {
@@ -258,9 +247,7 @@ class GenerateAgeSimulations implements ShouldQueue
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  PARALLEL GENERATION WITH MODEL FALLBACK
-  // ─────────────────────────────────────────────────────────────────────
+  
 
   private function generateTransformations(array $imageData, array $breedProfile, string $primaryModel): array
   {
@@ -317,9 +304,7 @@ class GenerateAgeSimulations implements ShouldQueue
     return $results;
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  GEMINI API CALL
-  // ─────────────────────────────────────────────────────────────────────
+  
 
   private function createGenerationPromise(Client $client, string $prompt, array $imageData, string $modelName)
   {
@@ -359,9 +344,7 @@ class GenerateAgeSimulations implements ShouldQueue
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  EXTRACT IMAGE FROM RESPONSE
-  // ─────────────────────────────────────────────────────────────────────
+ 
 
   private function extractImage($response, string $modelName = ''): ?string
   {
@@ -413,9 +396,7 @@ class GenerateAgeSimulations implements ShouldQueue
     throw new \Exception("No usable image data from {$modelName}");
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  AGING PROMPT BUILDER
-  // ─────────────────────────────────────────────────────────────────────
+ 
 
   private function buildAgingPrompt(array $profile, int $targetYears): string
   {
@@ -1102,9 +1083,7 @@ class GenerateAgeSimulations implements ShouldQueue
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  COMPREHENSIVE BREED PROFILES — all intact, unchanged
-  // ─────────────────────────────────────────────────────────────────────
+ 
 
   private function getBreedProfile(string $breed): array
   {
@@ -1398,9 +1377,7 @@ class GenerateAgeSimulations implements ShouldQueue
     return $profile;
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  HELPER
-  // ─────────────────────────────────────────────────────────────────────
+ 
 
   private function mb(string $b, array $patterns): bool
   {
@@ -1410,10 +1387,7 @@ class GenerateAgeSimulations implements ShouldQueue
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  AGE PROFILES — FIX 2: sanitize control characters before json_decode
-  // ─────────────────────────────────────────────────────────────────────
-
+ 
   private function generateAgeProfiles(array $breedProfile): array
   {
     $breed    = $breedProfile['breed'];
@@ -1486,33 +1460,26 @@ IMPORTANT RULES for health_notes:
     return $parsed;
   }
 
-  /**
-   * Aggressively clean and decode JSON that Gemini may have polluted
-   * with control characters, markdown fences, or unescaped newlines.
-   */
+ 
   private function repairAndDecodeJson(string $text): ?array
   {
-    // Step 1: strip markdown fences (```json ... ``` or ``` ... ```)
     $text = preg_replace('/^```json\s*/i', '', trim($text));
     $text = preg_replace('/^```\s*/i',     '', $text);
     $text = preg_replace('/\s*```$/i',     '', $text);
     $text = trim($text);
 
-    // Step 2: quick attempt on clean text
     $parsed = json_decode($text, true);
     if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
       return $parsed;
     }
 
-    // Step 3: remove ALL ASCII control characters except \t (0x09) \n (0x0A) \r (0x0D)
     $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text);
     $parsed = json_decode($text, true);
     if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
       return $parsed;
     }
 
-    // Step 4: collapse all literal newlines/tabs to spaces
-    // (handles unescaped newlines inside JSON string values)
+   
     $text = preg_replace('/\r\n|\r|\n|\t/', ' ', $text);
     // Collapse multiple spaces
     $text = preg_replace('/ {2,}/', ' ', $text);
@@ -1521,7 +1488,6 @@ IMPORTANT RULES for health_notes:
       return $parsed;
     }
 
-    // Step 5: strip ALL non-printable / non-UTF8 bytes as last resort
     $text = preg_replace('/[^\x20-\x7E\x{0080}-\x{FFFF}]/u', '', $text);
     $parsed = json_decode($text, true);
     if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {

@@ -80,7 +80,6 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
 
     const { concerns = [], screenings = [], lifespan = 'Unknown', care_tips = [], visual_features = [] } = healthData;
 
-    // ── normalise weight / height ─────────────────────────────────────────────
     const fmtWH = (v: WeightHeight | string | undefined): string | null => {
         if (!v) return null;
         if (typeof v === 'string') return v;
@@ -92,7 +91,6 @@ const ViewHealthRisk: FC<Props> = ({ results }) => {
     const weightStr = fmtWH(healthData.weight);
     const heightStr = fmtWH(healthData.height);
 
-    // ── normalise visual_features (may be string[] or {label,value}[]) ────────
     const visualList: VisualFeature[] = useMemo(() => {
         if (!visual_features || visual_features.length === 0) return [];
         if (typeof visual_features[0] === 'string') {

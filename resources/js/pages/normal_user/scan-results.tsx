@@ -42,7 +42,6 @@ type PageProps = {
     results?: Result;
 };
 
-/* ── Reusable Panel (matches scan page) ── */
 const Panel = ({
     icon,
     title,

@@ -78,7 +78,6 @@ type PageProps = {
     stats: Stats;
 };
 
-// ── status badge ──────────────────────────────────────────────────────────────
 const statusBadge = (status: Appointment['status']) => {
     if (status === 'accepted')
         return (

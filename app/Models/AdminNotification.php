@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AdminNotification extends Model
 {
     protected $fillable = [
-        'type',            // 'appointment_accepted' | 'appointment_rejected'
+        'type',           
         'message',
         'breed',
         'scan_id',

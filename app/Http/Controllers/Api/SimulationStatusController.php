@@ -48,10 +48,10 @@ class SimulationStatusController extends Controller
         $simulationData = json_decode($result->simulation_data, true) ?? ['1_years' => null, '3_years' => null, 'status' => 'pending'];
         $baseUrl = config('filesystems.disks.object-storage.url');
 
-        // ✅ FIX: Build complete URL for original image
+       
         $originalImageUrl = null;
         if ($result->image) {
-            // Check if image already has full URL
+          
             if (str_starts_with($result->image, 'http://') || str_starts_with($result->image, 'https://')) {
                 $originalImageUrl = $result->image;
             } else {
@@ -78,7 +78,7 @@ class SimulationStatusController extends Controller
                 '1_years' => $this->buildUrl($simulationData['1_years'] ?? null, $baseUrl),
                 '3_years' => $this->buildUrl($simulationData['3_years'] ?? null, $baseUrl),
             ],
-            'original_image' => $originalImageUrl,  // ✅ Now returns full URL
+            'original_image' => $originalImageUrl,  
             'breed' => $result->breed,
             'scan_id' => $scanId,
             'timestamp' => now()->timestamp,

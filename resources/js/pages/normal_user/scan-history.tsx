@@ -443,9 +443,7 @@ export default function ScanHistory({ mockScans, user }: Props) {
                         </div>
                     )}
 
-                    {/* ✅ FIX: Replaced CSS `columns` (fills top-to-bottom) with CSS Grid
-                        (fills left-to-right row by row). Cards now render in reading order:
-                        item 1 → item 2 → item 3 on row 1, then item 4 → item 5 → item 6, etc. */}
+                   
                     {filtered.length > 0 && (
                         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
                             {filtered.map((scan, idx) => (

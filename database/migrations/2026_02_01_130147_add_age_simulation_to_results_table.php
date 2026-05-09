@@ -8,7 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Check if column doesn't exist before adding
         if (!Schema::hasColumn('results', 'age_simulation')) {
             Schema::table('results', function (Blueprint $table) {
                 $table->text('age_simulation')->nullable();

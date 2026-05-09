@@ -29,7 +29,6 @@ Route::get('/header', [PageController::class, "header"]);
 Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.redirect');
 Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
 
-// GET route to handle accidental navigation (redirects back to scan)
 Route::get('/analyze', function () {
     return redirect()->route('scan')->with('error', [
         'message' => 'Please upload an image to analyze.'
@@ -47,7 +46,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/appointments/request', [AppointmentController::class, 'userRequest'])
     ->name('appointments.request');
-    // Admin / Vet — create appointment (in your existing admin route group)
     Route::post('/model/appointments', [AppointmentController::class, 'store'])
         ->name('appointments.store');
     Route::get('/model/appointmentspage', [AppointmentController::class, 'adminIndex']);
@@ -63,7 +61,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])
     ->name('appointments.destroy');
 
-    // Admin appointment-response notifications (polled by the bell icon)
     Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])
         ->name('admin.notifications.index');
 

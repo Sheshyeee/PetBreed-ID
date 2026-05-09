@@ -14,10 +14,7 @@ use Inertia\Inertia;
 
 class AppointmentController extends Controller
 {
-    /**
-     * Admin/Vet creates an appointment (clinic-initiated).
-     * Fires a Notification to the dog owner.
-     */
+   
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -73,11 +70,7 @@ class AppointmentController extends Controller
             ->with('success', 'Appointment scheduled. The owner has been notified.');
     }
 
-    /**
-     * Normal user requests an appointment (user-initiated).
-     * No scan required — free-form request sent to admin for approval.
-     * Admin responds via updateStatus().
-     */
+   
     public function userRequest(Request $request)
     {
         $validated = $request->validate([
@@ -90,7 +83,6 @@ class AppointmentController extends Controller
         $user = Auth::user();
 
         $appointment = Appointment::create([
-            // No scan_id / result_id — user-initiated has no linked scan
             'scan_id'          => 'USER-REQ-' . strtoupper(substr(uniqid(), -6)),
             'result_id'        => null,
             'user_id'          => $user->id,
@@ -126,18 +118,12 @@ class AppointmentController extends Controller
         return redirect()->back()->with('success', 'Appointment request sent. The clinic will get back to you soon.');
     }
 
-    /**
-     * Status update — works for both directions:
-     *  - Normal user accepts/rejects a clinic-created appointment
-     *  - Admin accepts/rejects a user-created appointment request
-     */
+   
     public function updateStatus(Request $request, Appointment $appointment)
     {
         $user = Auth::user();
 
-        // Determine who is allowed to respond
-        // If clinic created it → owner responds
-        // If user created it → admin responds (any admin user)
+        
         $allowedEmails = ['modeltraining2000@gmail.com', 'jrbd2022-8800-57025@bicol-u.edu.ph', 'dmbc2022-2141-53989@bicol-u.edu.ph', 'asvermudo@gmail.com'];
         $isAdmin = in_array($user->email, $allowedEmails);
 
@@ -162,16 +148,13 @@ class AppointmentController extends Controller
                 : null,
         ];
 
-        // Admin assigning vet when accepting a user request
         if ($appointment->initiated_by === 'user' && $validated['status'] === 'accepted' && !empty($validated['vet_name'])) {
             $updateData['vet_name'] = $validated['vet_name'];
         }
 
         $appointment->update($updateData);
 
-        // ── Fire appropriate notification ─────────────────────────────────────
         if ($appointment->initiated_by === 'clinic') {
-            // Owner responded → notify admin
             $breed = optional($appointment->result)->breed ?? 'Unknown Breed';
             AdminNotification::create([
                 'type'             => $validated['status'] === 'accepted' ? 'appointment_accepted' : 'appointment_rejected',
@@ -188,7 +171,6 @@ class AppointmentController extends Controller
                 'is_read'          => false,
             ]);
         } else {
-            // Admin responded to user request → notify user
             Notification::create([
                 'user_id' => $appointment->user_id,
                 'type'    => $validated['status'] === 'accepted' ? 'appointment_accepted' : 'appointment_rejected',
@@ -214,9 +196,7 @@ class AppointmentController extends Controller
         return redirect()->back()->with('success', $successMsg);
     }
 
-    /**
-     * Normal user — list their appointments (both clinic-created and user-requested).
-     */
+  
     public function userIndex()
     {
         $baseUrl = config('filesystems.disks.object-storage.url');
@@ -237,9 +217,7 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * Admin — list all appointments split by who initiated them.
-     */
+   
     public function adminIndex()
     {
         $baseUrl = config('filesystems.disks.object-storage.url');
@@ -257,7 +235,6 @@ class AppointmentController extends Controller
             return $appt;
         });
 
-        // User-initiated: paginate separately
         $userAppts = Appointment::where('initiated_by', 'user')
             ->with('owner:id,name,email')
             ->latest()
@@ -279,9 +256,7 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * Delete an appointment (only allowed after a decision has been made).
-     */
+   
     public function destroy(Appointment $appointment)
     {
         

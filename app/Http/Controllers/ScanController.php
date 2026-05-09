@@ -11,7 +11,6 @@ class ScanController extends Controller
 {
     public function index()
     {
-        // ── Top 5 most-scanned breeds ────────────────────────────────────────
         $topBreeds = Results::selectRaw('breed, COUNT(*) as scan_count, ROUND(CAST(AVG(confidence) AS numeric), 1) as avg_confidence')
             ->whereNotNull('breed')
             ->where('breed', '!=', '')
@@ -32,7 +31,6 @@ class ScanController extends Controller
         }
         unset($b);
 
-        // ── Global statistics ────────────────────────────────────────────────
         $allResults    = Results::all();
         $totalScans    = $allResults->count();
         $verifiedCount = Results::where('pending', 'verified')->count();
@@ -45,7 +43,6 @@ class ScanController extends Controller
             'uptime'      => '99.9%',
         ];
 
-        // ── Pending appointments for the logged-in user ──────────────────────
         $userId = Auth::id();
 
         $pendingAppointments = Appointment::where('user_id', $userId)

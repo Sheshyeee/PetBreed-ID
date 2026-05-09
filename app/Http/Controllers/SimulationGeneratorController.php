@@ -9,10 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class SimulationGeneratorController extends Controller
 {
-    /**
-     * Generate simulations asynchronously via API call
-     * This is called AFTER the initial scan completes
-     */
+    
     public function generate(Request $request)
     {
         try {

@@ -27,7 +27,6 @@ class Notification extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Make sure these are visible in JSON responses
     protected $visible = [
         'id',
         'user_id',

@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('results', function (Blueprint $table) {
-            // This adds the new column to your existing table
             $table->json('simulation_data')->nullable();
         });
     }
@@ -23,7 +22,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('results', function (Blueprint $table) {
-            // This removes the column if you ever roll back
             $table->dropColumn('simulation_data');
         });
     }

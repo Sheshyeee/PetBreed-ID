@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 class MobileAppointmentController extends Controller
 {
-  /** List all appointments for the authenticated user */
+ 
   public function index()
   {
     $baseUrl = config('filesystems.disks.object-storage.url');
@@ -29,14 +29,12 @@ class MobileAppointmentController extends Controller
           $appt->result->image = $baseUrl . '/' . $appt->result->image;
         }
 
-        // Normalize appointment_date to string
+        
         $appt->appointment_date = $appt->appointment_date
           ? $appt->appointment_date->format('Y-m-d')
           : null;
 
-        // ── FIX: Normalize null initiated_by → default to 'clinic' ──
-        // Records created before the initiated_by migration have NULL.
-        // The mobile app filters by this field — null = invisible.
+       
         if (empty($appt->initiated_by)) {
           $appt->initiated_by = 'clinic';
         }
@@ -52,7 +50,6 @@ class MobileAppointmentController extends Controller
     return response()->json(['success' => true, 'appointments' => $appointments]);
   }
 
-  /** User requests an appointment (no scan required) */
   public function request(Request $request)
   {
     $validated = $request->validate([

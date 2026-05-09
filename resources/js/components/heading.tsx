@@ -1,4 +1,4 @@
-export default function Heading({
+trainiexport default function Heading({
     title,
     description,
 }: {
